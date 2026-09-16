@@ -82,4 +82,4 @@ psycopg 在读取 JSONB 时保持既有字符串序列化边界，避免在本�
 
 ## 8. 阶段限制
 
-P2 未实现 P3 身份/ACL、P4 凭证加密、P5 多 Worker lease/fencing/quota、P6 对象级协作 API、P7 公网部署与 P8 总体验收。真实付费 Provider 未调用；Provider 契约使用 monkeypatch、本机 fake server 和禁止非 loopback 出站的测试复验。
+P2 未实现 P3 身份/ACL、P4 凭证加密、P5 对象级协作 API、P6 多 Worker 调度/lease/fencing/quota、P7 公网部署与 P8 总体验收。真实付费 Provider 未调用；Provider 契约使用 monkeypatch、本机 fake server 和禁止非 loopback 出站的测试复验。

@@ -1,7 +1,6 @@
 """PostgreSQL-backed studio storage. Model workers never own browser state."""
 import json
 import os
-import threading
 import time
 import uuid
 from pathlib import Path
@@ -15,8 +14,9 @@ ASSETS = DATA / 'assets'
 STORAGE = LocalStorageBackend(ASSETS)
 EVENT_RETENTION = 2000
 JOB_EVENT_INTERVAL = 5.0
-_job_event_times = {}
-_job_event_lock = threading.Lock()
+# Serializing publication until transaction end makes an event id a safe SSE
+# cursor: a later id cannot commit before an earlier id.
+EVENT_PUBLISH_LOCK_KEY = 0x4F56435F45565431  # "OVC_EVT1"
 for folder in (DATA, ASSETS, DATA / 'logs'):
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -50,11 +50,14 @@ def set_setting(key, value):
         c.execute('INSERT INTO settings VALUES(%s,%s) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,dumps(value)))
 
 def _event(connection, project_id, payload):
+    connection.execute('SELECT pg_advisory_xact_lock(%s)', (EVENT_PUBLISH_LOCK_KEY,))
     inserted = connection.execute(
         'INSERT INTO events(project_id,payload,created) VALUES(%s,%s,%s) RETURNING id',
         (project_id,dumps(payload),time.time()),
     ).fetchone()['id']
-    connection.execute('DELETE FROM events WHERE id<=%s', (max(0, inserted - EVENT_RETENTION),))
+    connection.execute('''DELETE FROM events WHERE id < COALESCE((
+        SELECT MIN(id) FROM (SELECT id FROM events ORDER BY id DESC LIMIT %s) retained
+    ),0)''', (EVENT_RETENTION,))
 
 
 def event(project_id, payload, *, connection=None):
@@ -64,19 +67,16 @@ def event(project_id, payload, *, connection=None):
     with db() as current:
         _event(current, project_id, payload)
 
-def _notify_job(project_id, job_id, *, force=False):
-    now = time.monotonic()
-    with _job_event_lock:
-        previous = _job_event_times.get(job_id, 0)
-        if not force and now - previous < JOB_EVENT_INTERVAL:
+def _notify_job(connection, project_id, job_id, *, force=False):
+    if not force:
+        recent = connection.execute("""SELECT 1 FROM events
+            WHERE project_id=%s AND payload::jsonb->>'type'='job'
+            AND payload::jsonb->>'id'=%s AND created>%s LIMIT 1""",
+            (project_id, job_id, time.time() - JOB_EVENT_INTERVAL),
+        ).fetchone()
+        if recent:
             return False
-        _job_event_times[job_id] = now
-        if len(_job_event_times) > EVENT_RETENTION:
-            cutoff = now - JOB_EVENT_INTERVAL * 2
-            for key, value in list(_job_event_times.items()):
-                if value < cutoff:
-                    _job_event_times.pop(key, None)
-    event(project_id, {'type':'job','id':job_id})
+    _event(connection, project_id, {'type':'job','id':job_id})
     return True
 
 def unpack(row):
@@ -102,8 +102,8 @@ def job_update(job_id, **fields):
         if not current or current['status'] in ('cancelled','succeeded'):
             return False
         c.execute('UPDATE jobs SET '+','.join(f'{k}=%s' for k in fields)+' WHERE id=%s',(*fields.values(),job_id))
-    force = bool(fields.keys() & {'status','error','provider_job_id'})
-    _notify_job(current['project_id'], job_id, force=force)
+        force = bool(fields.keys() & {'status','error','provider_job_id'})
+        _notify_job(c, current['project_id'], job_id, force=force)
     return True
 
 def attach_provider_job_id(job_id, provider_job_id):
@@ -115,7 +115,7 @@ def attach_provider_job_id(job_id, provider_job_id):
         if existing and existing!=provider_job_id:raise ValueError('供应商任务编号冲突，请人工核对')
         if not existing:
             c.execute('UPDATE jobs SET provider_job_id=%s,updated=%s WHERE id=%s',(provider_job_id,time.time(),job_id))
-    event(current['project_id'],{'type':'job','id':job_id})
+        _event(c,current['project_id'],{'type':'job','id':job_id})
     return current['status']
 
 def cancelled_phase(job_id, phase):
@@ -123,5 +123,5 @@ def cancelled_phase(job_id, phase):
         current=c.execute("SELECT project_id FROM jobs WHERE id=%s AND status='cancelled'",(job_id,)).fetchone()
         if not current:return False
         c.execute('UPDATE jobs SET phase=%s,updated=%s WHERE id=%s',(phase,time.time(),job_id))
-    event(current['project_id'],{'type':'job','id':job_id})
+        _event(c,current['project_id'],{'type':'job','id':job_id})
     return True

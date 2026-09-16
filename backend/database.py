@@ -6,6 +6,7 @@ the standalone Alembic migration before starting Web or Worker processes.
 from __future__ import annotations
 
 import os
+import threading
 from contextlib import contextmanager
 from functools import lru_cache
 from urllib.parse import urlsplit, urlunsplit
@@ -181,9 +182,13 @@ class WorkerAdvisoryLock:
     # Fixed application namespace. PostgreSQL already scopes advisory locks by
     # database, so every process claiming this queue competes on the same key.
     KEY = 0x4F56435F574B5231  # "OVC_WKR1"
+    KEY_HIGH = KEY >> 32
+    KEY_LOW = KEY & 0xFFFFFFFF
 
     def __init__(self):
         self.connection: psycopg.Connection | None = None
+        self.backend_pid: int | None = None
+        self._mutex = threading.Lock()
 
     def acquire(self) -> None:
         if self.connection is not None:
@@ -202,12 +207,42 @@ class WorkerAdvisoryLock:
             connection.close()
             raise
         self.connection = connection
+        self.backend_pid = connection.execute('SELECT pg_backend_pid() AS pid').fetchone()['pid']
+
+    def assert_held(self) -> None:
+        """Fail if the dedicated PostgreSQL session no longer owns its lock.
+
+        This deliberately never reacquires the lock: losing the session is a
+        fatal ownership failure and the Worker process must be restarted.
+        """
+        with self._mutex:
+            connection = self.connection
+            if connection is None:
+                raise RuntimeError('Worker PostgreSQL advisory lock is not held.')
+            try:
+                row = connection.execute(
+                    """SELECT pg_backend_pid() AS pid, EXISTS(
+                        SELECT 1 FROM pg_locks
+                        WHERE locktype='advisory' AND pid=pg_backend_pid()
+                        AND classid=%s AND objid=%s AND objsubid=1 AND granted
+                    ) AS held""",
+                    (self.KEY_HIGH, self.KEY_LOW),
+                ).fetchone()
+            except BaseException as exc:
+                raise RuntimeError('Worker lost its PostgreSQL advisory-lock session.') from exc
+            if not row['held'] or row['pid'] != self.backend_pid:
+                raise RuntimeError('Worker no longer owns its PostgreSQL advisory lock.')
 
     def release(self) -> None:
-        connection, self.connection = self.connection, None
-        if connection is None:
-            return
-        try:
-            connection.execute('SELECT pg_advisory_unlock(%s)', (self.KEY,))
-        finally:
-            connection.close()
+        with self._mutex:
+            connection, self.connection = self.connection, None
+            self.backend_pid = None
+            if connection is None:
+                return
+            try:
+                connection.execute('SELECT pg_advisory_unlock(%s)', (self.KEY,))
+            except BaseException:
+                # A terminated backend has already released the session lock.
+                pass
+            finally:
+                connection.close()

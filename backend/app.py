@@ -256,7 +256,7 @@ def create_episode(production_id:str,body:EpisodeCreate):
     document=new_document(default_ark_policy(s.get_setting('providers',[])))
     now=time.time();pid=s.uid('project-')
     with s.db() as c:
-        parent=c.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
+        parent=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not parent:raise HTTPException(404,'Production 不存在')
         episode_no=c.execute(
             'SELECT COALESCE(MAX(episode_no),0)+1 value FROM projects WHERE production_id=%s',
@@ -595,9 +595,8 @@ def delete_asset(pid:str,aid:str):
     row=reference_asset(pid,aid)
     with s.db() as c:
         c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('asset',%s,%s,%s)",(aid,row['project_id'],time.time()))
-    with s.db() as c:
         episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=%s',(row['production_id'],))]
-    for episode_id in episode_ids:s.event(episode_id,{'type':'asset_deleted','id':aid})
+        for episode_id in episode_ids:s.event(episode_id,{'type':'asset_deleted','id':aid},connection=c)
     return {'deleted':aid,'soft':True}
 
 @app.get('/api/trash')
@@ -643,7 +642,7 @@ def restore_deleted_item(kind:str,item_id:str):
             if hidden_source:raise HTTPException(409,'请先恢复章节所属原著。')
             episode_ids=production_event_targets(c,row['project_id'])
         else:episode_ids=[row['project_id']] if row['project_id'] else []
-    for episode_id in episode_ids:s.event(episode_id,{'type':'restored','kind':kind,'id':item_id})
+        for episode_id in episode_ids:s.event(episode_id,{'type':'restored','kind':kind,'id':item_id},connection=c)
     return {'restored':item_id,'kind':kind}
 
 @app.get('/api/assets/{aid}/file')
@@ -848,8 +847,10 @@ def prompt_library():
 def save_prompt_template(tid:str,body:PromptTemplateSave):
     if len(tid)>100 or body.kind not in ('text','storyboard','image','video'):raise ValueError('模板类型或编号无效')
     with s.db() as c:
+        c.execute("""INSERT INTO settings(key,value) VALUES('prompt_library',%s)
+            ON CONFLICT(key) DO NOTHING""",(s.dumps({'revision':0,'templates':[]}),))
         row=c.execute("SELECT value FROM settings WHERE key='prompt_library' FOR UPDATE").fetchone()
-        library=json.loads(row['value']) if row else {'revision':0,'templates':[]}
+        library=json.loads(row['value'])
         if library['revision']!=body.revision:raise HTTPException(409,'模板库已在另一页面更新，请刷新后保存；当前草稿仍保留')
         old=next((t for t in library['templates'] if t['id']==tid),None)
         history=old.get('history',[]) if old else []
@@ -858,7 +859,7 @@ def save_prompt_template(tid:str,body:PromptTemplateSave):
         library['templates']=[template,*[t for t in library['templates'] if t['id']!=tid]]
         if len(library['templates'])>500:raise ValueError('模板库最多保存 500 个模板')
         library['revision']+=1
-        c.execute('INSERT INTO settings VALUES(%s,%s) ON CONFLICT(key) DO UPDATE SET value=excluded.value',('prompt_library',s.dumps(library)))
+        c.execute("UPDATE settings SET value=%s WHERE key='prompt_library'",(s.dumps(library),))
     return library
 
 def create_job_record(c,pid,body):
@@ -1118,9 +1119,9 @@ def delete_source_document(production_id:str,source_id:str):
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=chapter_ids,event_ids=event_ids)
         targets=production_event_targets(c,production_id)
-    for target in targets:
-        s.event(target,{'type':'source_deleted','id':source_id})
-        if production_revision is not None:s.event(target,{'type':'production','revision':production_revision})
+        for target in targets:
+            s.event(target,{'type':'source_deleted','id':source_id},connection=c)
+            if production_revision is not None:s.event(target,{'type':'production','revision':production_revision},connection=c)
     return {'deleted':source_id,'name':source['title'],'soft':True}
 
 def trash_source_chapters(production_id,chapter_ids):
@@ -1149,9 +1150,9 @@ def trash_source_chapters(production_id,chapter_ids):
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=chapter_ids,event_ids=event_ids)
         targets=production_event_targets(c,production_id)
-    for target in targets:
-        s.event(target,{'type':'source_chapters_deleted','ids':chapter_ids})
-        if production_revision is not None:s.event(target,{'type':'production','revision':production_revision})
+        for target in targets:
+            s.event(target,{'type':'source_chapters_deleted','ids':chapter_ids},connection=c)
+            if production_revision is not None:s.event(target,{'type':'production','revision':production_revision},connection=c)
     return {'deleted':chapter_ids,'count':len(chapter_ids),'soft':True}
 
 @app.post('/api/productions/{production_id}/chapters/trash')
@@ -1183,8 +1184,12 @@ def source_chapters(production_id:str,source_id:str|None=None,q:str=''):
 @app.post('/api/productions/{production_id}/sources/{source_id}/chapters')
 def create_source_chapter(production_id:str,source_id:str,body:ChapterCreate):
     if not body.title.strip():raise ValueError('章节标题不能为空')
-    source_document_row(production_id,source_id);now=time.time()
+    now=time.time()
     with s.db() as c:
+        source=c.execute('''SELECT * FROM source_documents WHERE id=%s AND production_id=%s
+            AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='source' AND d.item_id=source_documents.id)
+            FOR UPDATE''',(source_id,production_id)).fetchone()
+        if not source:raise HTTPException(404,'原著文档不存在')
         next_no=c.execute('SELECT COALESCE(MAX(chapter_no),0)+1 value FROM source_chapters WHERE source_id=%s',(source_id,)).fetchone()['value']
         chapter_id=s.uid('chapter-')
         c.execute('INSERT INTO source_chapters VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
@@ -1210,9 +1215,9 @@ def save_source_chapter(production_id:str,chapter_id:str,body:ChapterSave):
         c.execute('UPDATE source_documents SET updated=%s WHERE id=%s',(now,row['source_id']))
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=[chapter_id])
-    if production_revision is not None:
-        with s.db() as event_db:targets=production_event_targets(event_db,production_id)
-        for target in targets:s.event(target,{'type':'production','revision':production_revision})
+        if production_revision is not None:
+            targets=production_event_targets(c,production_id)
+            for target in targets:s.event(target,{'type':'production','revision':production_revision},connection=c)
     return next(item for item in source_chapters(production_id) if item['id']==chapter_id)
 
 @app.get('/api/productions/{production_id}/source-events')
@@ -1328,7 +1333,7 @@ def read_adaptation(production_id:str):
             revision=_persist_production_context(c,row,context)
             targets=production_event_targets(c,production_id)
         sources=source_snapshot(c,production_id)
-    for target in targets:s.event(target,{'type':'production','revision':revision})
+        for target in targets:s.event(target,{'type':'production','revision':revision},connection=c)
     return {**adaptation_bundle(context),'revision':revision,'sourceEventCount':len(sources)}
 
 @app.put('/api/productions/{production_id}/adaptation')
@@ -1351,7 +1356,7 @@ def save_adaptation(production_id:str,body:AdaptationSave):
         if changed:_stale_scripts(c,production_id)
         revision=_persist_production_context(c,row,context)
         targets=production_event_targets(c,production_id)
-    for pid in targets:s.event(pid,{'type':'production','revision':revision})
+        for pid in targets:s.event(pid,{'type':'production','revision':revision},connection=c)
     return {**bundle,'revision':revision}
 
 def transition_adaptation(production_id,expected_revision,target):
@@ -1374,7 +1379,7 @@ def transition_adaptation(production_id,expected_revision,target):
         context.update(bundle)
         revision=_persist_production_context(c,row,context)
         targets=production_event_targets(c,production_id)
-    for pid in targets:s.event(pid,{'type':'production','revision':revision})
+        for pid in targets:s.event(pid,{'type':'production','revision':revision},connection=c)
     return {**bundle,'revision':revision}
 
 @app.post('/api/productions/{production_id}/adaptation/review')
@@ -1472,7 +1477,7 @@ def save_episode_script(production_id:str,episode_no:int,body:ScriptSave):
             metadata.update({'origin':'canvas','projectionNodeId':body.canvasNodeId})
             c.execute('UPDATE episode_scripts SET metadata=%s WHERE project_id=%s',(s.dumps(metadata),project_row['id']))
             saved=script_row(c,project_row['id'])
-    s.event(project_row['id'],{'type':'script','revision':saved['revision']})
+        s.event(project_row['id'],{'type':'script','revision':saved['revision']},connection=c)
     return saved
 
 def transition_script(production_id,episode_no,expected_revision,target):
@@ -1495,7 +1500,7 @@ def transition_script(production_id,episode_no,expected_revision,target):
         ))
         c.execute('UPDATE episode_scripts SET status=%s,revision=revision+1,updated=%s WHERE project_id=%s',(target,now,project_row['id']))
         saved=script_row(c,project_row['id'])
-    s.event(project_row['id'],{'type':'script','revision':saved['revision']})
+        s.event(project_row['id'],{'type':'script','revision':saved['revision']},connection=c)
     return saved
 
 @app.post('/api/productions/{production_id}/episode-scripts/{episode_no}/review')
@@ -1795,7 +1800,7 @@ def resume(jid:str):
     # Remote jobs keep polling the original handle. Synchronous jobs do not have
     # one, so an explicit resume action requeues their frozen input instead.
     with s.db() as c:
-        job=c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone()
+        job=c.execute('SELECT * FROM jobs WHERE id=%s FOR UPDATE',(jid,)).fetchone()
         if not job: raise HTTPException(404,'任务不存在')
         if job['status'] in ('queued','running','succeeded'): return s.unpack(job)
         if job['status']!='interrupted': raise HTTPException(409,'只有中断任务可以恢复查询')
@@ -1817,9 +1822,11 @@ def resume(jid:str):
                 if not chapter or chapter['production_id']!=marker.get('productionId'):
                     raise HTTPException(409,'原任务对应的章节已删除或归属已变化，无法重新排队')
             phase='使用已保存的输入重新排队'
-        c.execute('''UPDATE jobs SET status='queued',result=NULL,error=NULL,phase=%s,progress=NULL,
-            started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s''',(phase,time.time(),jid))
-    s.event(job['project_id'],{'type':'job','id':jid})
+        updated=c.execute('''UPDATE jobs SET status='queued',result=NULL,error=NULL,phase=%s,progress=NULL,
+            started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s AND status='interrupted'
+            RETURNING *''',(phase,time.time(),jid)).fetchone()
+        if not updated:raise HTTPException(409,'任务状态已变化，不能恢复查询')
+        s.event(job['project_id'],{'type':'job','id':jid},connection=c)
     return read_job(jid)
 
 def _event_cursor(latest, after=None, last_event_id=None, backlog_limit=500):

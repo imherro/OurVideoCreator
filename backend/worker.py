@@ -26,6 +26,10 @@ class Worker:
         self.active_count=0
         self.serial_execution_lock=threading.Lock()
         self.process_lock=WorkerAdvisoryLock()
+        self.ownership_gate=threading.Lock()
+        self.failed=threading.Event()
+        self.fatal_error=None
+        self.failure_lock=threading.Lock()
     def start(self):
         self.process_lock.acquire()
         try:
@@ -39,10 +43,15 @@ class Worker:
                     WHERE status='interrupted' AND provider_job_id IS NULL
                     AND phase='服务已重启，可凭上游任务编号恢复查询'""")
             self.halt.clear()
+            self.failed.clear()
+            self.fatal_error=None
             self.threads=[
                 threading.Thread(target=self.loop,daemon=True,name=f'studio-worker-{index + 1}')
                 for index in range(self.concurrency)
             ]
+            self.threads.append(
+                threading.Thread(target=self.monitor_lock,daemon=True,name='studio-worker-lock-monitor')
+            )
             for thread in self.threads:thread.start()
         except BaseException:
             self.process_lock.release()
@@ -57,6 +66,25 @@ class Worker:
         # start against the same queue in the meantime.
         if stopped:self.process_lock.release()
 
+    def fail(self, exc):
+        with self.failure_lock:
+            if self.fatal_error is None:
+                self.fatal_error=exc
+        self.failed.set()
+        self.halt.set()
+
+    def raise_if_failed(self):
+        if self.failed.is_set():
+            raise RuntimeError('Worker stopped after a fatal queue-ownership or database failure.') from self.fatal_error
+
+    def monitor_lock(self):
+        try:
+            while not self.halt.wait(0.25):
+                with self.ownership_gate:
+                    self.process_lock.assert_held()
+        except BaseException as exc:
+            self.fail(exc)
+
     def mark_active(self,delta):
         with self.activity_lock:
             self.active_count=max(0,self.active_count+delta)
@@ -69,31 +97,44 @@ class Worker:
         try:return json.loads(row['provider']).get('type') in ('volcengine_ark','volcengine_speech')
         except (TypeError,ValueError):return False
     def loop(self):
+        try:
+            self._loop()
+        except BaseException as exc:
+            self.fail(exc)
+
+    def _loop(self):
         while not self.halt.is_set():
             failed=[]
             row=None
-            with s.db() as c:
-                candidates=c.execute(
-                    "SELECT * FROM jobs WHERE status='queued' ORDER BY created LIMIT 500 "
-                    'FOR UPDATE SKIP LOCKED'
-                ).fetchall()
-                for candidate in candidates:
-                    dependencies=json.loads(candidate['input']).get('upstream_job_ids',[])
-                    states=[c.execute('SELECT status FROM jobs WHERE id=%s',(dep,)).fetchone() for dep in dependencies]
-                    if any(not state or state['status'] in ('failed','cancelled') for state in states):
-                        c.execute("UPDATE jobs SET status='failed',phase='上游任务未完成',error='上游任务失败或取消，请修复上游后重新执行此分支',finished=%s,updated=%s WHERE id=%s",(time.time(),time.time(),candidate['id']))
-                        failed.append(candidate)
-                        continue
-                    if any(state['status']!='succeeded' for state in states): continue
-                    row=candidate;break
-                if row:
-                    claimed=c.execute(
-                        "UPDATE jobs SET status='running',started=COALESCE(started,%s),updated=%s "
-                        "WHERE id=%s AND status='queued' RETURNING id",
-                        (time.time(),time.time(),row['id']),
-                    ).fetchone()
-                    if not claimed:row=None
-            for item in failed:s.event(item['project_id'],{'type':'job','id':item['id']})
+            # Claims and the ownership monitor share a gate. If the monitor
+            # observes loss, no claimant can pass this point afterwards.
+            with self.ownership_gate:
+                if self.halt.is_set():
+                    break
+                self.process_lock.assert_held()
+                with s.db() as c:
+                    candidates=c.execute(
+                        "SELECT * FROM jobs WHERE status='queued' ORDER BY created LIMIT 500 "
+                        'FOR UPDATE SKIP LOCKED'
+                    ).fetchall()
+                    for candidate in candidates:
+                        dependencies=json.loads(candidate['input']).get('upstream_job_ids',[])
+                        states=[c.execute('SELECT status FROM jobs WHERE id=%s',(dep,)).fetchone() for dep in dependencies]
+                        if any(not state or state['status'] in ('failed','cancelled') for state in states):
+                            c.execute("UPDATE jobs SET status='failed',phase='上游任务未完成',error='上游任务失败或取消，请修复上游后重新执行此分支',finished=%s,updated=%s WHERE id=%s",(time.time(),time.time(),candidate['id']))
+                            failed.append(candidate)
+                            continue
+                        if any(state['status']!='succeeded' for state in states): continue
+                        row=candidate;break
+                    if row:
+                        claimed=c.execute(
+                            "UPDATE jobs SET status='running',started=COALESCE(started,%s),updated=%s "
+                            "WHERE id=%s AND status='queued' RETURNING id",
+                            (time.time(),time.time(),row['id']),
+                        ).fetchone()
+                        if not claimed:row=None
+                    for item in failed:
+                        s.event(item['project_id'],{'type':'job','id':item['id']},connection=c)
             if not row:
                 self.halt.wait(1)
                 continue

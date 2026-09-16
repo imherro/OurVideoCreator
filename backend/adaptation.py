@@ -654,7 +654,7 @@ def apply_adaptation_generation(job, generated):
         context.update(copy.deepcopy(bundle))
         _stale_scripts(connection, production_id)
         revision = _persist_production_context(connection, production, context)
-    s.event(job['project_id'], {'type': 'production', 'revision': revision})
+        s.event(job['project_id'], {'type': 'production', 'revision': revision}, connection=connection)
     return {**bundle, 'productionRevision': revision}
 
 
@@ -754,5 +754,5 @@ def apply_episode_script_generation(job, generated):
             'paywallBeat': {'role': plan['paywallRole'], 'hook': plan['hook'], 'cliffhanger': plan['cliffhanger']},
         }
         saved = save_script_row(connection,row,merged,status='review',generation_job_id=job['id'])
-    s.event(job['project_id'], {'type': 'script', 'revision': saved['revision']})
+        s.event(job['project_id'], {'type': 'script', 'revision': saved['revision']}, connection=connection)
     return {'script': saved}

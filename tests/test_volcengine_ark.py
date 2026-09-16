@@ -331,7 +331,11 @@ def test_worker_marks_recoverable_provider_error_interrupted(monkeypatch):
         worker.halt.set()
         raise common.RecoverableProviderError('temporary polling error')
     monkeypatch.setattr(worker,'execute',execute)
-    worker.loop()
+    worker.process_lock.acquire()
+    try:
+        worker.loop()
+    finally:
+        worker.process_lock.release()
     with s.db() as db:
         row=db.execute('SELECT status,provider_job_id,phase FROM jobs WHERE id=%s',(item['id'],)).fetchone()
     assert row['status']=='interrupted' and row['provider_job_id']=='existing-task'

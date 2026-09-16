@@ -16,16 +16,17 @@ def test_event_queue_retains_only_recent_notifications(monkeypatch):
 
 
 def test_job_notifications_are_throttled_but_terminal_state_is_immediate(monkeypatch):
-    emitted = []
-    ticks = iter([100.0, 101.0, 102.0])
-    monkeypatch.setattr(s.time, "monotonic", lambda: next(ticks))
-    monkeypatch.setattr(s, "event", lambda project_id, payload: emitted.append((project_id, payload)))
-    s._job_event_times.clear()
-
-    assert s._notify_job("project-a", "job-a") is True
-    assert s._notify_job("project-a", "job-a") is False
-    assert s._notify_job("project-a", "job-a", force=True) is True
-    assert emitted == [
-        ("project-a", {"type": "job", "id": "job-a"}),
-        ("project-a", {"type": "job", "id": "job-a"}),
+    with s.db() as connection:
+        connection.execute("DELETE FROM events")
+        assert s._notify_job(connection, "project-a", "job-a") is True
+        assert s._notify_job(connection, "project-a", "job-a") is False
+        assert s._notify_job(connection, "project-a", "job-a", force=True) is True
+    with s.db() as connection:
+        rows = connection.execute(
+            "SELECT payload FROM events WHERE project_id=%s ORDER BY id", ("project-a",)
+        ).fetchall()
+    import json
+    assert [json.loads(row["payload"]) for row in rows] == [
+        {"type": "job", "id": "job-a"},
+        {"type": "job", "id": "job-a"},
     ]

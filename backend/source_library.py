@@ -113,6 +113,6 @@ def replace_events(job, rows):
         production_revision = mark_adaptation_stale(
             connection, production_id, chapter_ids=[chapter_id], event_ids=previous_ids,
         )
-    if production_revision is not None:
-        s.event(job['project_id'], {'type': 'production', 'revision': production_revision})
+        if production_revision is not None:
+            s.event(job['project_id'], {'type': 'production', 'revision': production_revision}, connection=connection)
     return validated

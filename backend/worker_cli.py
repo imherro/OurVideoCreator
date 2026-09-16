@@ -37,18 +37,24 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print(
         f'Worker started: instance={describe_instance()["instance_id"]} data={store.DATA} '
-        f'concurrency={worker.concurrency} mode=single-process',
+        f'concurrency={worker.concurrency} mode=single-process '
+        f'lock_backend_pid={worker.process_lock.backend_pid}',
         flush=True,
     )
     try:
         while not stopping.wait(0.5):
-            pass
+            worker.raise_if_failed()
     except KeyboardInterrupt:
         pass
+    except RuntimeError as exc:
+        print(f'Worker stopped after fatal failure: {exc}', file=sys.stderr, flush=True)
+        return_code = 3
+    else:
+        return_code = 0
     finally:
         worker.stop()
     print('Worker stopped', flush=True)
-    return 0
+    return return_code
 
 
 if __name__ == '__main__':
