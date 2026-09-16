@@ -24,6 +24,8 @@
 
 前端 SSE 获取当前已授权 objects 快照后逐对象核 revision/草稿并一次合并投影，避免同一结构事务中的节点与 graph 事件先后到达制造本地修改。不会用整份读取结果写回数据库。当前仍为单 Worker；P5 只落实协作目标/候选版本边界，额度预占与多 Worker fencing 属 P6。
 
+P5-R1：现有镜头附属节点集合的新增、移除或编号变化，也必须在同一 `objects/commands`（或 batch）中携带当前 graph revision/epoch 和完整有效的拟提交结构。仅 PATCH 镜头或恢复旧历史而改变节点身份、未提供 graph 时返回 422；旧 graph 版本返回 409。边目标权限及位置、节点/镜头排序、连线存在性仍按原规则校验，失败整体回滚，不自动删除他人依赖。节点身份不变的正文和提示词保存仍只提交镜头，不要求 graph 或整集 revision。
+
 ## 通用规则
 
 - 身份来自服务端 session cookie；客户端不能提交 `user_id`、角色、workspace 归属、作者或 assignee 作为权威值。

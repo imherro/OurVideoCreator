@@ -1,0 +1,24 @@
+BUSINESS_SHA 34d646d5c17d5ba12fdc56d4948ab513703731ff
+UTC_START 2026-09-16T23:12:34.823196+00:00
+COMMAND C:\Python314\python.exe -m pytest -q -s --tb=short tests/test_p5_object_transactions.py::test_same_revision_real_pg_waiters_one_commit_one_conflict tests/test_p5_object_transactions.py::test_locked_shot_does_not_lock_other_shot tests/test_p5_object_transactions.py::test_timeline_lease_expiry_takeover_old_token_and_locked_clock tests/test_p5_owned_content.py::test_same_version_wait_chain_one_success_one_conflict tests/test_p5_relation_candidates.py::test_two_candidates_same_revision_pg_waiters_only_one_adoption tests/test_p5_storyboard_candidates.py::test_two_storyboard_candidates_compete_through_real_pg_graph_lock tests/test_p5_run_permissions.py::test_two_real_pg_waiting_runs_preserve_independent_batch_receipts tests/test_p5_collaboration_actions.py::test_capture_rechecks_director_after_real_pg_wait tests/test_p5_resume_permissions.py::test_resume_rechecks_after_real_pg_object_lock_wait
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+INFO  [alembic.runtime.migration] Running upgrade 0003_platform_models -> 0004_object_collaboration, Independent collaboration objects; no legacy business-data import.
+INFO  [alembic.runtime.migration] Running upgrade 0004_object_collaboration -> 0005_owned_source_scripts, Ownership on existing source/script sources, without copying legacy content.
+INFO  [alembic.runtime.migration] Running upgrade 0005_owned_source_scripts -> 0006_job_candidate_targets, Frozen collaboration target and explicit adoption on the existing job.
+P5 same-object database wait trace: [{"pid": 37420, "wait_event_type": "Lock", "wait_event": "transactionid", "blockers": [6584]}, {"pid": 4680, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [37420]}]
+...owned-content PostgreSQL wait trace chapter [{'pid': 35560, 'wait_event_type': 'Lock', 'wait_event': 'tuple', 'blockers': [35960]}, {'pid': 35960, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [22996]}]
+.owned-content PostgreSQL wait trace script [{'pid': 35152, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [38488]}, {'pid': 20972, 'wait_event_type': 'Lock', 'wait_event': 'tuple', 'blockers': [35152]}]
+.candidate adoption PostgreSQL wait trace [{'pid': 8900, 'wait_event_type': 'Lock', 'wait_event': 'tuple', 'blockers': [41808]}, {'pid': 41808, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [36180]}]
+.P5 storyboard import wait trace: [{'pid': 33028, 'wait_event_type': 'Lock', 'wait_event': 'tuple', 'blockers': [37468]}, {'pid': 37468, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [24688]}]
+.P5 run batch PostgreSQL wait chain: [{'pid': 34424, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [31536]}, {'pid': 31536, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [32400]}]
+.director capture PostgreSQL wait trace [{'pid': 22896, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [29724]}]
+.P5 resume object wait: [{'pid': 20624, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [38212]}]
+.
+10 passed in 43.52s
+
+EXIT_CODE 0
+UTC_END 2026-09-16T23:13:21.210743+00:00

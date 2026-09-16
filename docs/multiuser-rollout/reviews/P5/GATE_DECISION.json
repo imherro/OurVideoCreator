@@ -1,0 +1,49 @@
+{
+  "repository": "imherro/OurVideoCreator",
+  "stage": "P5-COLLAB-01",
+  "decision": "FAIL",
+  "decision_zh": "不通过",
+  "base_sha": "c0152ffcfb5623fcc0b723dbdf450acec9f17f73",
+  "backend_test_sha": "f4773f0075325625c6cf2e6236c5d2014d416d3f",
+  "business_sha": "0851dce02e0f22e87f6247b029fd3faedd39e7dd",
+  "evidence_head": "5143ee36f55ab783f203832558cfedd4efce4936",
+  "blocking_issues": [
+    {
+      "id": "OVC-P5-01",
+      "severity": "S2",
+      "title": "附属节点身份变化遗漏graph版本与完整性检查",
+      "matrix": [
+        "COLLAB-10",
+        "COLLAB-11"
+      ],
+      "status": "open"
+    }
+  ],
+  "new_evidence_only_blockers": [],
+  "prior_stages_unchanged": [
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "next_single_task": "P5-R1",
+  "P6_authorized": false,
+  "real_paid_api_authorized": false,
+  "public_deployment_authorized": false,
+  "reviewer_execution": {
+    "full_pg_api": false,
+    "full_project_regression": false,
+    "browser": false,
+    "source_logic_probe": true,
+    "proposed_pg_test_syntax_checked_only": true
+  },
+  "implementation_evidence": {
+    "backend_full": 458,
+    "pg_trace_tests": 10,
+    "frontend_final": 178,
+    "renderer_final": 30,
+    "build_modules_final": 1837,
+    "api_classified": 122
+  }
+}

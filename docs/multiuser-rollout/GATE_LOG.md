@@ -9,7 +9,7 @@
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
 | P3 | P3-R2 已复验 | 通过 | `de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6` | `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md` | 无；原六项及 R1-01/02/03 全部关闭 | P4 |
 | P4 | P4-R1 已复验 | 通过 | `c0152ffcfb5623fcc0b723dbdf450acec9f17f73` | `reviews/P4-R1/REVIEW.md` | 无；`OVC-P4-01/02/03` 全部关闭 | P5-COLLAB-01 |
-| P5 | 已授权实施，未提交 | 未验收 | | `prompts/P5_CODEX_PROMPT.md` | 尚未验收 | 否 |
+| P5 | 首轮已审，P5-R1 READY_FOR_REVIEW | 不通过（未自行关闭） | `5143ee36f55ab783f203832558cfedd4efce4936` | `reviews/P5/REVIEW.md`、`reviews/P5-Supplement/DECISION.md` | OVC-P5-01、OVC-P5-02（S2） | R1独立交付后P5-R2；P6 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
 | P7 | 未提交 | 未验收 | | | | 否 |
 | P8 | 未提交 | 未验收 | | | | 不适用 |
@@ -273,3 +273,11 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 新建 7028 隔离浏览器实例验证原生认证提示、Replicate audio 发布 400、普通用户缺失 max_tokens 400、填写 100 后独立 Worker 成功。证据在 `evidence/P4-R1/`，含真实工具调用/返回、安全扫描范围和未运行项。没有改动旧实例或调用真实付费 Provider。
 
 仅提交外部复验，**不自行关闭 OVC-P4-01/02/03，不授予 P5 权限**。请在协作版 OurVideoCreator 新仓库审核实际功能和最小修复，避免过度设计。
+
+## P5 首轮外部不通过与补充缺陷确认
+
+2026-09-17 主 ChatGPT 会话对证据 HEAD `5143ee36f55ab783f203832558cfedd4efce4936`（最终业务0851dce）给出不通过。首轮唯一正式阻塞 OVC-P5-01（S2）：附属节点身份集合变化未强制当前graph版本，可能持久化悬空结构。原件 `reviews/P5/`；下一单一任务 `prompts/P5_R1_CODEX_PROMPT.md`。既有已核验场景与P0–P4通过不变，不新增浏览器补证阻塞。
+
+随后提交迟到保存回执独立客户端红测的精确时序，主会话复读固定源码后正式补记 **OVC-P5-02（S2）**：先收到较新r3快照、后收到已提交r2的旧成功回执，draft基线与页面/rows/baseline正文错位，下一次保存可静默覆盖r3。该确认不是外部复跑新增测试，也不是P5-R1复验通过。
+
+补充原件 `reviews/P5-Supplement/DECISION.md`、`DECISION.json`，完整下一任务 `prompts/P5_R2_CODEX_PROMPT.md`。明确授权：**先完成P5-R1独立提交及取证，再以其实际最终提交为base执行P5-R2**；两项分别审核关闭，不将前端返修混入当前固定SHA日志，不回退到5143ee3。P5整体仍不通过，P6/付费API/公网未授权。

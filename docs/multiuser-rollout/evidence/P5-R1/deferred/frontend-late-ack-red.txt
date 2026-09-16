@@ -1,0 +1,37 @@
+RUNTIME_HEAD 5143ee36f55ab783f203832558cfedd4efce4936
+TEST_SOURCE_SHA256 B09287027B75B2E41A9908FC34EBA1E36CE4407DD1474F2C0542E968D3FCBEBA
+UTC_START 2026-09-16T22:38:32.9725675Z
+COMMAND node --test tests/p5_late_ack.test.mjs
+P5 late receipt: {"sent":[[{"revision":1,"content":{"shot":{"id":"x","uid":"x","action":"my saved v2","note":""},"nodes":[]}}],[{"revision":3,"content":{"shot":{"id":"x","uid":"x","action":"my saved v2","note":"my subsequent note"},"nodes":[]}}]],"final":{"id":"shot-x","kind":"shot","object_key":"x","revision":4,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"my saved v2","note":"my subsequent note"},"nodes":[]}},"state":"saved"}
+✖ a newer remote revision before an older save receipt cannot be silently overwritten (5.7682ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 166.2813
+
+✖ failing tests:
+
+test at tests\p5_late_ack.test.mjs:6:1
+✖ a newer remote revision before an older save receipt cannot be silently overwritten (5.7682ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'my saved v2'
+  - 'other page v3'
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_late_ack.test.mjs:50:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'my saved v2',
+    expected: 'other page v3',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT_CODE 1
+UTC_END 2026-09-16T22:38:33.2284182Z

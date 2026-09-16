@@ -402,3 +402,29 @@ CUA 原绑定 `p4browser`、`p5candidateA/B`、`p5latestA/B`、`p5secondA` 保�
 - Twick热更新、回执/首次规范化不回声保存、标题轨兼容性已修正并提交0851dce；未修改node_modules/后端/依赖。固定SHA受影响补跑178前端、30renderer、TS/build/diff全过，session47270已结束exit0。
 - 最终浏览器A 0.5s/B 1.5s，选择独立且共享标题实时同步；B草稿面对A新正文保留、明确处理后载入远端；本地FFmpeg真实导出成功。租约释放，旧第二A镜头冲突仍保留。
 - REPORT/SUMMARY/MATRIX/ATTEMPT_HISTORY/PROVENANCE与原始日志在evidence/P5，最后证据提交只含docs。P5仅READY_FOR_REVIEW，推送后直接送主ChatGPT审核；P6未授权。
+
+### P5 首轮外部不通过；P5-R1 固定业务取证中（2026-09-17）
+
+- 外部正式报告已下载并完整阅读，原件 reviews/P5/（完整ZIP下载名 OurVideoCreator_P5_Audit_5143ee3.zip），唯一正式阻塞 OVC-P5-01（S2，附属节点身份集合变化未强制graph）；新单一任务 prompts/P5_R1_CODEX_PROMPT.md。P0–P4仍通过，P6未授权。
+- 新本地业务提交 **34d646d5c17d5ba12fdc56d4948ab513703731ff**，尚未push。只有backend/collaboration.py 4增3删；另新增两个PG测试文件和一个frontend adapter测试。运行时/test干净，docs尚未提交。禁止正式capture结束前改runtime/tests/scripts/HEAD。
+- 审核提供草案真实运行基线：3 failed/15.46s/exit1，PATCH/batch/commands均200，shot r1→r2、graph r4不变、topological悬空。修复后开发15pass/63.71s；固定SHA专项15pass/66.21s、exit0，真实PG等待结果[409,200]，开发期相反[200,409]；两次无半写。全前端开发179pass，未改UI代码；原adapter已为child identity变化提交当前graph与shot同命令。
+- **正式完整capture仍运行 session20970**，UTC22:53:07.925732Z开始，目录 **C:\Users\kunpeng\AppData\Local\Temp\ovc-p5-evidence-nmwspojl**，脚本scripts/capture_p5_evidence.py 34d646d...。后端全量之后会继续旧并发10项、npm/tsc/build/routes/compile/diff。必须收最终exit/result；不能提前宣称通过或重跑/停止。
+- 新证据工作目录evidence/P5-R1，REPORT和ATTEMPT_HISTORY明确进行中；targeted-green/baseline-red已经复制。原始本地日志在 **C:\Users\kunpeng\AppData\Local\Temp\ovc-p5-review-5143ee3**。首次缺OVC_TEST_ADMIN_URL退出4另档，不算产品红测；后用本任务历史测试配置恢复仅当前子进程变量，没有输出DSN。后续新shell仍须安全读取历史启动配置（会话JSONL中已运行的CommandExecution cmd里的赋值），不能猜密码或打印DSN。脚本无env自动加载。
+- **额外前端迟到回执缺陷尚未修复**：原5143上真实CollaborationClient+mockCAS transport复现v2回执延迟、期间mergeRemoteRows v3、旧ack后下次note编辑以expected3携带v2正文覆盖v3为v4且显示saved，1failed。最终审核仅结构阻塞，故未混入runtime修改；原日志及可显式执行源码保留evidence/P5-R1/deferred，明确不计默认npm绿测覆盖，不隐藏问题。已直接发主ChatGPT请求评估后续单一任务。当前回复仍有“停止回答”，正在核验，无失败，不要重复发。获取完整回复/下载原件后遵循范围，不能自签P5 PASS。
+- 主会话tab1 p5Reviewer；browser p4browser。所有tab再次markHandoff，历史P5浏览器/数据库/Worker/旧服务一概保留，此轮不操作。UI未改，按P5-R1提示词无需重做61+17浏览器流程；原证据保持。
+- 下一步：收20970全部结果，处理实际回归失败；正式日志复制到P5-R1并脱敏/校验，补REPORT/MATRIX/SUMMARY、同步新外部回复。验证完成再提交docs、push origin并送ChatGPT复验，提醒审核OurVideoCreator与功能优先。不要向upstream推送。
+
+### P5 补充正式确认与 P5-R2 授权（R1 capture仍运行）
+
+- 主会话补充回复已结束（思考5m30s），**确认OVC-P5-02，S2、阻塞P5**。不是新需求或P6优化，复现时序成立；其实际证据是固定代码复读，没有冒称复跑新增测试。原P5-R1范围不变。
+- 已浏览器下载 `OurVideoCreator_P5_Supplement_OVC-P5-02.zip`，哈希 `9bf091cdde64c08ebb800174c985fa4cfbb36d533879e19721fe146327b5dc9f`。三个完整原件归档 `reviews/P5-Supplement/`；完整执行提示词 `prompts/P5_R2_CODEX_PROMPT.md` 已主agent全文阅读。两审核包10+3文件逐个与解包原件校验一致。
+- **顺序授权更新**：P5-R1独立提交及取证/交付准备完成后，可以执行P5-R2（不必等P6，也不等于R1外部通过）；以R1实际最终commit为base，不回退。仍须先完成当前capture及独立docs提交。两个缺陷分别审核关闭，P5整体未通过。
+- R2允许最小冲突策略：较新r3先到、旧r2回执后到时，保留页面/r2正文并标conflict，r3留作比较；明确处理前不得发出expected3搭配旧全文。或完整同步全部host/client/draft到r3。新增本地输入必须保留。不屏蔽SSE、刷新、加延时或改服务端CAS。需要实际client+宿主传播回归，严格CAS+epoch且第二客户端从r2合法提交r3；不强制真实浏览器，可使用宿主回调集成测试。
+- 若R2只改前端，不机械重复相同后端全量；用Git等同性绑定R1后端证据，仍跑全部前端/状态机/TS/build。原deferred红测/日志保留，不改写历史；新证据evidence/P5-R2。
+- 当前session20970完整pytest仍正常输出，已过30%，尚无最终结果。原capture目录 `ovc-p5-evidence-nmwspojl` 不变；不要重新启动。工作区只有docs变更。MATRIX/PROVENANCE已补，最终结果/校验/提交仍待capture完成。
+
+### P5-R1 正式取证完成 / READY_FOR_REVIEW
+
+- **session20970已完成exit0，禁止再次轮询或重启。** 固定业务34d646d：473后端/1162.95s/2既有warnings，10并发/43.52s，179默认前端，TS/build1837modules/9.03s/routes125总122API全分类/compile/diff均exit0。全部命令UTC22:53:07.925732—23:13:49.061445。15专项另在targeted-green.txt。
+- 正式日志已复制evidence/P5-R1/commands-34d646d，REPORT/MATRIX/SUMMARY/PROVENANCE更新为READY_FOR_REVIEW，仅OVC-P5-01，OVC-P5-02明确未修/独立红测不计默认绿测，禁止自签整体PASS。准备对docs脱敏/校验后独立提交、push origin，并发送R1复验。
+- R1证据提交完成后下一单一授权P5-R2；先读取P5_R2完整提示词并记录实际R1最终HEAD。最小安全方案可让旧ack遇更新remote时保留r2基线并进入conflict；client.save须向主页面传播冲突，不能仍resolve让host显示已保存。检查main.tsx save成功/失败、saveObject finally acceptObjectDocument；不要只修孤立draft断言。此处仅只读分析，尚未修改前端代码。

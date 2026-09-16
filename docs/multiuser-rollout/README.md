@@ -4,9 +4,9 @@
 
 已通过阶段：**P0、P1、P2、P3、P4**
 
-状态：**P4-R1 外部通过；P5 READY_FOR_REVIEW，等待外部验收，不得进入 P6**。
+状态：**P4-R1 外部通过；P5 首轮外部不通过，P5-R1 READY_FOR_REVIEW，随后独立执行已授权P5-R2，不得进入 P6**。
 
-当前阶段：**P5-COLLAB-01 — 对象级分工协作前后端闭环**。
+当前阶段：**P5-R1 — 附属节点身份变化的原子结构校验**。首轮阻塞 OVC-P5-01（S2），原件见 [P5 审核报告](reviews/P5/REVIEW.md)，执行要求见 [完整返修提示词](prompts/P5_R1_CODEX_PROMPT.md)。补充确认 OVC-P5-02（S2，迟到保存回执），见 [外部补充结论](reviews/P5-Supplement/DECISION.md)；P5-R1独立提交取证完成后才执行已授权 [P5-R2](prompts/P5_R2_CODEX_PROMPT.md)。两项都须外部关闭，P5尚未通过。
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 

@@ -1,0 +1,10 @@
+ImportError while loading conftest '[LOCAL_USER]\Documents\ChatGPT\OurVideoCreator\tests\conftest.py'.
+tests\conftest.py:12: in <module>
+    _TEST_DATABASE_NAME, _TEST_DATABASE_URL = create_isolated_database(_ROOT)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\postgres_test_db.py:46: in create_isolated_database
+    admin = _admin_url()
+            ^^^^^^^^^^^^
+tests\postgres_test_db.py:24: in _admin_url
+    raise RuntimeError(
+E   RuntimeError: OVC_TEST_ADMIN_URL is required for tests; it must point to a PostgreSQL admin database.

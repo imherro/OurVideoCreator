@@ -1,0 +1,22 @@
+{
+  "source_sha": "0851dce02e0f22e87f6247b029fd3faedd39e7dd",
+  "execution_scope": "source expressions + topology function, synthetic rows; no PG/API execution",
+  "is_structural": true,
+  "graph_update_required_by_current_branch": false,
+  "graph_rows_validated_by_current_update_loop": [],
+  "before_topological_order": [
+    "image-x",
+    "node-y"
+  ],
+  "after_node_ids": [
+    "image-x-new",
+    "node-y"
+  ],
+  "retained_graph_edge": {
+    "id": "edge-xy",
+    "source": "image-x",
+    "target": "node-y"
+  },
+  "after_topological_error": "连线引用了不存在的节点",
+  "full_application_http_status_observed": null
+}
