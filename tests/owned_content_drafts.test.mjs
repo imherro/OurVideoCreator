@@ -24,10 +24,17 @@ test('typing during save survives acknowledgement and stays dirty',async()=>{
   assert.equal(store.value('x').content,'typed later');assert.equal(store.value('x').revision,2);
   assert.equal(store.drafts.entries.get('x').state,'dirty');
 });
-test('a later remote version arriving before an earlier save response is retained',async()=>{
+test('a later remote version arriving before an earlier save response is retained for explicit comparison',async()=>{
   const store=setup();store.patch('x',{content:'sent'});let finish;
   const pending=store.save('x','a',()=>new Promise(resolve=>{finish=resolve;}));
   store.receive('x',row('x',3,'later remote'));finish(row('x',2,'sent'));await pending;
+  assert.equal(store.value('x').revision,2);assert.equal(store.value('x').content,'sent');
+  const entry=store.drafts.entries.get('x');
+  assert.equal(entry.state,'conflict');assert.equal(entry.remote.revision,3);
+  assert.equal(entry.remote.content.content,'later remote');
+  assert.equal(store.unsaved,true);
+  await assert.rejects(store.save('x','a',()=>assert.fail('must not auto-resend')),/冲突/);
+  store.drafts.resolve('x',entry.remote,'discard');
   assert.equal(store.value('x').revision,3);assert.equal(store.value('x').content,'later remote');
 });
 test('scope switch is blocked with drafts; a late old-scope fetch cannot enter new scope',()=>{

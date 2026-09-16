@@ -175,6 +175,11 @@ export class CollaborationClient {
         // A later metadata failure must not replay successful object creations.
         for(const part of [...delta.created,...delta.updated])base.parts.set(`${part.kind}:${part.key}`,copy(part));
         for(const part of delta.removed)base.parts.delete(`${part.kind}:${part.key}`);
+        // The write succeeded, but a newer snapshot arrived before its receipt.
+        // Commit the acknowledged baseline above, then propagate the conflict
+        // through both host save paths instead of reporting everything saved.
+        const conflicted=tickets.find(ticket=>this.drafts.entries.get(ticket.id)?.state==='conflict');
+        if(conflicted)throw Object.assign(new Error(this.drafts.entries.get(conflicted.id)!.error),{status:409});
       }
       if(delta.episodeMetadata||name!==project.name){
         const patch:Value={};

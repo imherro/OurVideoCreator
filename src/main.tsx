@@ -1114,6 +1114,9 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const snapshot = current.current;
     const projectSnapshot = snapshot.project;
     if (!projectSnapshot || !snapshot.doc || !dirty.current) return;
+    const clientSnapshot=collaboration.current!,generationSnapshot=clientSnapshot.drafts.generation;
+    const isCurrentScope=()=>current.current.project?.id===projectSnapshot.id&&
+      collaboration.current===clientSnapshot&&clientSnapshot.drafts.generation===generationSnapshot;
     dirty.current = false;
     saving.current = true;
     setSaved("保存中");
@@ -1121,7 +1124,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const work = (async () => {
       try {
         const result = await collaboration.current!.save(snapshot.doc!, name, collaborationAssets.current);
-        if (current.current.project?.id !== projectSnapshot.id) return;
+        if (!isCurrentScope()) return;
         revision.current = result.revision;
         productionRevision.current = result.production_revision;
         setProject((current) =>
@@ -1148,6 +1151,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         }
         setSaved(dirty.current ? "未保存" : "已保存");
       } catch (e: any) {
+        if (!isCurrentScope()) return;
         dirty.current = true;
         if (e.status === 409) {
           conflictRef.current = true;
@@ -1183,11 +1187,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     if(saveFlight.current)await saveFlight.current;
     const snapshot=current.current;
     if(!snapshot.doc||!snapshot.project)return;
+    const clientSnapshot=collaboration.current!,generationSnapshot=clientSnapshot.drafts.generation;
     const work=(async()=>{
       try{
         await collaboration.current!.saveOnly(id,snapshot.doc!,collaborationAssets.current);
       }finally{
-        if(current.current.project?.id===snapshot.project!.id&&current.current.doc)
+        if(current.current.project?.id===snapshot.project!.id&&current.current.doc&&
+          collaboration.current===clientSnapshot&&clientSnapshot.drafts.generation===generationSnapshot)
           acceptObjectDocument(current.current.doc);
       }
     })();

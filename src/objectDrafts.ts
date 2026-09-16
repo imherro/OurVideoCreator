@@ -83,6 +83,7 @@ export class ObjectDrafts {
       return true;
     }
     if (row.revision < entry.base.revision) return false;
+    if (entry.remote && row.revision < entry.remote.revision) return false;
     if (entry.state !== 'saved' || entry.flight) {
       if (row.revision !== entry.base.revision || row.assignment_epoch !== entry.base.assignment_epoch) {
         entry.remote = clone(row);
@@ -120,7 +121,14 @@ export class ObjectDrafts {
     if (entry.serial === ticket.serial) entry.content = clone(row.content);
     entry.state = equalContent(entry.content, row.content) ? 'saved' : 'dirty';
     // A newer SSE/read may arrive before the response to our earlier save.
-    if(observed&&observed.revision>row.revision)this.remote(ticket.projectId,ticket.generation,observed);
+    // Keep the acknowledged body/version paired until the user explicitly
+    // compares the newer snapshot. Advancing only this draft would leave the
+    // host document and client baseline at the older body.
+    if(observed&&(observed.revision>row.revision||observed.assignment_epoch>row.assignment_epoch)){
+      entry.remote=observed;
+      entry.state='conflict';
+      entry.error='本次保存已提交，但远端对象已有更新；本地草稿保留，请比较后明确处理';
+    }
     return true;
   }
 
