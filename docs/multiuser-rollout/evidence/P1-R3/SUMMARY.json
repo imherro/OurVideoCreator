@@ -1,0 +1,129 @@
+{
+  "evidence_kind": "P1-R3 final acceptance run",
+  "business_code_sha": "7283fc513cdc8bd296b54e340875ead9431055e4",
+  "capture_start_head": "7283fc513cdc8bd296b54e340875ead9431055e4",
+  "capture_started_utc": "2026-09-16T07:05:10.428015+00:00",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "supersedes": "P1-R2 failed review at e4c61feba12765a6b70ecc9ee1e9db8e223372b1 without overwriting earlier evidence",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.2 (tags/v3.14.2:df79316, Dec  5 2025, 17:18:21) [MSC v.1944 64 bit (AMD64)]",
+    "node": "v24.13.0",
+    "npm": "11.8.0"
+  },
+  "test_isolation": "PowerShell tests use one driver PID for sequential real-script calls, disposable project copies, isolated data directories, loopback-only ports, and only their recorded test PIDs",
+  "paid_egress_guard": "pytest blocks non-loopback sockets; fake Providers are loopback-only; no real credentials are supplied",
+  "removed_surface": {
+    "embedded_inference_directory_exists": false,
+    "runtime_module_exists": false,
+    "tracked_removed_paths": [],
+    "expected": "all false/empty"
+  },
+  "runs": [
+    {
+      "name": "01-npm-ci",
+      "command": "npm.cmd ci",
+      "started_utc": "2026-09-16T07:05:10.994427+00:00",
+      "duration_seconds": 40.511,
+      "exit_code": 0,
+      "log": "01-npm-ci.log"
+    },
+    {
+      "name": "02-npm-test",
+      "command": "npm.cmd test",
+      "started_utc": "2026-09-16T07:05:51.505256+00:00",
+      "duration_seconds": 1.395,
+      "exit_code": 0,
+      "log": "02-npm-test.log"
+    },
+    {
+      "name": "03-npm-build",
+      "command": "npm.cmd run build",
+      "started_utc": "2026-09-16T07:05:52.901586+00:00",
+      "duration_seconds": 14.05,
+      "exit_code": 0,
+      "log": "03-npm-build.log"
+    },
+    {
+      "name": "04-pytest-collect",
+      "command": "C:\\Python314\\python.exe -m pytest --collect-only -q",
+      "started_utc": "2026-09-16T07:06:06.951932+00:00",
+      "duration_seconds": 1.536,
+      "exit_code": 0,
+      "log": "04-pytest-collect.log"
+    },
+    {
+      "name": "05-pytest",
+      "command": "C:\\Python314\\python.exe -m pytest -q",
+      "started_utc": "2026-09-16T07:06:08.488588+00:00",
+      "duration_seconds": 113.677,
+      "exit_code": 1,
+      "log": "05-pytest.log"
+    },
+    {
+      "name": "06-same-session-powershell",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_powershell.py::test_same_powershell_session_restores_caller_environment tests/test_p1_powershell.py::test_stop_nonzero_exit_restores_environment_and_location -s",
+      "started_utc": "2026-09-16T07:08:02.164871+00:00",
+      "duration_seconds": 6.319,
+      "exit_code": 0,
+      "log": "06-same-session-powershell.log"
+    },
+    {
+      "name": "07-cross-root-powershell",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_powershell.py::test_absolute_script_path_targets_its_own_project_from_any_cwd -s",
+      "started_utc": "2026-09-16T07:08:08.484467+00:00",
+      "duration_seconds": 37.024,
+      "exit_code": 0,
+      "log": "07-cross-root-powershell.log"
+    },
+    {
+      "name": "08-all-powershell-lifecycle",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_powershell.py -s",
+      "started_utc": "2026-09-16T07:08:45.508177+00:00",
+      "duration_seconds": 53.917,
+      "exit_code": 0,
+      "log": "08-all-powershell-lifecycle.log"
+    },
+    {
+      "name": "09-inflight-web-restart",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_processes.py -s",
+      "started_utc": "2026-09-16T07:09:39.425100+00:00",
+      "duration_seconds": 6.108,
+      "exit_code": 0,
+      "log": "09-inflight-web-restart.log"
+    },
+    {
+      "name": "10-ffmpeg-export",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_export.py -s",
+      "started_utc": "2026-09-16T07:09:45.533621+00:00",
+      "duration_seconds": 7.709,
+      "exit_code": 0,
+      "log": "10-ffmpeg-export.log"
+    },
+    {
+      "name": "11-zero-upstream-on-missing-provider",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_api.py::test_missing_or_removed_local_provider_fails_before_any_upstream_request -s",
+      "started_utc": "2026-09-16T07:09:53.242925+00:00",
+      "duration_seconds": 1.52,
+      "exit_code": 0,
+      "log": "11-zero-upstream-on-missing-provider.log"
+    },
+    {
+      "name": "12-route-audit",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "started_utc": "2026-09-16T07:09:54.763225+00:00",
+      "duration_seconds": 0.599,
+      "exit_code": 0,
+      "log": "12-route-audit.log"
+    },
+    {
+      "name": "13-diff-check",
+      "command": "git diff --check",
+      "started_utc": "2026-09-16T07:09:55.362811+00:00",
+      "duration_seconds": 0.037,
+      "exit_code": 0,
+      "log": "13-diff-check.log"
+    }
+  ],
+  "capture_finished_utc": "2026-09-16T07:09:55.399882+00:00"
+}

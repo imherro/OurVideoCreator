@@ -6,7 +6,7 @@
 
 状态：**PASSED**（外部复验绑定 `b957e39405522baf8ae7e3052b2938941e75b00b`）
 
-当前阶段：**P1-R3 开发中，仅处理 OVC-P1-R2-01**
+当前阶段：**P1-R3 已完成开发并处于 READY_FOR_REVIEW**
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 
@@ -15,6 +15,8 @@ P1-R1 被测试业务 SHA：`f27439fc9fcabd706e2772d5cd7212d76a9f4706`
 P1-R2 被测试业务 SHA：`16a56194c7a15e71142696b283934ea1b7a2e3b5`
 
 P1-R2 外部复验 HEAD：`e4c61feba12765a6b70ecc9ee1e9db8e223372b1`（不通过；唯一阻塞 `OVC-P1-R2-01`）
+
+P1-R3 被测试业务 SHA：`7283fc513cdc8bd296b54e340875ead9431055e4`
 
 下一阶段：**P2 未授权；等待 P1 外部验收**
 
@@ -38,6 +40,7 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P1/REPORT.md`](evidence/P1/REPORT.md)（内置推理移除、Web/Worker 分离及首次原始验收日志；保留不覆盖）
 - [`evidence/P1-R1/REPORT.md`](evidence/P1-R1/REPORT.md)（实例所有权、确定性在途任务屏障及 P1-R1 完整回归）
 - [`evidence/P1-R2/REPORT.md`](evidence/P1-R2/REPORT.md)（脚本工程根绑定、三种数据目录模式的跨工程真实脚本回归）
+- [`evidence/P1-R3/REPORT.md`](evidence/P1-R3/REPORT.md)（调用者环境恢复、同一 PowerShell PID 连续调用及非零出口回归）
 
 ## 阶段边界
 
