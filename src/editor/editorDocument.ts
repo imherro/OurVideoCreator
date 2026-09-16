@@ -60,6 +60,8 @@ export function attachAssetReferences(
   const referencedAssets = new Set<string>();
   const tracks = timeline.tracks.map((track) => ({
     ...track,
+    // Text is an element kind, not a renderer track kind in Twick.
+    ...(track.type === "text" ? { type: "element" } : {}),
     elements: track.elements.map((element) => {
       const currentFilter = element.props?.mediaFilter;
       const normalized = typeof currentFilter === "string" && LEGACY_FILTER_ALIASES[currentFilter]

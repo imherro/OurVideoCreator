@@ -300,9 +300,10 @@ export function setTextStyle(
 }
 
 export function addTrack(editor: TimelineEditor, type: "video" | "audio" | "text" | "caption") {
-  const index = editor.getTracksByType(type).length + 1;
+  const trackType = type === "text" ? "element" : type;
+  const index = editor.getTracksByType(trackType).length + 1;
   const prefix = type === "video" ? "V" : type === "audio" ? "A" : type === "caption" ? "字幕" : "T";
-  return editor.addTrack(`${prefix}${index}`, type);
+  return editor.addTrack(`${prefix}${index}`, trackType);
 }
 
 function preferredTrack(editor: TimelineEditor, type: string, name: string): Track {
@@ -330,7 +331,7 @@ export async function addTextElement(
     .setEnd(start + duration)
     .setPosition({ x: resolution.width * 0.15, y: resolution.height * 0.12 })
     .setMetadata({ mvc: { role: "title" } });
-  const track = preferredTrack(editor, "text", "T1 · 标题");
+  const track = preferredTrack(editor, "element", "T1 · 标题");
   if (!(await editor.addElementToTrack(track, element))) {
     const fallback = addTrack(editor, "text");
     if (!(await editor.addElementToTrack(fallback, element))) throw new Error("标题加入时间线失败");

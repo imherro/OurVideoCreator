@@ -45,7 +45,9 @@ test('legacy trim and volume edit really updates Twick but preserves subtitles, 
   assert.equal(track.elements[0].e,3);assert.equal(track.elements[0].props.volume,0.7);
   assert.equal(track.elements[0].props.opacity,0.75);
   assert.equal(track.elements[1].s,5); // unchanged two-second gap
-  assert.deepEqual(next.editor.timeline.tracks.slice(2),before.editor.timeline.tracks.slice(2));
+  const preserved = structuredClone(before.editor.timeline.tracks.slice(2));
+  preserved[0].type = 'element'; // Twick renders title elements on element tracks.
+  assert.deepEqual(next.editor.timeline.tracks.slice(2),preserved);
   assert.deepEqual(next.timeline,legacyTimelineProjection(next.editor.timeline));
 });
 

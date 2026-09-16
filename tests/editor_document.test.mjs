@@ -110,3 +110,17 @@ test("editor resolution follows the project aspect ratio", () => {
   assert.deepEqual(editorResolution("9:16"), { width: 720, height: 1280 });
   assert.deepEqual(editorResolution("1:1"), { width: 1080, height: 1080 });
 });
+
+test("title tracks use Twick's renderable element kind without changing titles or other tracks", () => {
+  const timeline = {version: 3, tracks: [
+    {id: 'title-track', type: 'text', elements: [
+      {id: 'title', type: 'text', s: 0, e: 3, props: {text: 'Keep title'}}]},
+    {id: 'video-track', type: 'video', elements: []},
+  ]};
+  const result = attachAssetReferences(timeline, []);
+  assert.equal(result.tracks[0].type, 'element');
+  assert.deepEqual(result.tracks[0].elements, timeline.tracks[0].elements);
+  assert.equal(result.tracks[1].type, 'video');
+  assert.equal(timeline.tracks[0].type, 'text');
+  assert.deepEqual(attachAssetReferences(result, []), result);
+});

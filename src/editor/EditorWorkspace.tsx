@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { Sparkles } from "lucide-react";
 import VideoEditor from "@twick/video-editor";
 import "@twick/video-editor/dist/video-editor.css";
@@ -17,6 +17,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorShortcuts } from "./EditorShortcuts";
 import { planInitialTimeline } from "./initialTimeline";
 import { addAssetToTimeline } from "./assetAdapter";
+import { TimelineInputSync } from "./timelineInputSync";
 import { TIMELINE_DROP_MEDIA_TYPE } from "@twick/video-editor";
 import "./editorWorkspace.css";
 
@@ -44,17 +45,22 @@ function TimelinePersistence({
   assets: EditorAsset[];
   onChange: EditorWorkspaceProps["onChange"];
 }) {
-  const { present, changeLog } = useTimelineContext();
-  const lastSaved = useRef(JSON.stringify(attachAssetReferences(initialTimeline, assets)));
+  const { editor, present, changeLog } = useTimelineContext();
+  const sync = useRef<TimelineInputSync | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!present) return;
-    const timeline = attachAssetReferences(present, assets);
-    const serialized = JSON.stringify(timeline);
-    if (serialized === lastSaved.current) return;
-    lastSaved.current = serialized;
-    onChange({ version: 1, timeline });
-  }, [assets, changeLog, onChange, present]);
+    if (!sync.current) {
+      // Loading existing JSON may normalize track kinds/version. It is not a
+      // user edit, particularly on a read-only collaborator's first render.
+      sync.current = new TimelineInputSync(initialTimeline, attachAssetReferences(editor.getProject(), assets));
+      return;
+    }
+    const timeline = sync.current.update(initialTimeline,
+      () => attachAssetReferences(editor.getProject(), assets),
+      (remote) => editor.loadProject(remote));
+    if (timeline) onChange({ version: 1, timeline });
+  }, [assets, changeLog, editor, initialTimeline, onChange, present]);
 
   return null;
 }
@@ -111,7 +117,7 @@ function EditorSurface({
         const type = track.getType();
         const number = (counters.get(type) || 0) + 1;
         counters.set(type, number);
-        const label = type === "video" ? `V${number}` : type === "audio" ? `A${number}` : type === "caption" ? "字幕" : type === "text" ? `T${number}` : "空";
+        const label = type === "video" ? `V${number}` : type === "audio" ? `A${number}` : type === "caption" ? "字幕" : type === "text" || type === "element" ? `T${number}` : "空";
         header.dataset.trackLabel = label;
         header.title = `${label} · ${track.getName() || "未命名轨道"}`;
       });
@@ -225,7 +231,7 @@ export function EditorWorkspace({
 }: EditorWorkspaceProps) {
   const initialTimeline = useMemo(
     () => attachAssetReferences(readEditorTimeline(editor), assets),
-    [projectId],
+    [projectId, editor, assets],
   );
   const resolution = editorResolution(ratio);
 
