@@ -1,0 +1,53 @@
+baseline_sha=1ae1544ce62e9fa351a6d7a4da09c281544658dd
+expected_failure=true
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+{"actual_backlog_rows": 1, "case": "large_rollback_gap_stream", "database": "ovc_test_35048_98318ea85512", "received_ids": [null, null], "requested_cursor": 1, "retained_ids": [1, 502], "rollback_event_count": 500}
+F
+================================== FAILURES ===================================
+____ test_p2_r2_large_rollback_gap_replays_through_last_event_id_and_after ____
+
+    def test_p2_r2_large_rollback_gap_replays_through_last_event_id_and_after():
+        with s.db() as connection:
+            connection.execute('DELETE FROM events')
+        s.event('gap-project', {'type':'project','revision':1})
+        first_id = retained_ids()[0]
+    
+        rolled_back = database.connect()
+        try:
+            for revision in range(2, 502):
+                s._event(rolled_back, 'gap-project', {'type':'project','revision':revision})
+            rolled_back.rollback()
+        finally:
+            rolled_back.close()
+    
+        s.event('gap-project', {'type':'project','revision':502})
+        visible = retained_ids()
+        assert len(visible) == 2
+        assert visible[0] == first_id
+        assert visible[1] - visible[0] == 501
+    
+        last_event_chunk = asyncio.run(first_stream_chunk(last_event_id=first_id))
+        after_chunk = asyncio.run(first_stream_chunk(after=first_id))
+        received = [stream_id(last_event_chunk), stream_id(after_chunk)]
+        print(json.dumps({
+            'case':'large_rollback_gap_stream',
+            'database':s.init()['database_name'],
+            'rollback_event_count':500,
+            'retained_ids':visible,
+            'actual_backlog_rows':1,
+            'requested_cursor':first_id,
+            'received_ids':received,
+        },sort_keys=True))
+>       assert received == [visible[1], visible[1]]
+E       assert [None, None] == [502, 502]
+E         
+E         At index 0 diff: None != 502
+E         Use -v to get more diff
+
+tests\test_p2_r2.py:74: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p2_r2.py::test_p2_r2_large_rollback_gap_replays_through_last_event_id_and_after
+1 failed in 2.24s
+exit_code=1

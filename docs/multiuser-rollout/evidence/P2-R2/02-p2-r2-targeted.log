@@ -1,0 +1,9 @@
+business_sha=fc8feee3d9c3bfaffb39c55ab10d41e0fff7050f
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+{"actual_backlog_rows": 1, "case": "large_rollback_gap_stream", "database": "ovc_test_35292_4413acf9888c", "received_ids": [502, 502], "requested_cursor": 1, "retained_ids": [1, 502], "rollback_event_count": 500}
+.{"case": "stream_cursor_policy", "expired_cursor": 1009, "expired_result": "head_only", "expired_retained_ids": [1010, 1011, 1012], "initial_connection": "head_only", "no_gap_received": 504, "overlimit_result": "head_only", "overlimit_visible_backlog": 501, "small_gap_received": 506}
+.......
+8 passed in 3.66s
+exit_code=0

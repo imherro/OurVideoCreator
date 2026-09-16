@@ -145,3 +145,23 @@ P0/P1 继续保持通过。P2 阻塞项：`OVC-P2-01` Worker 锁连接死亡后�
 报告：`evidence/P2-R1/REPORT.md`；结构化并发轨迹：`evidence/P2-R1/01-p2-r1-targeted.log`；正式全量：`evidence/P2-R1/02-pytest-full.log`。
 
 开发侧已逐项处理 `OVC-P2-01` 至 `OVC-P2-05`，正式验证为 P2-R1 定向 10/10、Python 全量 273/273、原 P2/进程回归 13/13、前端 126/126、构建通过。是否关闭和 P2 是否通过由外部验收人复核；未开始 P3。
+
+## P2-R1 外部复验记录
+
+结论：**不通过**（2026-09-16，主 ChatGPT 会话只审查协作版新仓库 `imherro/OurVideoCreator`）。
+
+绑定 evidence HEAD：`1ae1544ce62e9fa351a6d7a4da09c281544658dd`；被测试业务 SHA：`246db511bd950e649f59600a5f6cd2ed183be71e`。
+
+关闭：`OVC-P2-01`、`OVC-P2-02`、`OVC-P2-03`、`OVC-P2-04`。`OVC-P2-05` 的事务发布顺序、业务/event 原子性和按行保留已认可，但剩余 `OVC-P2-R1-01`（S2）：`_event_cursor()` 仍按 Identity 数值差判断积压，大 rollback 空洞可跳过仍保留的新事件。
+
+下一单一任务：P2-R2，只修实际可见积压/保留边界判断，并补 500 次真实 rollback 后通过 `Last-Event-ID` 和 `after` 读取实际流的回归。P3 仍未授权。
+
+## P2-R2 待复验记录
+
+状态：**READY_FOR_REVIEW**（2026-09-16）
+
+被测试业务 SHA：`fc8feee3d9c3bfaffb39c55ab10d41e0fff7050f`
+
+报告：`evidence/P2-R2/REPORT.md`；修复前失败：`evidence/P2-R2/00-prefix-large-gap-failure.log`；修复后专项：`evidence/P2-R2/02-p2-r2-targeted.log`；正式全量：`evidence/P2-R2/03-pytest-full.log`。
+
+开发侧只处理 `OVC-P2-R1-01`：重连判断使用同一 SQL 快照中的实际可见积压行数和保留边界。正式结果为 P2-R2 定向 8/8、Python 全量 276/276、P2/进程回归 20/20、前端 126/126、构建通过。是否关闭剩余阻塞和 P2 是否通过由外部验收人复核；未开始 P3。
