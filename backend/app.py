@@ -202,7 +202,7 @@ def logout(request:Request,response:Response):
 
 @app.post('/api/auth/password-reset')
 def consume_password_reset(body:ResetPasswordBody,request:Request,response:Response):
-    now=time.time();token_hash=identity.digest(body.token)
+    token_hash=identity.digest(body.token)
     keys=['reset:ip:'+identity.client_ip(request),'reset:token:'+token_hash]
     failure = None
     with s.db() as c:
@@ -217,6 +217,7 @@ def consume_password_reset(body:ResetPasswordBody,request:Request,response:Respo
         else:
             user=identity.lock_password_recovery_user(c,hint['user_id'])
             item=c.execute('SELECT * FROM password_reset_tokens WHERE id=%s FOR UPDATE',(hint['id'],)).fetchone()
+            now=time.time()
             if not item or item['revoked_at'] or item['consumed_at'] or item['expires']<=now:
                 identity.record_failure(c,keys,limit=8)
                 failure = HTTPException(400,'重置链接无效或已失效')
@@ -319,9 +320,10 @@ class PasswordResetCreate(StrictBody):
 
 @app.post('/api/admin/password-resets')
 def issue_password_reset(body:PasswordResetCreate):
-    principal=identity.current();raw=secrets.token_urlsafe(36);now=time.time();reset_id=s.uid('reset-')
+    principal=identity.current();raw=secrets.token_urlsafe(36);reset_id=s.uid('reset-')
     with s.db() as c:
         user=identity.lock_password_recovery_user(c,body.user_id)
+        now=time.time()
         if not user or not user['is_active']:
             raise HTTPException(404,'用户不存在')
         c.execute('UPDATE password_reset_tokens SET revoked_at=%s WHERE user_id=%s AND consumed_at IS NULL AND revoked_at IS NULL',(now,body.user_id))

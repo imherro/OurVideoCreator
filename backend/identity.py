@@ -193,8 +193,9 @@ def _lock_rate_limit_keys(connection, keys: Iterable[str]) -> tuple[str, ...]:
 
 
 def rate_limit(connection, keys: Iterable[str], *, limit: int = 10, window: int = 300) -> None:
+    keys = _lock_rate_limit_keys(connection, keys)
     now = time.time()
-    for key in _lock_rate_limit_keys(connection, keys):
+    for key in keys:
         row = connection.execute('SELECT * FROM auth_rate_limits WHERE key=%s FOR UPDATE', (key,)).fetchone()
         if not row:
             continue
@@ -205,8 +206,9 @@ def rate_limit(connection, keys: Iterable[str], *, limit: int = 10, window: int 
 
 
 def record_failure(connection, keys: Iterable[str], *, limit: int = 10, window: int = 300) -> None:
+    keys = _lock_rate_limit_keys(connection, keys)
     now = time.time()
-    for key in _lock_rate_limit_keys(connection, keys):
+    for key in keys:
         connection.execute(
             '''INSERT INTO auth_rate_limits(key,window_started,attempts,blocked_until)
                VALUES(%s,%s,1,NULL)

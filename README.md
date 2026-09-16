@@ -1,6 +1,6 @@
 # 安影 · OurVideoCreator
 
-安影协作版 AI 视频创作工作室。当前处于多用户改造 P2 PostgreSQL 阶段：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。共享工作室密码仍是过渡方案，不具备公网多用户安全条件。
+安影协作版 AI 视频创作工作室。P0–P2 已通过外部验收，当前处于 P3 身份与团队权限返修阶段：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；P3 尚未通过外部验收，不得公网部署。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
 
 ## 运行
 
@@ -25,7 +25,7 @@ $env:OVC_DATABASE_URL='postgresql+psycopg://用户名:密码@127.0.0.1:5432/our_
 
 开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁，多 Worker 要等 P6。
 
-首次部署后，可从能够访问工作室地址的浏览器设置工作室密码。P3 完成前只能在受控开发网络使用，不得公网部署。
+首次部署必须由运维使用 `python -m backend.admin_cli bootstrap-admin --phone <管理员手机号> --nickname <昵称>` 初始化平台管理员，并通过进程环境 `OVC_BOOTSTRAP_PASSWORD` 提供密码；没有默认密码，浏览器公共初始化入口已退役。后续用户通过管理员邀请注册，入组及作品授权后才能访问对应内容。P3 完成前只能在受控开发网络使用，不得公网部署。
 
 当前主机的局域网地址在首次开发检查时为 `192.168.2.100`，可能随网络改变。程序不会自行修改防火墙。允许 Python 入站访问时限定到需要的私人网络。
 
