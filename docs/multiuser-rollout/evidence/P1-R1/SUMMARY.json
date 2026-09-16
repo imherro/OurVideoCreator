@@ -1,0 +1,113 @@
+{
+  "evidence_kind": "P1-R1 final acceptance run",
+  "business_code_sha": "f27439fc9fcabd706e2772d5cd7212d76a9f4706",
+  "capture_start_head": "f27439fc9fcabd706e2772d5cd7212d76a9f4706",
+  "capture_started_utc": "2026-09-16T06:08:33.065915+00:00",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "supersedes": "P1 failed review at 5ed0afa361b0e86590cd05b9ac285d9285854635 without overwriting P1 evidence",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.2 (tags/v3.14.2:df79316, Dec  5 2025, 17:18:21) [MSC v.1944 64 bit (AMD64)]",
+    "node": "v24.13.0",
+    "npm": "11.8.0"
+  },
+  "test_isolation": "all process tests use isolated temporary MVC_DATA_DIR values and loopback-only ports",
+  "paid_egress_guard": "pytest blocks non-loopback sockets; the deterministic Provider is loopback-only; no real credentials are supplied",
+  "removed_surface": {
+    "embedded_inference_directory_exists": false,
+    "runtime_module_exists": false,
+    "tracked_removed_paths": [],
+    "expected": "all false/empty"
+  },
+  "runs": [
+    {
+      "name": "01-npm-ci",
+      "command": "npm.cmd ci",
+      "started_utc": "2026-09-16T06:08:33.641254+00:00",
+      "duration_seconds": 69.357,
+      "exit_code": 0,
+      "log": "01-npm-ci.log"
+    },
+    {
+      "name": "02-npm-test",
+      "command": "npm.cmd test",
+      "started_utc": "2026-09-16T06:09:42.997494+00:00",
+      "duration_seconds": 1.662,
+      "exit_code": 0,
+      "log": "02-npm-test.log"
+    },
+    {
+      "name": "03-npm-build",
+      "command": "npm.cmd run build",
+      "started_utc": "2026-09-16T06:09:44.660522+00:00",
+      "duration_seconds": 14.406,
+      "exit_code": 0,
+      "log": "03-npm-build.log"
+    },
+    {
+      "name": "04-pytest-collect",
+      "command": "C:\\Python314\\python.exe -m pytest --collect-only -q",
+      "started_utc": "2026-09-16T06:09:59.067284+00:00",
+      "duration_seconds": 1.632,
+      "exit_code": 0,
+      "log": "04-pytest-collect.log"
+    },
+    {
+      "name": "05-pytest",
+      "command": "C:\\Python314\\python.exe -m pytest -q",
+      "started_utc": "2026-09-16T06:10:00.700216+00:00",
+      "duration_seconds": 43.041,
+      "exit_code": 0,
+      "log": "05-pytest.log"
+    },
+    {
+      "name": "06-inflight-web-restart",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_processes.py -s",
+      "started_utc": "2026-09-16T06:10:43.740793+00:00",
+      "duration_seconds": 6.051,
+      "exit_code": 0,
+      "log": "06-inflight-web-restart.log"
+    },
+    {
+      "name": "07-powershell-lifecycle",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_powershell.py -s",
+      "started_utc": "2026-09-16T06:10:49.792714+00:00",
+      "duration_seconds": 14.762,
+      "exit_code": 0,
+      "log": "07-powershell-lifecycle.log"
+    },
+    {
+      "name": "08-ffmpeg-export",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_export.py -s",
+      "started_utc": "2026-09-16T06:11:04.555385+00:00",
+      "duration_seconds": 7.804,
+      "exit_code": 0,
+      "log": "08-ffmpeg-export.log"
+    },
+    {
+      "name": "09-zero-upstream-on-missing-provider",
+      "command": "C:\\Python314\\python.exe -m pytest -q tests/test_api.py::test_missing_or_removed_local_provider_fails_before_any_upstream_request -s",
+      "started_utc": "2026-09-16T06:11:12.360077+00:00",
+      "duration_seconds": 1.455,
+      "exit_code": 0,
+      "log": "09-zero-upstream-on-missing-provider.log"
+    },
+    {
+      "name": "10-route-audit",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "started_utc": "2026-09-16T06:11:13.815116+00:00",
+      "duration_seconds": 0.568,
+      "exit_code": 0,
+      "log": "10-route-audit.log"
+    },
+    {
+      "name": "11-diff-check",
+      "command": "git diff --check",
+      "started_utc": "2026-09-16T06:11:14.383956+00:00",
+      "duration_seconds": 0.037,
+      "exit_code": 0,
+      "log": "11-diff-check.log"
+    }
+  ],
+  "capture_finished_utc": "2026-09-16T06:11:14.421889+00:00"
+}
