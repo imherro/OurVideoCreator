@@ -7,7 +7,7 @@
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
-| P3 | P3-R1 已提交待审 | 待复验（首轮不通过） | `a8cd59e8247b915737084383f5b53df1f831f4fe` | `evidence/P3-R1/REPORT.md` | `OVC-P3-01…06` 待外部关闭 | P3-R1 |
+| P3 | P3-R2 返修中 | 不通过 | `5e0c5e36d37415d4867d380f4e86dd47c87eebce` | `evidence/P3-R1/REPORT.md` | `OVC-P3-R1-01…03` | P3-R2 |
 | P4 | 未提交 | 未验收 | | | | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
@@ -207,3 +207,15 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 报告：`evidence/P3-R1/REPORT.md`；正式日志与结构化证据：`evidence/P3-R1/01-p3-r1-targeted.log` 至 `08-browser-db-audit.json`。
 
 开发侧已逐项处理 `OVC-P3-01…06`：统一批量删除权限、串行化成员/授权和最后管理员/owner 不变量、串行化登录/重置、限流前置与共享 IP 记录保留、补齐管理 UI 与真实路由负向测试。正式结果为 P3-R1 定向 12/12、Python 全量 288/288、前端 126/126、构建通过、85/85 API 已分类，并完成双浏览器隔离闭环。是否关闭阻塞和 P3 是否通过由外部验收人复核；P4 未开始。
+
+## P3-R1 外部复验记录
+
+结论：**不通过**（2026-09-16，主 ChatGPT 会话只审查协作版新仓库 `imherro/OurVideoCreator`）。
+
+绑定 evidence HEAD：`5e0c5e36d37415d4867d380f4e86dd47c87eebce`；被测试业务 SHA：`a8cd59e8247b915737084383f5b53df1f831f4fe`。
+
+关闭：`OVC-P3-01`、`OVC-P3-02`、`OVC-P3-04`。部分完成：`OVC-P3-03`、`OVC-P3-05`、`OVC-P3-06`。
+
+剩余阻塞：`OVC-P3-R1-01`（S2，首次限流桶不存在时并发请求可一起通过旧检查）；`OVC-P3-R1-02`（S2，同用户并发签发可能留下两个有效重置令牌，且签发/消费需统一 user→token 锁顺序）；`OVC-P3-R1-03`（S2，必须实际点击新增管理控件并提交可追溯浏览器/请求/DOM/审计原始证据）。
+
+下一单一任务：P3-R2，只补上述三个残留项并写入 `evidence/P3-R2/`。P0/P1/P2 历史通过不变；P4、公网部署和真实付费 API 仍未授权。

@@ -473,6 +473,198 @@ def test_p3_r1_rate_limits_precede_hashing_and_success_preserves_shared_ip(admin
         assert connection.execute("SELECT 1 FROM auth_rate_limits WHERE key=%s", (account_key,)).fetchone() is None
 
 
+def test_p3_r2_first_rate_limit_bucket_serializes_concurrent_entry(admin, clients, monkeypatch):
+    _, _, number = register(admin, clients, nickname="首次限流并发用户")
+    verify_calls = 0
+    result_lock = threading.Lock()
+    original_verify = identity.verify_password
+
+    def observed_verify(encoded: str, password: str):
+        nonlocal verify_calls
+        with result_lock:
+            verify_calls += 1
+        return original_verify(encoded, password)
+
+    monkeypatch.setattr(identity, "verify_password", observed_verify)
+
+    def concurrent_round() -> list[int]:
+        contenders = [clients() for _ in range(11)]
+        barrier = threading.Barrier(len(contenders) + 1)
+        outcomes: list[int] = []
+
+        def attempt(client: TestClient):
+            barrier.wait()
+            status = client.post("/api/auth/login", json={
+                "phone": number, "password": "definitely-wrong",
+            }).status_code
+            with result_lock:
+                outcomes.append(status)
+
+        threads = [threading.Thread(target=attempt, args=(client,)) for client in contenders]
+        for thread in threads:
+            thread.start()
+        barrier.wait()
+        for thread in threads:
+            thread.join(timeout=30)
+            assert not thread.is_alive()
+        return outcomes
+
+    assert sorted(concurrent_round()) == [401] * 10 + [429]
+    assert verify_calls == 10
+    ip_key = "login:ip:testclient"
+    account_key = "login:account:" + identity.digest(identity.normalize_phone(number))
+    with s.db() as connection:
+        rows = connection.execute(
+            "SELECT key,attempts,blocked_until FROM auth_rate_limits WHERE key=ANY(%s)",
+            ([ip_key, account_key],),
+        ).fetchall()
+    assert {row["key"]: row["attempts"] for row in rows} == {ip_key: 10, account_key: 10}
+    assert all(row["blocked_until"] is not None for row in rows)
+
+    # Expired windows and explicitly cleared buckets re-enter through the same
+    # key lock; neither reset creates a new first-row race.
+    with s.db() as connection:
+        connection.execute(
+            "UPDATE auth_rate_limits SET window_started=%s,blocked_until=%s WHERE key=ANY(%s)",
+            (time.time() - 301, time.time() - 1, [ip_key, account_key]),
+        )
+    assert sorted(concurrent_round()) == [401] * 10 + [429]
+    assert verify_calls == 20
+    with s.db() as connection:
+        identity.clear_rate_limit(connection, [ip_key, account_key])
+    assert sorted(concurrent_round()) == [401] * 10 + [429]
+    assert verify_calls == 30
+
+
+def test_p3_r2_reset_issue_and_consume_share_user_then_token_lock_order(admin, clients, monkeypatch):
+    _, user, _ = register(admin, clients, nickname="重置签发并发用户")
+    admin_a, admin_b = clients(), clients()
+    login_admin(admin_a)
+    login_admin(admin_b)
+
+    def concurrent_issue() -> tuple[dict, dict]:
+        barrier = threading.Barrier(3)
+        issued: list[dict] = []
+        result_lock = threading.Lock()
+
+        def issue(client: TestClient):
+            barrier.wait()
+            response = client.post("/api/admin/password-resets", json={"user_id": user["id"]})
+            assert response.status_code == 200, response.text
+            with result_lock:
+                issued.append(response.json())
+
+        threads = [threading.Thread(target=issue, args=(client,)) for client in (admin_a, admin_b)]
+        for thread in threads:
+            thread.start()
+        barrier.wait()
+        for thread in threads:
+            thread.join(timeout=20)
+            assert not thread.is_alive()
+
+        with s.db() as connection:
+            active = connection.execute(
+                """SELECT token_hash FROM password_reset_tokens
+                   WHERE user_id=%s AND consumed_at IS NULL AND revoked_at IS NULL AND expires>%s""",
+                (user["id"], time.time()),
+            ).fetchall()
+        assert len(active) == 1
+        active_hash = active[0]["token_hash"]
+        winner = next(item for item in issued if identity.digest(item["token"]) == active_hash)
+        loser = next(item for item in issued if identity.digest(item["token"]) != active_hash)
+        return winner, loser
+
+    # First exercise two issuers when no reset row exists.
+    first_winner, first_loser = concurrent_issue()
+    assert clients().post("/api/auth/password-reset", json={
+        "token": first_loser["token"], "password": "P3-R2-first-loser-revoked!",
+    }).status_code == 400
+
+    # Repeat with an already-active token; the old winner must be replaced.
+    winner, loser = concurrent_issue()
+    assert clients().post("/api/auth/password-reset", json={
+        "token": first_winner["token"], "password": "P3-R2-old-winner-revoked!",
+    }).status_code == 400
+    assert clients().post("/api/auth/password-reset", json={
+        "token": loser["token"], "password": "P3-R2-second-loser-revoked!",
+    }).status_code == 400
+
+    # Hold the consumer immediately after it acquires the user row. A new
+    # issuance must wait for that same lock, then revoke/replace consistently.
+    lock_entered = threading.Event()
+    release_lock = threading.Event()
+    first_call = True
+    hook_lock = threading.Lock()
+    original_lock_user = identity.lock_password_recovery_user
+
+    def observed_lock_user(connection, user_id: str):
+        nonlocal first_call
+        row = original_lock_user(connection, user_id)
+        with hook_lock:
+            pause = first_call
+            first_call = False
+        if pause:
+            lock_entered.set()
+            assert release_lock.wait(10)
+        return row
+
+    monkeypatch.setattr(identity, "lock_password_recovery_user", observed_lock_user)
+    race_results: dict[str, object] = {}
+    consume_client = clients()
+
+    def consume_current():
+        response = consume_client.post("/api/auth/password-reset", json={
+            "token": winner["token"], "password": "P3-R2-consumed-first!",
+        })
+        race_results["consume_status"] = response.status_code
+
+    def issue_after_consumer_lock():
+        response = admin_a.post("/api/admin/password-resets", json={"user_id": user["id"]})
+        race_results["issue_status"] = response.status_code
+        race_results["issued_token"] = response.json()["token"]
+
+    consume_thread = threading.Thread(target=consume_current)
+    consume_thread.start()
+    assert lock_entered.wait(10)
+    issue_thread = threading.Thread(target=issue_after_consumer_lock)
+    issue_thread.start()
+    time.sleep(0.2)
+    assert issue_thread.is_alive()
+    release_lock.set()
+    for thread in (consume_thread, issue_thread):
+        thread.join(timeout=20)
+        assert not thread.is_alive()
+
+    assert race_results["consume_status"] == 200
+    assert race_results["issue_status"] == 200
+    assert clients().post("/api/auth/password-reset", json={
+        "token": winner["token"], "password": "P3-R2-replay-blocked!",
+    }).status_code == 400
+
+    final_token = str(race_results["issued_token"])
+    expired = admin.post("/api/admin/password-resets", json={"user_id": user["id"]}).json()
+    with s.db() as connection:
+        connection.execute(
+            "UPDATE password_reset_tokens SET expires=%s WHERE token_hash=%s",
+            (time.time() - 1, identity.digest(expired["token"])),
+        )
+    assert clients().post("/api/auth/password-reset", json={
+        "token": expired["token"], "password": "P3-R2-expired-blocked!",
+    }).status_code == 400
+    revoked = admin.post("/api/admin/password-resets", json={"user_id": user["id"]}).json()
+    with s.db() as connection:
+        connection.execute(
+            "UPDATE password_reset_tokens SET revoked_at=%s WHERE token_hash=%s",
+            (time.time(), identity.digest(revoked["token"])),
+        )
+    assert clients().post("/api/auth/password-reset", json={
+        "token": revoked["token"], "password": "P3-R2-revoked-blocked!",
+    }).status_code == 400
+    assert clients().post("/api/auth/password-reset", json={
+        "token": final_token, "password": "P3-R2-replaced-blocked!",
+    }).status_code == 400
+
+
 def test_p3_r1_last_platform_admin_guard_is_concurrent(admin):
     with s.db() as connection:
         first = connection.execute(

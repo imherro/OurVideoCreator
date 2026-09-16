@@ -207,22 +207,33 @@ def consume_password_reset(body:ResetPasswordBody,request:Request,response:Respo
     failure = None
     with s.db() as c:
         identity.rate_limit(c,keys,limit=8)
-        item=c.execute('SELECT * FROM password_reset_tokens WHERE token_hash=%s FOR UPDATE',(token_hash,)).fetchone()
-        if not item or item['revoked_at'] or item['consumed_at'] or item['expires']<=now:
+        # Discover the lock root without locking the token, then always acquire
+        # user -> token. Issuance uses the same order, avoiding a recovery-path
+        # deadlock while still rechecking every token field under lock.
+        hint=c.execute('SELECT id,user_id FROM password_reset_tokens WHERE token_hash=%s',(token_hash,)).fetchone()
+        if not hint:
             identity.record_failure(c,keys,limit=8)
             failure = HTTPException(400,'重置链接无效或已失效')
         else:
-            user=c.execute('SELECT id,is_active FROM users WHERE id=%s FOR UPDATE',(item['user_id'],)).fetchone()
-            if not user or not user['is_active']:
+            user=identity.lock_password_recovery_user(c,hint['user_id'])
+            item=c.execute('SELECT * FROM password_reset_tokens WHERE id=%s FOR UPDATE',(hint['id'],)).fetchone()
+            if not item or item['revoked_at'] or item['consumed_at'] or item['expires']<=now:
+                identity.record_failure(c,keys,limit=8)
+                failure = HTTPException(400,'重置链接无效或已失效')
+            elif not user or not user['is_active']:
                 raise HTTPException(400,'账号不可用')
-            encoded=identity.hash_password(body.password)
-            c.execute('UPDATE users SET password_hash=%s,updated=%s WHERE id=%s',
-                      (encoded,now,item['user_id']))
-            c.execute('UPDATE password_reset_tokens SET consumed_at=%s WHERE id=%s',(now,item['id']))
-            c.execute('UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL',(now,item['user_id']))
-            identity.audit(c,'user.password_reset','user',item['user_id'],actor_user_id=item['user_id'])
-            identity.clear_rate_limit(c,[keys[1]])
-            identity.issue_session(c,response,request,item['user_id'])
+            else:
+                encoded=identity.hash_password(body.password)
+                c.execute('UPDATE users SET password_hash=%s,updated=%s WHERE id=%s',
+                          (encoded,now,item['user_id']))
+                c.execute('UPDATE password_reset_tokens SET consumed_at=%s WHERE id=%s',(now,item['id']))
+                c.execute('''UPDATE password_reset_tokens SET revoked_at=%s
+                    WHERE user_id=%s AND id<>%s AND consumed_at IS NULL AND revoked_at IS NULL''',
+                    (now,item['user_id'],item['id']))
+                c.execute('UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL',(now,item['user_id']))
+                identity.audit(c,'user.password_reset','user',item['user_id'],actor_user_id=item['user_id'])
+                identity.clear_rate_limit(c,[keys[1]])
+                identity.issue_session(c,response,request,item['user_id'])
     if failure:
         raise failure
     return {'ok':True}
@@ -310,7 +321,8 @@ class PasswordResetCreate(StrictBody):
 def issue_password_reset(body:PasswordResetCreate):
     principal=identity.current();raw=secrets.token_urlsafe(36);now=time.time();reset_id=s.uid('reset-')
     with s.db() as c:
-        if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(body.user_id,)).fetchone():
+        user=identity.lock_password_recovery_user(c,body.user_id)
+        if not user or not user['is_active']:
             raise HTTPException(404,'用户不存在')
         c.execute('UPDATE password_reset_tokens SET revoked_at=%s WHERE user_id=%s AND consumed_at IS NULL AND revoked_at IS NULL',(now,body.user_id))
         c.execute('''INSERT INTO password_reset_tokens(id,token_hash,user_id,created_by,created,expires)

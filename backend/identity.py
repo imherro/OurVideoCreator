@@ -181,9 +181,20 @@ def require_csrf(request: Request, principal: Principal) -> None:
         raise HTTPException(403, 'CSRF 校验失败')
 
 
+def _lock_rate_limit_keys(connection, keys: Iterable[str]) -> tuple[str, ...]:
+    """Serialize each logical bucket even before its first row exists."""
+    ordered = tuple(sorted(set(keys)))
+    for key in ordered:
+        connection.execute(
+            'SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))',
+            (key,),
+        )
+    return ordered
+
+
 def rate_limit(connection, keys: Iterable[str], *, limit: int = 10, window: int = 300) -> None:
     now = time.time()
-    for key in keys:
+    for key in _lock_rate_limit_keys(connection, keys):
         row = connection.execute('SELECT * FROM auth_rate_limits WHERE key=%s FOR UPDATE', (key,)).fetchone()
         if not row:
             continue
@@ -195,7 +206,7 @@ def rate_limit(connection, keys: Iterable[str], *, limit: int = 10, window: int 
 
 def record_failure(connection, keys: Iterable[str], *, limit: int = 10, window: int = 300) -> None:
     now = time.time()
-    for key in keys:
+    for key in _lock_rate_limit_keys(connection, keys):
         connection.execute(
             '''INSERT INTO auth_rate_limits(key,window_started,attempts,blocked_until)
                VALUES(%s,%s,1,NULL)
@@ -210,8 +221,16 @@ def record_failure(connection, keys: Iterable[str], *, limit: int = 10, window: 
 
 
 def clear_rate_limit(connection, keys: Iterable[str]) -> None:
-    for key in keys:
+    for key in _lock_rate_limit_keys(connection, keys):
         connection.execute('DELETE FROM auth_rate_limits WHERE key=%s', (key,))
+
+
+def lock_password_recovery_user(connection, user_id: str):
+    """Use the user row as the single lock root for reset issue and consume."""
+    return connection.execute(
+        'SELECT id,is_active FROM users WHERE id=%s FOR UPDATE',
+        (user_id,),
+    ).fetchone()
 
 
 def lock_identity_invariants(connection) -> None:
