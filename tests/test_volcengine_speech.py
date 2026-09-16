@@ -40,15 +40,15 @@ def test_speech_v3_sse_uses_fixed_voice_and_registers_dialogue(monkeypatch):
     }
     with s.db() as connection:
         connection.execute(
-            'INSERT INTO productions(id,name,created,updated) VALUES(?,?,?,?)',
+            'INSERT INTO productions(id,name,created,updated) VALUES(%s,%s,%s,%s)',
             (production_id, '语音测试', now, now),
         )
         connection.execute(
-            'INSERT INTO projects(id,name,revision,document,created,updated,production_id,episode_no,episode_title) VALUES(?,?,1,?,?,?,?,1,?)',
+            'INSERT INTO projects(id,name,revision,document,created,updated,production_id,episode_no,episode_title) VALUES(%s,%s,1,%s,%s,%s,%s,1,%s)',
             (project_id, '第一集', '{}', now, now, production_id, '第一集'),
         )
         connection.execute(
-            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,production_id) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (job_id, job_id, project_id, 'dialogue:1', 'audio', 'running', s.dumps(job_input), now, now, production_id),
         )
 
@@ -86,7 +86,7 @@ def test_speech_v3_sse_uses_fixed_voice_and_registers_dialogue(monkeypatch):
     assert result['assets'][0]['kind'] == 'audio'
     assert result['assets'][0]['name'].endswith('.mp3')
     with s.db() as connection:
-        asset = s.unpack(connection.execute('SELECT * FROM assets WHERE id=?', (result['assets'][0]['id'],)).fetchone())
+        asset = s.unpack(connection.execute('SELECT * FROM assets WHERE id=%s', (result['assets'][0]['id'],)).fetchone())
     assert asset['metadata']['input']['dialogue']['shotUid'] == 'shot-uid-1'
     assert asset['metadata']['duration'] == 1.25
 

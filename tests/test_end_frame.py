@@ -8,11 +8,11 @@ from backend.capabilities import maestro_model,validate_media
 def test_tail_frame_upload_and_provider_flags(monkeypatch):
     s.init();pid=s.uid();jid=s.uid();now=time.time();ids=[]
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'tail','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'n','video','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'tail','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'n','video','running','{}',now,now))
         for color in ('red','blue'):
             aid=s.uid();path=s.ASSETS/(aid+'.png');Image.new('RGB',(16,16),color).save(path);ids.append(aid)
-            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',(aid,pid,color+'.png','image',path.name,'image/png','{}',now))
+            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',(aid,pid,color+'.png','image',path.name,'image/png','{}',now))
     captured=[];uploads=[]
     def handle(request):
         if request.url.path=='/api/v1/models':return httpx.Response(200,json={'models':[{'model_type':'h3','supports_end_frame':True,'is_downloaded':True,'director':{'video':{'story':{'compatible':True}},'clip_min_frames':124,'clip_frame_step':17}}]})
@@ -46,10 +46,10 @@ def test_unsupported_model_rejects_tail():
 def test_flux_image_reference_is_uploaded_and_sent_in_native_reference_mode(monkeypatch):
     s.init();pid=s.uid();jid=s.uid();now=time.time();aid=s.uid()
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'reference','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'image','image','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'reference','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'image','image','running','{}',now,now))
         path=s.ASSETS/(aid+'.png');Image.new('RGB',(32,16),'orange').save(path)
-        c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',(aid,pid,'character.png','image',path.name,'image/png','{}',now))
+        c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',(aid,pid,'character.png','image',path.name,'image/png','{}',now))
     captured=[]
     def handle(request):
         if request.url.path=='/api/v1/models':

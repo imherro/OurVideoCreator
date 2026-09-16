@@ -115,11 +115,11 @@ def test_import_120_chapters_and_create_recoverable_text_jobs_only(source_client
     assert all(item["input"]["source_event_extraction"]["chapterId"] in body["chapter_ids"] for item in jobs)
     with s.db() as connection:
         kinds = connection.execute(
-            "SELECT DISTINCT kind FROM jobs WHERE project_id=?", (episode["id"],)
+            "SELECT DISTINCT kind FROM jobs WHERE project_id=%s", (episode["id"],)
         ).fetchall()
         assert [row["kind"] for row in kinds] == ["text"]
         connection.execute(
-            "UPDATE jobs SET status='cancelled' WHERE project_id=?", (episode["id"],)
+            "UPDATE jobs SET status='cancelled' WHERE project_id=%s", (episode["id"],)
         )
 
 
@@ -148,7 +148,7 @@ def test_invalid_or_stale_extraction_preserves_existing_events(source_client, mo
     now = time.time()
     with s.db() as connection:
         connection.execute(
-            "INSERT INTO source_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO source_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 "source-event-existing", production["id"], chapter["id"], 1,
                 s.dumps(["阿青"]), "旧事件", "medium", "紧张", s.dumps({"weather": "rain"}),
@@ -259,9 +259,9 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
 
     now = time.time()
     with s.db() as connection:
-        connection.execute("UPDATE jobs SET status='cancelled' WHERE id=?", (extraction["id"],))
+        connection.execute("UPDATE jobs SET status='cancelled' WHERE id=%s", (extraction["id"],))
         connection.execute(
-            "INSERT INTO source_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO source_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 "source-event-soft-delete", production["id"], chapter["id"], 1,
                 s.dumps(["阿青"]), "旧事件仍可恢复", "medium", "平静", "{}",

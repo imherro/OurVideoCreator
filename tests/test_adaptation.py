@@ -205,7 +205,7 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
     assert client.get(f'/api/productions/{production["id"]}/episode-scripts/13').json()["revision"] == 0
     with s.db() as connection:
         assert {row["kind"] for row in connection.execute(
-            "SELECT DISTINCT kind FROM jobs WHERE project_id IN (SELECT id FROM projects WHERE production_id=?)",
+            "SELECT DISTINCT kind FROM jobs WHERE project_id IN (SELECT id FROM projects WHERE production_id=%s)",
             (production["id"],),
         )} == {"text"}
 
@@ -214,10 +214,10 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
     client = adaptation_client
     production, _, _, adaptation = setup_production(client, count=2)
     with s.db() as connection:
-        row = connection.execute("SELECT shared_context FROM productions WHERE id=?", (production["id"],)).fetchone()
+        row = connection.execute("SELECT shared_context FROM productions WHERE id=%s", (production["id"],)).fetchone()
         context = json.loads(row["shared_context"])
         context["generationPolicy"]["text"] = {"providerId": "ark-for-script", "modelId": "doubao-seed"}
-        connection.execute("UPDATE productions SET shared_context=? WHERE id=?", (s.dumps(context), production["id"]))
+        connection.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), production["id"]))
     approved = save_and_approve(client, production, adaptation)
     virtual = client.get(f'/api/productions/{production["id"]}/episode-scripts/2').json()
     payload = {
@@ -320,7 +320,7 @@ def test_project_put_cannot_persist_a_second_copy_of_production_adaptation(adapt
     reopened = client.get(f'/api/projects/{episode["id"]}').json()
     assert all(key not in reopened["document"] for key in ("adaptationPlan", "episodePlans", "monetizationPlan"))
     with s.db() as connection:
-        stored = json.loads(connection.execute('SELECT document FROM projects WHERE id=?',(episode["id"],)).fetchone()["document"])
+        stored = json.loads(connection.execute('SELECT document FROM projects WHERE id=%s',(episode["id"],)).fetchone()["document"])
     assert all(key not in stored for key in ("adaptationPlan", "episodePlans", "monetizationPlan"))
     current = client.get(f'/api/productions/{production["id"]}/adaptation').json()
     assert current["adaptationPlan"] == canonical["adaptationPlan"]
@@ -352,6 +352,6 @@ def test_source_edit_marks_approved_plan_and_derived_script_stale_without_ai_cal
     assert client.get(f'/api/productions/{production["id"]}/episode-scripts/1').json()["status"] == "stale"
     with s.db() as connection:
         assert connection.execute(
-            "SELECT COUNT(*) value FROM jobs WHERE project_id IN (SELECT id FROM projects WHERE production_id=?)",
+            "SELECT COUNT(*) value FROM jobs WHERE project_id IN (SELECT id FROM projects WHERE production_id=%s)",
             (production["id"],),
         ).fetchone()["value"] == before_jobs

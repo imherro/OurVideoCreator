@@ -57,7 +57,7 @@ def test_batch_carries_static_reference_asset_to_minimax(batch_authenticated):
     assert len(jobs)==1
     assert jobs[0]['input']['asset_ids']==[asset['id']]
     with s.db() as db:
-        frozen=db.execute('SELECT provider FROM job_private WHERE job_id=?',(jobs[0]['id'],)).fetchone()['provider']
+        frozen=db.execute('SELECT provider FROM job_private WHERE job_id=%s',(jobs[0]['id'],)).fetchone()['provider']
     assert 'MiniMax-Hailuo-2.3' in frozen
 
 
@@ -124,13 +124,13 @@ def test_batch_seedream_keeps_canvas_reference_order_after_parent_finishes(batch
         {'type':'asset','asset_id':manual['id']},
     ]
     with s.db() as db:
-        db.execute("UPDATE jobs SET status='succeeded',result=? WHERE id=?",(
+        db.execute("UPDATE jobs SET status='succeeded',result=%s WHERE id=%s",(
             s.dumps({'assets':[{'id':generated['id'],'kind':'image'}]}),parent['id']))
-        db.execute("UPDATE jobs SET status='running' WHERE id=?",(target['id'],))
+        db.execute("UPDATE jobs SET status='running' WHERE id=%s",(target['id'],))
     expected=[]
     for asset in (generated,static,manual):
         with s.db() as db:
-            row=db.execute('SELECT path FROM assets WHERE id=?',(asset['id'],)).fetchone()
+            row=db.execute('SELECT path FROM assets WHERE id=%s',(asset['id'],)).fetchone()
         expected.append((s.ASSETS/row['path']).read_bytes())
     original=httpx.Client
     def handle(request):

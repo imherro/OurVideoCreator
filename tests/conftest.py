@@ -3,8 +3,19 @@ import ipaddress
 import socket
 import tempfile
 import pytest
+from pathlib import Path
+from tests.postgres_test_db import create_isolated_database, drop_isolated_database
+
 # Installed before collection imports backend.store, including single-file runs.
 os.environ['MVC_DATA_DIR']=tempfile.mkdtemp(prefix='mvc-tests-')
+_ROOT = Path(__file__).resolve().parents[1]
+_TEST_DATABASE_NAME, _TEST_DATABASE_URL = create_isolated_database(_ROOT)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    from backend.database import engine
+    engine().dispose()
+    drop_isolated_database(_TEST_DATABASE_NAME, _TEST_DATABASE_URL)
 
 
 @pytest.fixture(autouse=True)

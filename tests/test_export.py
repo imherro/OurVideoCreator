@@ -16,8 +16,8 @@ def test_real_export_two_stills_and_decode():
     s.set_setting('ffmpeg',ffmpeg)
     pid=s.uid();jid=s.uid();now=time.time()
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Export integration','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'export','export','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Export integration','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'export','export','running','{}',now,now))
     job={'id':jid,'project_id':pid,'node_id':'export','kind':'export','input':{}}
     timeline=[]
     for color in ('red','blue'):
@@ -28,7 +28,7 @@ def test_real_export_two_stills_and_decode():
     result=Worker().export(job)
     assert result['assets'][0]['kind']=='video'
     with s.db() as c:
-        file=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=?',(result['assets'][0]['id'],)).fetchone()['path']
+        file=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=%s',(result['assets'][0]['id'],)).fetchone()['path']
     assert file.stat().st_size>500
     frames=[]
     for offset in ('0.1','0.7'):
@@ -44,10 +44,10 @@ def test_export_original_audio_music_subtitle_and_mute():
     from backend.media import ffmpeg_executable,probe
     s.init();ffmpeg=ffmpeg_executable()
     pid=s.uid();now=time.time()
-    with s.db() as c:c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Sound and subtitle','{}',now,now))
+    with s.db() as c:c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Sound and subtitle','{}',now,now))
     def job():
         jid=s.uid()
-        with s.db() as c:c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'export','export','running','{}',now,now))
+        with s.db() as c:c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'export','export','running','{}',now,now))
         return {'id':jid,'project_id':pid,'node_id':'export','kind':'export','input':{}}
     source=s.DATA/(s.uid()+'.mp4');music=s.DATA/(s.uid()+'.wav');base=job()
     for args in (
@@ -59,12 +59,12 @@ def test_export_original_audio_music_subtitle_and_mute():
     video=register(base,source);audio=register(base,music);source.unlink();music.unlink()
     sid=s.uid();subtitle=s.ASSETS/(sid+'.srt')
     subtitle.write_text('1\n00:00:00,000 --> 00:00:01,000\nTEST\n',encoding='utf-8')
-    with s.db() as c:c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',(sid,pid,'test.srt','subtitle',subtitle.name,'application/x-subrip','{}',now))
+    with s.db() as c:c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',(sid,pid,'test.srt','subtitle',subtitle.name,'application/x-subrip','{}',now))
     amplitudes=[]
     for volume in (1,0):
         current=job();current['input']={'timeline':[{'asset_id':video['id'],'duration':1,'volume':volume}], 'resolution':'320x180','audio_id':audio['id'],'music_volume':.5,'subtitle_id':sid,'transition':'fade'}
         result=Worker().export(current)
-        with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=?',(result['assets'][0]['id'],)).fetchone()['path']
+        with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=%s',(result['assets'][0]['id'],)).fetchone()['path']
         info=probe(path);assert info['has_audio'] and .95<info['duration']<1.2
         pcm=subprocess.run([ffmpeg,'-v','error','-ss','0.2','-i',str(path),'-t','0.6','-vn','-ac','1','-ar','8000','-f','f32le','-'],capture_output=True,timeout=30)
         assert pcm.returncode==0
@@ -88,8 +88,8 @@ def test_editor_export_composites_tracks_text_and_audio():
     s.init();ffmpeg=ffmpeg_executable()
     pid=s.uid();jid=s.uid();now=time.time()
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Editor export','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'export','export','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Editor export','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'export','export','running','{}',now,now))
     job={'id':jid,'project_id':pid,'node_id':'export','kind':'export','input':{}}
     source=s.DATA/(s.uid()+'.mp4');music=s.DATA/(s.uid()+'.wav');overlay=s.DATA/(s.uid()+'.png')
     commands=(
@@ -123,7 +123,7 @@ def test_editor_export_composites_tracks_text_and_audio():
     job['input']={'editor_timeline':project,'render_mode':'editor','resolution':'160x90'}
     result=Worker().export(job)
     assert result['render']=={'mode':'editor','duration':1.0,'visual_count':2,'audio_count':2,'text_count':1}
-    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=?',(result['assets'][0]['id'],)).fetchone()['path']
+    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=%s',(result['assets'][0]['id'],)).fetchone()['path']
     info=probe(path);assert info['has_audio'] and .95<info['duration']<1.2
     frame=subprocess.run([ffmpeg,'-v','error','-ss','0.5','-i',str(path),'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'],capture_output=True,timeout=30)
     assert frame.returncode==0,frame.stderr
@@ -149,8 +149,8 @@ def test_editor_export_crossfades_adjacent_visuals():
     s.init();ffmpeg=ffmpeg_executable()
     pid=s.uid();jid=s.uid();now=time.time()
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Crossfade','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'export','export','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Crossfade','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'export','export','running','{}',now,now))
     job={'id':jid,'project_id':pid,'node_id':'export','kind':'export','input':{}}
     assets=[]
     for color in ('red','blue'):
@@ -170,7 +170,7 @@ def test_editor_export_crossfades_adjacent_visuals():
     ]}
     job['input']={'editor_timeline':project,'resolution':'64x64'}
     result=Worker().export(job)
-    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=?',(result['assets'][0]['id'],)).fetchone()['path']
+    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=%s',(result['assets'][0]['id'],)).fetchone()['path']
     colors=[]
     for offset in ('0.2','0.8','1.3'):
         frame=subprocess.run([ffmpeg,'-v','error','-ss',offset,'-i',str(path),'-frames:v','1','-vf','scale=1:1','-f','rawvideo','-pix_fmt','rgb24','-'],capture_output=True,timeout=30)
@@ -186,8 +186,8 @@ def test_editor_export_honors_source_trim_rate_filter_and_caption():
     s.init();ffmpeg=ffmpeg_executable()
     pid=s.uid();jid=s.uid();now=time.time()
     with s.db() as c:
-        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Trim filter caption','{}',now,now))
-        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',(jid,jid,pid,'export','export','running','{}',now,now))
+        c.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Trim filter caption','{}',now,now))
+        c.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(jid,jid,pid,'export','export','running','{}',now,now))
     job={'id':jid,'project_id':pid,'node_id':'export','kind':'export','input':{}}
     source=s.DATA/(s.uid()+'.mp4')
     command=[ffmpeg,'-y','-v','error',
@@ -212,7 +212,7 @@ def test_editor_export_honors_source_trim_rate_filter_and_caption():
     ]}
     job['input']={'editor_timeline':project,'resolution':'128x128'}
     result=Worker().export(job)
-    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=?',(result['assets'][0]['id'],)).fetchone()['path']
+    with s.db() as c:path=s.ASSETS/c.execute('SELECT path FROM assets WHERE id=%s',(result['assets'][0]['id'],)).fetchone()['path']
     info=probe(path);assert .45<info['duration']<.65
     frame=subprocess.run([ffmpeg,'-v','error','-ss','0.25','-i',str(path),'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'],capture_output=True,timeout=30)
     assert frame.returncode==0,frame.stderr

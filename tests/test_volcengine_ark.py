@@ -22,10 +22,10 @@ def stored_job(kind, provider, provider_job_id=None):
     now=time.time()
     inp={'provider':provider['id'],'allow_cloud':True,'prompt':'电影感机器人走向窗前'}
     with s.db() as db:
-        db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Ark test','{}',now,now))
-        db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)',
+        db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Ark test','{}',now,now))
+        db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                    (jid,'ark-submit-'+uuid.uuid4().hex,pid,'node',kind,'running',s.dumps(inp),provider_job_id,now,now))
-        db.execute('INSERT INTO job_private VALUES(?,?)',(jid,s.dumps(provider)))
+        db.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(provider)))
     return {'id':jid,'project_id':pid,'node_id':'node','kind':kind,'status':'running','input':inp,'provider_job_id':provider_job_id}
 
 
@@ -48,7 +48,7 @@ def add_image_asset(item, name, color, size=(32,24)):
     path=s.ASSETS/(aid+'.png')
     Image.new('RGB',size,color).save(path)
     with s.db() as db:
-        db.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',(
+        db.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',(
             aid,item['project_id'],name,'image',path.name,'image/png',s.dumps({'width':size[0],'height':size[1]}),time.time()
         ))
     return aid,path.read_bytes()
@@ -63,7 +63,7 @@ def add_audio_asset(item, name='对白'):
         audio.setframerate(24000)
         audio.writeframes(b'\x00\x00'*12000)
     with s.db() as db:
-        db.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',(
+        db.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',(
             aid,item['project_id'],name,'audio',path.name,'audio/wav',s.dumps({'duration':.5}),time.time()
         ))
     return aid
@@ -145,7 +145,7 @@ def test_seedance_persists_task_and_resume_only_queries(monkeypatch):
     worker=Worker();worker.halt=NoWait()
     assert worker.execute(item)['assets'][0]['id']=='asset-video'
     with s.db() as db:
-        assert db.execute('SELECT provider_job_id FROM jobs WHERE id=?',(item['id'],)).fetchone()['provider_job_id']=='ark-task-1'
+        assert db.execute('SELECT provider_job_id FROM jobs WHERE id=%s',(item['id'],)).fetchone()['provider_job_id']=='ark-task-1'
     assert calls==[('POST','/api/v3/contents/generations/tasks'),('GET','/api/v3/contents/generations/tasks/ark-task-1')]
 
     resumed=stored_job('video',p,'existing-task')
@@ -319,13 +319,13 @@ def test_seedance_poll_failure_keeps_existing_task_recoverable(monkeypatch,statu
     with pytest.raises(common.RecoverableProviderError):
         worker.execute(item)
     with s.db() as db:
-        assert db.execute('SELECT provider_job_id FROM jobs WHERE id=?',(item['id'],)).fetchone()['provider_job_id']=='existing-task'
+        assert db.execute('SELECT provider_job_id FROM jobs WHERE id=%s',(item['id'],)).fetchone()['provider_job_id']=='existing-task'
 
 
 def test_worker_marks_recoverable_provider_error_interrupted(monkeypatch):
     item=stored_job('video',provider(),'existing-task')
     with s.db() as db:
-        db.execute("UPDATE jobs SET status='queued',created=-1 WHERE id=?",(item['id'],))
+        db.execute("UPDATE jobs SET status='queued',created=-1 WHERE id=%s",(item['id'],))
     worker=Worker()
     def execute(job):
         worker.halt.set()
@@ -333,7 +333,7 @@ def test_worker_marks_recoverable_provider_error_interrupted(monkeypatch):
     monkeypatch.setattr(worker,'execute',execute)
     worker.loop()
     with s.db() as db:
-        row=db.execute('SELECT status,provider_job_id,phase FROM jobs WHERE id=?',(item['id'],)).fetchone()
+        row=db.execute('SELECT status,provider_job_id,phase FROM jobs WHERE id=%s',(item['id'],)).fetchone()
     assert row['status']=='interrupted' and row['provider_job_id']=='existing-task'
     assert '可恢复查询' in row['phase']
 
@@ -352,7 +352,7 @@ def test_seedance_cancel_race_persists_remote_task_id(monkeypatch):
     with pytest.raises(InterruptedError):
         worker.execute(item)
     with s.db() as db:
-        row=db.execute('SELECT status,provider_job_id,phase FROM jobs WHERE id=?',(item['id'],)).fetchone()
+        row=db.execute('SELECT status,provider_job_id,phase FROM jobs WHERE id=%s',(item['id'],)).fetchone()
     assert row['status']=='cancelled' and row['provider_job_id']=='paid-task-after-cancel'
     assert '已请求供应商取消' in row['phase']
     assert calls==[('POST','/api/v3/contents/generations/tasks'),('DELETE','/api/v3/contents/generations/tasks/paid-task-after-cancel')]

@@ -62,14 +62,14 @@ def stored_job(kind, provider_value, provider_job_id=None):
     inp = {'provider': provider_value['id'], 'prompt': '电影感镜头'}
     with s.db() as db:
         db.execute(
-            'INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',
+            'INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',
             (pid, 'HC test', '{}', now, now),
         )
         db.execute(
-            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (jid, 'hc-submit-' + uuid.uuid4().hex, pid, 'node', kind, 'running', s.dumps(inp), provider_job_id, now, now),
         )
-        db.execute('INSERT INTO job_private VALUES(?,?)', (jid, s.dumps(provider_value)))
+        db.execute('INSERT INTO job_private VALUES(%s,%s)', (jid, s.dumps(provider_value)))
     return {'id': jid, 'submission_id': 'hc-submit-test', 'project_id': pid, 'node_id': 'node', 'kind': kind, 'status': 'running', 'input': inp, 'provider_job_id': provider_job_id}
 
 
@@ -147,7 +147,7 @@ def test_seedance_uses_v3_signed_first_frame_and_minimum_duration(monkeypatch):
     path.write_bytes(b'png-test')
     with s.db() as db:
         db.execute(
-            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',
+            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (aid, item['project_id'], 'frame.png', 'image', path.name, 'image/png', '{}', time.time()),
         )
     item['input']['asset_ids'] = [aid]
@@ -207,7 +207,7 @@ def test_seedance_uses_v3_signed_first_frame_and_minimum_duration(monkeypatch):
 
     cached_client = original(transport=httpx.MockTransport(reject_network))
     with s.db() as db:
-        local_asset = dict(db.execute('SELECT * FROM assets WHERE id=?', (aid,)).fetchone())
+        local_asset = dict(db.execute('SELECT * FROM assets WHERE id=%s', (aid,)).fetchone())
     assert hc_atom._register_seedance_asset(worker, item, cached_client, configured, local_asset) == 'asset://asset-1'
 
 
@@ -223,7 +223,7 @@ def test_seedance_stops_before_video_submit_when_provider_asset_review_fails(mon
     path.write_bytes(b'png-test')
     with s.db() as db:
         db.execute(
-            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',
+            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (aid, item['project_id'], 'sensitive.png', 'image', path.name, 'image/png', '{}', time.time()),
         )
     item['input']['asset_ids'] = [aid]
@@ -287,7 +287,7 @@ def test_reference_image_uses_async_task_protocol(monkeypatch):
     path.write_bytes(b'png-test')
     with s.db() as db:
         db.execute(
-            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',
+            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (aid, item['project_id'], 'reference.png', 'image', path.name, 'image/png', '{}', time.time()),
         )
     item['input']['asset_ids'] = [aid]

@@ -110,7 +110,10 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         opener = build_opener(HTTPCookieProcessor(CookieJar()))
         base_one = f'http://127.0.0.1:{web_one_port}'
         base_two = f'http://127.0.0.1:{web_two_port}'
-        assert json_request(opener, base_one+'/api/auth/setup', 'POST', {'password':'p1-process-test'})['ok']
+        auth_status=json_request(opener, base_one+'/api/auth/status')
+        auth_path='/api/auth/login' if auth_status['configured'] else '/api/auth/setup'
+        auth_password='integration-test-only' if auth_status['configured'] else 'p1-process-test'
+        assert json_request(opener, base_one+auth_path, 'POST', {'password':auth_password})['ok']
         provider = {'id':'p1-fake','name':'P1 Fake','type':'openai','kind':'text','url':f'http://127.0.0.1:{fake_port}/v1','local':True,'model':'p1-fake-model'}
         json_request(opener, base_one+'/api/settings', 'PUT', {'providers':[provider]})
         project = json_request(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
@@ -165,7 +168,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
             cwd=ROOT, env=env, capture_output=True, text=True, encoding='utf-8', timeout=10, creationflags=CREATE_FLAGS,
         )
         assert contender.returncode == 2
-        assert 'refused to start' in contender.stderr and '已有任务进程' in contender.stderr
+        assert 'refused to start' in contender.stderr and 'already has a Worker' in contender.stderr
         log_snapshot = {
             name: {
                 'stdout': stdout.read_text(encoding='utf-8', errors='replace'),

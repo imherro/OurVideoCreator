@@ -21,20 +21,20 @@ def _job(compiled):
     if compiled:
         input_value.update(reference_compiler={'version':1},image_reference_sources=[])
     with s.db() as db:
-        db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'Prompt freeze','{}',now,now))
+        db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Prompt freeze','{}',now,now))
         db.execute(
             'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,result,created,updated) '
-            'VALUES(?,?,?,?,?,?,?,?,?,?)',
+            'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (upstream_id,s.uid(),pid,'storyboard','storyboard','succeeded',s.dumps({'prompt':'story'}),
              s.dumps({'text':'任意上游剧本文本'}),now,now),
         )
         db.execute(
             'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) '
-            'VALUES(?,?,?,?,?,?,?,?,?)',
+            'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (job_id,s.uid(),pid,'image','image','running',s.dumps(input_value),now,now),
         )
-        db.execute('INSERT INTO job_private VALUES(?,?)',(job_id,s.dumps(provider)))
-        return s.unpack(db.execute('SELECT * FROM jobs WHERE id=?',(job_id,)).fetchone())
+        db.execute('INSERT INTO job_private VALUES(%s,%s)',(job_id,s.dumps(provider)))
+        return s.unpack(db.execute('SELECT * FROM jobs WHERE id=%s',(job_id,)).fetchone())
 
 
 def test_film_bible_compiled_prompt_is_the_exact_provider_facing_prompt(monkeypatch):

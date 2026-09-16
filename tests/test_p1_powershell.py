@@ -136,22 +136,21 @@ def test_powershell_scripts_own_only_their_instance(tmp_path):
         assert not (data_b/'worker.process.json').exists()
         assert process_alive(restarted_web_a['pid']) and process_alive(worker_a['pid'])
 
-        run('Start-Studio.ps1', data_b, '-WorkerOnly')
-        worker_b = remember(data_b, 'worker')
+        second_worker = run('Start-Studio.ps1', data_b, '-WorkerOnly', expected=1)
+        assert 'already has a Worker' in (second_worker['stdout'] + second_worker['stderr'])
+        assert not (data_b/'worker.process.json').exists()
         original_worker_a = (data_a/'worker.process.json').read_bytes()
         tampered = read_record(data_a, 'worker')
-        tampered['pid'] = worker_b['pid']
+        tampered['pid'] = restarted_web_a['pid']
         (data_a/'worker.process.json').write_text(
             json.dumps(tampered, ensure_ascii=False, indent=2), encoding='utf-8',
         )
         refused = run('Stop-Studio.ps1', data_a, '-WorkerOnly', expected=2)
         assert 'was not stopped' in (refused['stdout'] + refused['stderr'])
         assert process_alive(worker_a['pid'])
-        assert process_alive(worker_b['pid']), 'wrong PID must never be stopped'
+        assert process_alive(restarted_web_a['pid']), 'wrong PID must never be stopped'
         (data_a/'worker.process.json').write_bytes(original_worker_a)
 
-        run('Stop-Studio.ps1', data_b, '-WorkerOnly')
-        assert wait_stopped(worker_b['pid'])
         run('Stop-Studio.ps1', data_a)
         assert wait_stopped(restarted_web_a['pid'])
         assert wait_stopped(worker_a['pid'])
@@ -160,6 +159,7 @@ def test_powershell_scripts_own_only_their_instance(tmp_path):
             'initial_records': {'web': web_a, 'worker': worker_a},
             'restarted_web_record': restarted_web_a,
             'different_instance_refused': True,
+            'different_data_dir_worker_refused': True,
             'wrong_pid_refused': True,
             'web_only_preserved_worker_pid': worker_a['pid'],
             'transcript': transcript,
@@ -270,15 +270,15 @@ def test_absolute_script_path_targets_its_own_project_from_any_cwd(tmp_path, dat
         }
 
         invoke(project_b, 'Start-Studio.ps1', data_value_b, start_b_cwd,
-               '-Port', port_b, '-NoBrowser')
-        web_b, worker_b = remember(data_b, 'web'), remember(data_b, 'worker')
+               '-Port', port_b, '-NoBrowser', '-WebOnly')
+        web_b = remember(data_b, 'web')
         assert web_a['instance_id'] != web_b['instance_id']
-        assert worker_a['instance_id'] != worker_b['instance_id']
         assert web_b['project_root'].casefold() == str(project_b.resolve()).casefold()
-        assert worker_b['data_dir'].casefold() == str(data_b.resolve()).casefold()
+        assert web_b['data_dir'].casefold() == str(data_b.resolve()).casefold()
+        assert not (data_b/'worker.process.json').exists()
 
-        invoke(project_b, 'Stop-Studio.ps1', data_value_b, stop_b_cwd)
-        assert wait_stopped(web_b['pid']) and wait_stopped(worker_b['pid'])
+        invoke(project_b, 'Stop-Studio.ps1', data_value_b, stop_b_cwd, '-WebOnly')
+        assert wait_stopped(web_b['pid'])
         assert process_alive(web_a['pid']) and process_alive(worker_a['pid'])
         for role in ('web', 'worker'):
             assert (data_a/f'{role}.process.json').read_bytes() == a_records_before[role]
@@ -289,9 +289,9 @@ def test_absolute_script_path_targets_its_own_project_from_any_cwd(tmp_path, dat
             'data_mode': data_mode,
             'project_a_records_unchanged_while_stopping_b': True,
             'project_a_pids': [web_a['pid'], worker_a['pid']],
-            'project_b_pids': [web_b['pid'], worker_b['pid']],
+            'project_b_pids': [web_b['pid']],
             'project_b_root': web_b['project_root'],
-            'project_b_data': worker_b['data_dir'],
+            'project_b_data': web_b['data_dir'],
             'transcript': transcript,
         }, ensure_ascii=False))
     finally:
@@ -389,6 +389,7 @@ function Get-EnvironmentState([string]$Name){{
 
 $initialMvc=Get-EnvironmentState 'MVC_DATA_DIR'
 $initialPython=Get-EnvironmentState 'PYTHONUTF8'
+$initialDatabase=Get-EnvironmentState 'OVC_DATABASE_URL'
 $driverPid=$PID
 $trace=[Collections.Generic.List[object]]::new()
 
@@ -403,6 +404,7 @@ function Assert-EnvironmentState($Expected,[string]$Name,[string]$Label){{
 function Assert-CallerState([string]$Label){{
     Assert-EnvironmentState $initialMvc 'MVC_DATA_DIR' $Label
     Assert-EnvironmentState $initialPython 'PYTHONUTF8' $Label
+    Assert-EnvironmentState $initialDatabase 'OVC_DATABASE_URL' $Label
     if(-not [string]::Equals((Get-Location).Path,$initialLocation,[StringComparison]::OrdinalIgnoreCase)){{
         throw "$Label changed the caller working directory."
     }}
@@ -430,8 +432,10 @@ $trace.Add([pscustomobject]@{{Call='start-b-failure';Pid=$PID;Output=$failureOut
     DriverPid=$driverPid
     InitialMvc=$initialMvc
     InitialPython=$initialPython
+    InitialDatabase=$initialDatabase
     FinalMvc=(Get-EnvironmentState 'MVC_DATA_DIR')
     FinalPython=(Get-EnvironmentState 'PYTHONUTF8')
+    FinalDatabase=(Get-EnvironmentState 'OVC_DATABASE_URL')
     Location=(Get-Location).Path
     CrossProjectRecordUnchanged={'$true' if exercise_cross_project else '$false'}
     Trace=$trace
@@ -453,6 +457,7 @@ $trace.Add([pscustomobject]@{{Call='start-b-failure';Pid=$PID;Output=$failureOut
         assert {entry['Pid'] for entry in payload['Trace']} == {payload['DriverPid']}
         assert payload['FinalMvc'] == payload['InitialMvc']
         assert payload['FinalPython'] == payload['InitialPython']
+        assert payload['FinalDatabase'] == payload['InitialDatabase']
         assert payload['CrossProjectRecordUnchanged'] is exercise_cross_project
         print(json.dumps(payload, ensure_ascii=False))
     finally:

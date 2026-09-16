@@ -111,8 +111,8 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     assert [item['id'] for item in inherited_assets]==[reference['id']]
     assert inherited_assets[0]['origin_episode_no']==1
     with s.db() as db:
-        stored_asset=db.execute('SELECT id,project_id,production_id,path,metadata,category,source FROM assets WHERE id=?',(reference['id'],)).fetchone()
-        assert db.execute('SELECT COUNT(*) FROM assets WHERE id=?',(reference['id'],)).fetchone()[0]==1
+        stored_asset=db.execute('SELECT id,project_id,production_id,path,metadata,category,source FROM assets WHERE id=%s',(reference['id'],)).fetchone()
+        assert db.execute('SELECT COUNT(*) count FROM assets WHERE id=%s',(reference['id'],)).fetchone()['count']==1
     assert stored_asset['project_id']==first['id'] and stored_asset['production_id']==production['id']
     assert (s.ASSETS/stored_asset['path']).read_bytes()==stream.getvalue()
     usage=c.get(f'/api/productions/{production["id"]}/visual-usage').json()
@@ -123,11 +123,11 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     }]
     with s.db() as db:
         rows=db.execute(
-            'SELECT id,document FROM projects WHERE production_id=? ORDER BY episode_no',
+            'SELECT id,document FROM projects WHERE production_id=%s ORDER BY episode_no',
             (production['id'],),
         ).fetchall()
         assert len(db.execute(
-            'SELECT id FROM production_revisions WHERE production_id=?',
+            'SELECT id FROM production_revisions WHERE production_id=%s',
             (production['id'],),
         ).fetchall())==1
     for row in rows:
@@ -186,7 +186,7 @@ def test_legacy_project_create_api_still_creates_one_episode_wrapper(authenticat
     parent=c.get('/api/productions/'+item['production_id']).json()
     assert parent['name']==item['name'] and parent['episode_count']==1
 
-def test_project_schema_revision_migration_and_generation_policy_roundtrip(authenticated):
+def test_project_schema_revision_and_generation_policy_roundtrip(authenticated):
     c=authenticated
     old_providers=s.get_setting('providers',[])
     ark={'id':'phase0-ark','name':'Phase 0 Ark','type':'volcengine_ark','local':False,
@@ -203,21 +203,10 @@ def test_project_schema_revision_migration_and_generation_policy_roundtrip(authe
         assert saved.status_code==200,saved.text
         assert c.get('/api/projects/'+created['id']).json()['document']['generationPolicy']['video']['modelId']=='seedance-custom'
 
-        pid=s.uid('legacy-');rid=s.uid('revision-');now=time.time()
-        legacy={'nodes':[{'id':'old-node'}],'edges':[],'shots':[],'timeline':[],'editor':{'timeline':{'tracks':[]}}}
-        encoded=s.dumps(legacy)
-        with s.db() as db:
-            db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',(pid,'旧项目',encoded,now,now))
-            db.execute('INSERT INTO revisions VALUES(?,?,?,?,?)',(rid,pid,1,encoded,now))
-        s.init()
-        current=c.get('/api/projects/'+pid).json()['document']
-        historical=c.get(f'/api/projects/{pid}/revisions/{rid}').json()['document']
-        assert current['schemaVersion']==CURRENT_SCHEMA_VERSION and historical['schemaVersion']==CURRENT_SCHEMA_VERSION
-        assert current['nodes']==legacy['nodes'] and historical['editor']==legacy['editor']
-        with s.db() as db:
-            assert db.execute('SELECT document FROM revisions WHERE id=?',(rid,)).fetchone()['document']==encoded
-            persisted=json.loads(db.execute('SELECT document FROM projects WHERE id=?',(pid,)).fetchone()['document'])
-            assert 'filmBible' not in persisted and 'generationPolicy' not in persisted and 'style' not in persisted
+        # P2 starts from an empty PostgreSQL baseline. Legacy SQLite row
+        # rewriting is intentionally retired; current documents still round-trip.
+        reopened=c.get('/api/projects/'+created['id']).json()['document']
+        assert reopened['schemaVersion']==CURRENT_SCHEMA_VERSION
     finally:
         s.set_setting('providers',old_providers)
 
@@ -570,8 +559,12 @@ def test_asset_library_semantic_categories(authenticated):
     assert c.get(f'/api/projects/{p["id"]}/assets?category=character').json()==[]
     assert c.patch(f'/api/projects/{p["id"]}/assets/{asset["id"]}',json={'category':'bad'}).status_code==400
     with s.db() as db:
-        columns={row['name'] for row in db.execute('PRAGMA table_info(assets)')}
-        indexes={row['name'] for row in db.execute('PRAGMA index_list(assets)')}
+        columns={row['column_name'] for row in db.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='assets'"
+        )}
+        indexes={row['indexname'] for row in db.execute(
+            "SELECT indexname FROM pg_indexes WHERE schemaname=current_schema() AND tablename='assets'"
+        )}
     assert {'category','source'}<=columns
     assert 'assets_project_category_created' in indexes
 
@@ -670,7 +663,7 @@ def test_volcengine_ark_unified_settings_and_connection(authenticated,monkeypatc
         'input':{'provider':'ark','prompt':'一只猫走过窗前','allow_cloud':True},
     }).json()
     with s.db() as db:
-        db.execute('UPDATE jobs SET provider_job_id=? WHERE id=?',('remote-ark-task',queued['id']))
+        db.execute('UPDATE jobs SET provider_job_id=%s WHERE id=%s',('remote-ark-task',queued['id']))
     monkeypatch.setattr('backend.providers.volcengine_ark.cancel',lambda job,provider:False)
     cancelled=c.post('/api/jobs/'+queued['id']+'/cancel').json()
     assert cancelled['status']=='cancelled'
@@ -720,11 +713,14 @@ def test_hc_atom_unified_settings_and_connection(authenticated,monkeypatch):
 def test_ark_cancel_rereads_handle_attached_after_initial_snapshot(authenticated,monkeypatch):
     c=authenticated;p=project(c)
     now=time.time();jid='ark-cancel-reverse-race'
-    provider=next(item for item in s.get_setting('providers',[]) if item['id']=='ark')
+    provider=next(
+        (item for item in s.get_setting('providers',[]) if item['id']=='ark'),
+        {'id':'ark','name':'Test Ark','type':'volcengine_ark','url':'https://example.invalid','api_key':'test-only'},
+    )
     with s.db() as db:
-        db.execute('INSERT OR REPLACE INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(?,?,?,?,?,?,?,?,?)',
+        db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                    (jid,jid,p['id'],'video-node','video','running',s.dumps({'provider':'ark','allow_cloud':True,'prompt':'test'}),now,now))
-        db.execute('INSERT OR REPLACE INTO job_private VALUES(?,?)',(jid,s.dumps(provider)))
+        db.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(provider)))
     original_job_update=s.job_update
     seen=[]
     def racing_job_update(job_id,**fields):
@@ -810,7 +806,7 @@ def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(auth
     assert len(c.get('/api/projects/'+p['id']+'/jobs').json())==1
     assert 'do-not-expose' not in str(first)
     with s.db() as db:
-        frozen=db.execute('SELECT provider FROM job_private WHERE job_id=?',(first['id'],)).fetchone()['provider']
+        frozen=db.execute('SELECT provider FROM job_private WHERE job_id=%s',(first['id'],)).fetchone()['provider']
     assert 'do-not-expose' in frozen
 
 def test_missing_or_removed_local_provider_fails_before_any_upstream_request(authenticated,monkeypatch):
@@ -878,7 +874,7 @@ def test_restart_marks_ambiguous_running_job(authenticated):
     s.set_setting('providers',[provider])
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'provider':provider['id'],'prompt':'test'}}).json()
     with s.db() as db:
-        db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND id!=?",(job['id'],))
+        db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND id!=%s",(job['id'],))
     s.job_update(job['id'],status='running',provider_job_id='upstream-paid-id')
     worker=Worker();worker.start();worker.stop()
     result=c.get('/api/jobs/'+job['id']).json()
@@ -909,7 +905,7 @@ def test_graph_storyboard_defaults_to_two_pass_film_bible(authenticated):
     assert all(stage['system_prompt'] for stage in jobs[0]['input']['prompt_stages'])
     assert all(stage['response_schema'] for stage in jobs[0]['input']['prompt_stages'])
     with s.db() as db:
-        db.execute("UPDATE jobs SET status='cancelled' WHERE project_id=?",(p['id'],))
+        db.execute("UPDATE jobs SET status='cancelled' WHERE project_id=%s",(p['id'],))
 
 def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     c=authenticated;p=project(c);doc=p['document']
@@ -920,7 +916,7 @@ def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'graph-run-test-001'}).json()
     assert result['count']==2
     with s.db() as db:
-        db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND project_id!=?",(p['id'],))
+        db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND project_id!=%s",(p['id'],))
     queued=c.get('/api/projects/'+p['id']+'/jobs').json()
     assert all(job['input']['target_duration']==15 for job in queued)
     received=[]

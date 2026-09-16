@@ -41,14 +41,14 @@ def stored_job(kind, provider_value, provider_job_id=None):
     inp = {'provider': provider_value['id'], 'prompt': '电影感镜头'}
     with s.db() as db:
         db.execute(
-            'INSERT INTO projects(id,name,revision,document,created,updated) VALUES(?,?,1,?,?,?)',
+            'INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',
             (pid, 'RunningHub test', '{}', now, now),
         )
         db.execute(
-            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (jid, 'rh-submit-' + uuid.uuid4().hex, pid, 'node', kind, 'running', s.dumps(inp), provider_job_id, now, now),
         )
-        db.execute('INSERT INTO job_private VALUES(?,?)', (jid, s.dumps(provider_value)))
+        db.execute('INSERT INTO job_private VALUES(%s,%s)', (jid, s.dumps(provider_value)))
     return {'id': jid, 'submission_id': 'rh-submit-test', 'project_id': pid, 'node_id': 'node', 'kind': kind, 'status': 'running', 'input': inp, 'provider_job_id': provider_job_id}
 
 
@@ -58,7 +58,7 @@ def add_image(item, name='reference.png'):
     Image.new('RGB', (16, 9), 'red').save(path)
     with s.db() as db:
         db.execute(
-            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(?,?,?,?,?,?,?,?)',
+            'INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
             (aid, item['project_id'], name, 'image', path.name, 'image/png', '{}', time.time()),
         )
     return aid

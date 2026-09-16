@@ -76,8 +76,8 @@ def test_project_create_with_setup_fields_owns_data_and_has_no_generation_side_e
     assert client.get(f'/api/projects/{project["id"]}/jobs').json() == []
     assert client.get(f'/api/projects/{project["id"]}/assets').json() == []
     with s.db() as db:
-        episode = db.execute("SELECT document FROM projects WHERE id=?", (project["id"],)).fetchone()
-        production = db.execute("SELECT name,shared_context FROM productions WHERE id=?", (project["production_id"],)).fetchone()
+        episode = db.execute("SELECT document FROM projects WHERE id=%s", (project["id"],)).fetchone()
+        production = db.execute("SELECT name,shared_context FROM productions WHERE id=%s", (project["production_id"],)).fetchone()
     stored_episode = json.loads(episode["document"])
     assert not {"style", "generationPolicy", "filmBible"}.intersection(stored_episode)
     stored_context = json.loads(production["shared_context"])
@@ -111,13 +111,13 @@ def test_legacy_fixed_adaptation_defaults_follow_existing_episode_when_untouched
         "name": "旧项目规格修复", "ratio": "16:9", "duration": 30,
     }).json()
     with s.db() as db:
-        row = db.execute("SELECT shared_context FROM productions WHERE id=?", (project["production_id"],)).fetchone()
+        row = db.execute("SELECT shared_context FROM productions WHERE id=%s", (project["production_id"],)).fetchone()
         context = json.loads(row["shared_context"])
         context["adaptationPlan"]["format"] = {
             "episodeCount": 60, "targetDuration": 60, "ratio": "9:16", "platform": "红果短剧",
         }
         context["episodePlans"] = []
-        db.execute("UPDATE productions SET shared_context=? WHERE id=?", (s.dumps(context), project["production_id"]))
+        db.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), project["production_id"]))
     adaptation = client.get(f'/api/productions/{project["production_id"]}/adaptation').json()
     assert adaptation["adaptationPlan"]["format"] == {
         "episodeCount": 1, "targetDuration": 30.0, "ratio": "16:9", "platform": "通用短视频",
@@ -127,14 +127,14 @@ def test_legacy_fixed_adaptation_defaults_follow_existing_episode_when_untouched
 
 def test_invalid_generation_policy_leaves_no_partial_rows(client, configured_provider):
     with s.db() as db:
-        before = tuple(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("productions", "projects"))
+        before = tuple(db.execute(f"SELECT COUNT(*) count FROM {table}").fetchone()['count'] for table in ("productions", "projects"))
     response = client.post("/api/projects", json={
         "name": "不应创建",
         "generation_policy": {"text": {"providerId": "missing", "modelId": "x"}, "image": None, "video": None},
     })
     assert response.status_code == 400
     with s.db() as db:
-        after = tuple(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("productions", "projects"))
+        after = tuple(db.execute(f"SELECT COUNT(*) count FROM {table}").fetchone()['count'] for table in ("productions", "projects"))
     assert after == before
 
 
@@ -168,12 +168,12 @@ def test_production_rename_is_revision_protected_and_preserves_episode_and_conte
 def test_shared_settings_save_preserves_adaptation_context(client):
     project = client.post("/api/projects", json={"name": "上下文保留"}).json()
     with s.db() as db:
-        row = db.execute("SELECT shared_context FROM productions WHERE id=?", (project["production_id"],)).fetchone()
+        row = db.execute("SELECT shared_context FROM productions WHERE id=%s", (project["production_id"],)).fetchone()
         context = json.loads(row["shared_context"])
         context["adaptationPlan"] = {"status": "approved", "premise": "保留改编方案"}
         context["episodePlans"] = [{"episode_no": 1, "title": "保留集纲"}]
         context["monetizationPlan"] = {"format": "learning"}
-        db.execute("UPDATE productions SET shared_context=? WHERE id=?", (s.dumps(context), project["production_id"]))
+        db.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), project["production_id"]))
     current = client.get(f'/api/projects/{project["id"]}').json()
     current["document"]["generationPolicy"] = {"text": None, "image": None, "video": None}
     saved = client.put(f'/api/projects/{project["id"]}', json={
