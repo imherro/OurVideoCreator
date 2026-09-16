@@ -7,7 +7,7 @@
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
-| P3 | P3-ID-01 开发中 | 未验收 | | `evidence/P3/REPORT.md` | 待开发侧提交 | 否 |
+| P3 | P3-ID-01 已提交待审 | 未验收 | `8b9c74607b46d8c09fb5d6445e46d57fead4f2b3` | `evidence/P3/REPORT.md` | 等待外部验收 | 否 |
 | P4 | 未提交 | 未验收 | | | | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
@@ -177,3 +177,13 @@ P0/P1 继续保持通过。P2 阻塞项：`OVC-P2-01` Worker 锁连接死亡后�
 非阻塞观察：`OVC-P2-R2-N01`（S3），开发组合运行中一次 PostgreSQL connect timeout 仍未归因；不能写成根因已解决。历史 `OVC-P1-R3-N01` 继续保留。
 
 下一阶段授权：P3。下一单一任务：`P3-ID-01`（邀请制账号、团队/作品隔离与基础页面闭环）。P4 及后续实施、公网部署、真实付费 API 未授权。
+
+## P3-ID-01 待复验记录
+
+状态：**READY_FOR_REVIEW**（2026-09-16）
+
+被测试业务 SHA：`8b9c74607b46d8c09fb5d6445e46d57fead4f2b3`
+
+报告：`evidence/P3/REPORT.md`；正式原始日志：`evidence/P3/01-p3-targeted.log` 至 `06-compile.log`；浏览器补充：`evidence/P3/07-browser-manual.md`。
+
+开发侧已完成邀请制个人账号、团队/作品角色隔离、嵌套资源授权、素材读取与签名、SSE 撤权、管理/成员基础页面和 ACL-09 fail-closed 路由守卫。正式结果为 P3 定向 7/7、Python 全量 283/283、前端 126/126、构建通过、85/85 API 已分类。是否通过由外部验收人复核；P4 未开始。
