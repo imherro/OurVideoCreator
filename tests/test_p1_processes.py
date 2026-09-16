@@ -64,6 +64,7 @@ def wait_until(predicate, message, timeout=15):
 
 
 def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
+    started_at = time.monotonic()
     data = tmp_path / 'p1-data'
     data.mkdir()
     env = {**os.environ, 'MVC_DATA_DIR':str(data), 'PYTHONUTF8':'1', 'NO_PROXY':'127.0.0.1,localhost'}
@@ -73,6 +74,54 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
     release_file = tmp_path / 'fake-release'
     processes = []
     log_paths = {}
+    job_id = None
+    phase = 'initializing'
+    last_request = None
+
+    def request_json(opener, url, method='GET', body=None):
+        nonlocal last_request
+        request_started = time.monotonic()
+        try:
+            return json_request(opener, url, method, body)
+        finally:
+            last_request = {
+                'url': url,
+                'method': method,
+                'elapsed_seconds': round(time.monotonic() - request_started, 3),
+            }
+
+    def diagnostics(status, error=None):
+        child_logs = {
+            name: {
+                'stdout': stdout.read_text(encoding='utf-8', errors='replace'),
+                'stderr': stderr.read_text(encoding='utf-8', errors='replace'),
+            }
+            for name, (stdout, stderr) in log_paths.items()
+        }
+        database = task = None
+        try:
+            from backend.database import check_ready
+            database = check_ready()
+            if job_id:
+                from backend import store
+                with store.db() as connection:
+                    row = connection.execute(
+                        'SELECT id,status,phase,provider_job_id,updated FROM jobs WHERE id=%s',
+                        (job_id,),
+                    ).fetchone()
+                    task = dict(row) if row else None
+        except Exception as exc:
+            database = {'diagnostic_error': f'{exc.__class__.__name__}: {exc}'}
+        return {
+            'status': status,
+            'phase': phase,
+            'error': error,
+            'elapsed_seconds': round(time.monotonic() - started_at, 3),
+            'last_request': last_request,
+            'database': database,
+            'task': task,
+            'child_logs': child_logs,
+        }
 
     def spawn(name, command):
         stdout_path, stderr_path = tmp_path/f'{name}.stdout.log', tmp_path/f'{name}.stderr.log'
@@ -89,6 +138,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         return process
 
     try:
+        phase = 'starting fake provider'
         fake = spawn('fake-provider', [
             sys.executable, str(ROOT/'tests'/'fake_provider_server.py'),
             '--port', str(fake_port), '--count-file', str(count_file),
@@ -103,6 +153,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
             wait_json(f'http://127.0.0.1:{port}/api/health')
             return process
 
+        phase = 'starting two web processes'
         web_one, web_two = web(web_one_port, 'web-one'), web(web_two_port, 'web-two')
         assert web_one.poll() is None and web_two.poll() is None
         assert not (data/'worker.lock').exists(), 'Web must not acquire the Worker lock'
@@ -110,24 +161,27 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         opener = build_opener(HTTPCookieProcessor(CookieJar()))
         base_one = f'http://127.0.0.1:{web_one_port}'
         base_two = f'http://127.0.0.1:{web_two_port}'
-        auth_status=json_request(opener, base_one+'/api/auth/status')
+        phase = 'authenticating and enqueueing'
+        auth_status=request_json(opener, base_one+'/api/auth/status')
         auth_path='/api/auth/login' if auth_status['configured'] else '/api/auth/setup'
         auth_password='integration-test-only' if auth_status['configured'] else 'p1-process-test'
-        assert json_request(opener, base_one+auth_path, 'POST', {'password':auth_password})['ok']
+        assert request_json(opener, base_one+auth_path, 'POST', {'password':auth_password})['ok']
         provider = {'id':'p1-fake','name':'P1 Fake','type':'openai','kind':'text','url':f'http://127.0.0.1:{fake_port}/v1','local':True,'model':'p1-fake-model'}
-        json_request(opener, base_one+'/api/settings', 'PUT', {'providers':[provider]})
-        project = json_request(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
-        job = json_request(opener, base_one+f'/api/projects/{project["id"]}/jobs', 'POST', {
+        request_json(opener, base_one+'/api/settings', 'PUT', {'providers':[provider]})
+        project = request_json(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
+        job = request_json(opener, base_one+f'/api/projects/{project["id"]}/jobs', 'POST', {
             'node_id':'p1-text','kind':'text','submission_id':'p1-process-job-001',
             'input':{'provider':'p1-fake','model':'p1-fake-model','prompt':'process isolation'},
         })
+        job_id = job['id']
         assert job['status'] == 'queued'
 
+        phase = 'waiting for worker/provider handoff'
         worker = spawn('worker', [sys.executable, '-m', 'backend.worker_cli', '--concurrency', '1'])
         wait_until(lambda: received_file.exists(), 'Worker never reached the fake Provider')
 
         def running_job():
-            value = json_request(opener, base_two+f'/api/jobs/{job["id"]}')
+            value = request_json(opener, base_two+f'/api/jobs/{job["id"]}')
             return value if value['status'] == 'running' else None
 
         running_before = wait_until(
@@ -143,7 +197,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         restarted_web = web(web_one_port, 'web-one-restarted')
         assert restarted_web.pid != web_one.pid
 
-        running_after = json_request(opener, base_one+f'/api/jobs/{job["id"]}')
+        running_after = request_json(opener, base_one+f'/api/jobs/{job["id"]}')
         assert running_after['status'] == 'running'
         assert running_after['started'] == running_before['started']
         assert worker.poll() is None and worker.pid == worker_pid
@@ -154,7 +208,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         deadline = time.time()+15
         current = None
         while time.time()<deadline:
-            current = json_request(opener, base_two+f'/api/jobs/{job["id"]}')
+            current = request_json(opener, base_two+f'/api/jobs/{job["id"]}')
             if current['status'] == 'succeeded':
                 break
             time.sleep(.1)
@@ -169,22 +223,18 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         )
         assert contender.returncode == 2
         assert 'refused to start' in contender.stderr and 'already has a Worker' in contender.stderr
-        log_snapshot = {
-            name: {
-                'stdout': stdout.read_text(encoding='utf-8', errors='replace'),
-                'stderr': stderr.read_text(encoding='utf-8', errors='replace'),
-            }
-            for name, (stdout, stderr) in log_paths.items()
-        }
-        print(json.dumps({
+        phase = 'complete'
+        print(json.dumps({**diagnostics('passed'),
             'web_pids':[web_one.pid,web_two.pid,restarted_web.pid],
             'worker_pid':worker_pid,'job_id':job['id'],
             'running_before_web_restart':running_before,
             'running_after_web_restart':running_after,
             'final_job':current,
             'fake_request_count':1,'second_worker_exit':contender.returncode,
-            'child_logs':log_snapshot,
         }, ensure_ascii=False))
+    except BaseException as exc:
+        print(json.dumps(diagnostics('failed', f'{exc.__class__.__name__}: {exc}'), ensure_ascii=False))
+        raise
     finally:
         for process in reversed(processes):
             stop(process)
