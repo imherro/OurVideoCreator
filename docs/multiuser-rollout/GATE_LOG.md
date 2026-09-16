@@ -5,7 +5,7 @@
 | 阶段 | 提交状态 | 外部结论 | 被验收 SHA | 报告 | 阻塞问题 | 下一阶段授权 |
 |---|---|---|---|---|---|---|
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
-| P1 | P1-R2 已提交待复验 | P1-R1 不通过；P1-R2 未验收 | `16a56194c7a15e71142696b283934ea1b7a2e3b5` | `evidence/P1-R2/REPORT.md` | 待外部复核 `OVC-P1-R1-01`；`OVC-P1-02`、`OVC-P1-N01` 已关闭 | 否 |
+| P1 | P1-R3 开发中 | P1-R2 不通过 | `e4c61feba12765a6b70ecc9ee1e9db8e223372b1` | `evidence/P1-R2/REPORT.md` | `OVC-P1-R2-01`（S2）；其余 P1 问题已关闭 | 否 |
 | P2 | 未提交 | 未验收 | | | | 否 |
 | P3 | 未提交 | 未验收 | | | | 否 |
 | P4 | 未提交 | 未验收 | | | | 否 |
@@ -79,3 +79,15 @@
 报告：`evidence/P1-R2/REPORT.md`；原始命令日志与汇总：`evidence/P1-R2/`。
 
 开发侧已处理 `OVC-P1-R1-01`；是否关闭由外部验收人复核。P1-R2 未获通过前不授权 P2。
+
+## P1-R2 外部复验记录
+
+结论：**不通过**（2026-09-16，主 ChatGPT 会话审查新仓库 `imherro/OurVideoCreator`）
+
+绑定 HEAD：`e4c61feba12765a6b70ecc9ee1e9db8e223372b1`；其中被测试业务 SHA 为 `16a56194c7a15e71142696b283934ea1b7a2e3b5`。
+
+已关闭：`OVC-P1-R1-01`。保持关闭：`OVC-P1-02`、`OVC-P1-N01`。
+
+唯一阻塞：`OVC-P1-R2-01`（S2）。`Start-Studio.ps1` 与 `Stop-Studio.ps1` 把规范化后的绝对 `MVC_DATA_DIR` 写回当前 PowerShell 进程但未恢复；同一会话连续调用不同工程时，前一次调用留下的数据目录可能让下一次调用读取并删除另一实例的生命周期记录。
+
+下一单一授权任务：P1-R3，只修 `MVC_DATA_DIR`、`PYTHONUTF8` 的最外层环境恢复并增加同一 PowerShell PID 的连续真实脚本回归。P2 仍未授权，新证据必须写入 `evidence/P1-R3/`，不得覆盖历史目录。

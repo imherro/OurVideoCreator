@@ -1,4 +1,4 @@
-"""P1-R1 acceptance for the real Windows lifecycle scripts."""
+"""P1 lifecycle acceptance for the real Windows scripts and caller session."""
 from __future__ import annotations
 
 import ctypes
@@ -187,7 +187,11 @@ def copy_script_project(destination):
     for name in ('Studio-Process.ps1', 'Start-Studio.ps1', 'Stop-Studio.ps1'):
         shutil.copy2(ROOT/name, destination/name)
     (destination/'dist').mkdir()
-    (destination/'dist'/'index.html').write_text('<!doctype html><title>P1-R2</title>', encoding='utf-8')
+    (destination/'dist'/'index.html').write_text('<!doctype html><title>P1-R3</title>', encoding='utf-8')
+
+
+def powershell_literal(value):
+    return "'" + str(value).replace("'", "''") + "'"
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='PowerShell lifecycle is Windows-only')
@@ -305,3 +309,213 @@ def test_absolute_script_path_targets_its_own_project_from_any_cwd(tmp_path, dat
                     ['taskkill.exe', '/PID', str(pid), '/T', '/F'],
                     capture_output=True, creationflags=CREATE_FLAGS,
                 )
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='PowerShell lifecycle is Windows-only')
+@pytest.mark.parametrize('data_mode', ['unset', 'relative', 'absolute'])
+def test_same_powershell_session_restores_caller_environment(tmp_path, data_mode):
+    project_a, project_b = tmp_path/'project-a', tmp_path/'project-b'
+    ordinary = tmp_path/'ordinary-cwd'
+    copy_script_project(project_a)
+    copy_script_project(project_b)
+    ordinary.mkdir()
+
+    if data_mode == 'unset':
+        setup_environment = "Remove-Item Env:MVC_DATA_DIR,Env:PYTHONUTF8 -ErrorAction SilentlyContinue"
+        data_a, data_b = project_a/'data', project_b/'data'
+        exercise_cross_project = True
+    elif data_mode == 'relative':
+        setup_environment = "$env:MVC_DATA_DIR='relative-data'; $env:PYTHONUTF8='0'"
+        data_a, data_b = project_a/'relative-data', project_b/'relative-data'
+        exercise_cross_project = True
+    else:
+        absolute_data = tmp_path/'absolute-caller-data'
+        setup_environment = (
+            f"$env:MVC_DATA_DIR={powershell_literal(absolute_data)}; "
+            "$env:PYTHONUTF8='0'"
+        )
+        data_a = data_b = absolute_data
+        exercise_cross_project = False
+
+    driver = tmp_path/f'same-session-{data_mode}.ps1'
+    port = free_port()
+    cross_project_block = ''
+    if exercise_cross_project:
+        cross_project_block = f"""
+$startOutput=& $startB -WorkerOnly *>&1 | Out-String
+Assert-CallerState 'start-b-success'
+$trace.Add([pscustomobject]@{{Call='start-b-success';Pid=$PID;Output=$startOutput}})
+$recordPathB={powershell_literal(data_b/'worker.process.json')}
+if(-not (Test-Path -LiteralPath $recordPathB)){{throw 'B worker record was not created.'}}
+$recordBytesBefore=[IO.File]::ReadAllBytes($recordPathB)
+$workerRecord=Get-Content -LiteralPath $recordPathB -Raw | ConvertFrom-Json
+$workerPid=[int]$workerRecord.pid
+
+$stopAOutput=& $stopA -WorkerOnly *>&1 | Out-String
+Assert-CallerState 'stop-a-after-start-b'
+$trace.Add([pscustomobject]@{{Call='stop-a-after-start-b';Pid=$PID;Output=$stopAOutput}})
+if($null -eq (Get-Process -Id $workerPid -ErrorAction SilentlyContinue)){{throw 'A stop terminated B worker.'}}
+$recordBytesAfter=[IO.File]::ReadAllBytes($recordPathB)
+if([Convert]::ToBase64String($recordBytesBefore) -cne [Convert]::ToBase64String($recordBytesAfter)){{
+    throw 'A stop changed B worker record.'
+}}
+
+$stopBOutput=& $stopB -WorkerOnly *>&1 | Out-String
+Assert-CallerState 'stop-b-success'
+$trace.Add([pscustomobject]@{{Call='stop-b-success';Pid=$PID;Output=$stopBOutput}})
+if($null -ne (Get-Process -Id $workerPid -ErrorAction SilentlyContinue)){{throw 'B worker did not stop.'}}
+"""
+    else:
+        cross_project_block = """
+$stopOutput=& $stopB -WorkerOnly *>&1 | Out-String
+Assert-CallerState 'stop-b-absolute-success'
+$trace.Add([pscustomobject]@{Call='stop-b-absolute-success';Pid=$PID;Output=$stopOutput})
+"""
+
+    driver.write_text(f"""
+$ErrorActionPreference='Stop'
+{setup_environment}
+$projectA={powershell_literal(project_a)}
+$projectB={powershell_literal(project_b)}
+$startB=Join-Path $projectB 'Start-Studio.ps1'
+$stopA=Join-Path $projectA 'Stop-Studio.ps1'
+$stopB=Join-Path $projectB 'Stop-Studio.ps1'
+$initialLocation=(Get-Location).Path
+
+function Get-EnvironmentState([string]$Name){{
+    $value=[Environment]::GetEnvironmentVariable($Name,[EnvironmentVariableTarget]::Process)
+    return [pscustomobject]@{{Defined=$null -ne $value;Value=$value}}
+}}
+
+$initialMvc=Get-EnvironmentState 'MVC_DATA_DIR'
+$initialPython=Get-EnvironmentState 'PYTHONUTF8'
+$driverPid=$PID
+$trace=[Collections.Generic.List[object]]::new()
+
+function Assert-EnvironmentState($Expected,[string]$Name,[string]$Label){{
+    $actual=Get-EnvironmentState $Name
+    if($actual.Defined -ne $Expected.Defined){{throw "$Label changed whether $Name is defined."}}
+    if($actual.Defined -and ([string]$actual.Value -cne [string]$Expected.Value)){{
+        throw "$Label changed $Name from '$($Expected.Value)' to '$($actual.Value)'."
+    }}
+}}
+
+function Assert-CallerState([string]$Label){{
+    Assert-EnvironmentState $initialMvc 'MVC_DATA_DIR' $Label
+    Assert-EnvironmentState $initialPython 'PYTHONUTF8' $Label
+    if(-not [string]::Equals((Get-Location).Path,$initialLocation,[StringComparison]::OrdinalIgnoreCase)){{
+        throw "$Label changed the caller working directory."
+    }}
+    if($PID -ne $driverPid){{throw "$Label ran in a different PowerShell process."}}
+}}
+
+$missingDist=Join-Path $projectB 'dist\\index.html'
+Remove-Item -LiteralPath $missingDist -Force
+$failed=$false
+$failureMessage=''
+try{{
+    $failureOutput=& $startB -WebOnly -NoBrowser -Port {port} *>&1 | Out-String
+}}catch{{
+    $failed=$true
+    $failureMessage=$_.Exception.Message
+}}
+if(-not $failed){{throw 'Expected Start-Studio to fail after applying its temporary environment.'}}
+Assert-CallerState 'start-b-failure'
+$trace.Add([pscustomobject]@{{Call='start-b-failure';Pid=$PID;Output=$failureOutput;Error=$failureMessage}})
+
+{cross_project_block}
+
+[pscustomobject]@{{
+    DataMode={powershell_literal(data_mode)}
+    DriverPid=$driverPid
+    InitialMvc=$initialMvc
+    InitialPython=$initialPython
+    FinalMvc=(Get-EnvironmentState 'MVC_DATA_DIR')
+    FinalPython=(Get-EnvironmentState 'PYTHONUTF8')
+    Location=(Get-Location).Path
+    CrossProjectRecordUnchanged={'$true' if exercise_cross_project else '$false'}
+    Trace=$trace
+}} | ConvertTo-Json -Depth 6 -Compress
+""", encoding='utf-8')
+
+    env = {**os.environ, 'NO_PROXY': '127.0.0.1,localhost'}
+    result = subprocess.run(
+        [POWERSHELL, '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+         '-File', str(driver)],
+        cwd=ordinary, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        creationflags=CREATE_FLAGS, timeout=45,
+    )
+    stdout, stderr = decode_output(result.stdout), decode_output(result.stderr)
+    try:
+        assert result.returncode == 0, stdout + stderr
+        payload = json.loads(stdout.strip().splitlines()[-1])
+        assert payload['DriverPid']
+        assert {entry['Pid'] for entry in payload['Trace']} == {payload['DriverPid']}
+        assert payload['FinalMvc'] == payload['InitialMvc']
+        assert payload['FinalPython'] == payload['InitialPython']
+        assert payload['CrossProjectRecordUnchanged'] is exercise_cross_project
+        print(json.dumps(payload, ensure_ascii=False))
+    finally:
+        record_path = data_b/'worker.process.json'
+        if record_path.exists():
+            try:
+                pid = int(read_record(data_b, 'worker')['pid'])
+                if process_alive(pid):
+                    subprocess.run(
+                        ['taskkill.exe', '/PID', str(pid), '/T', '/F'],
+                        capture_output=True, creationflags=CREATE_FLAGS,
+                    )
+            except (OSError, ValueError, KeyError, json.JSONDecodeError):
+                pass
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='PowerShell lifecycle is Windows-only')
+def test_stop_nonzero_exit_restores_environment_and_location(tmp_path):
+    project = tmp_path/'project'
+    ordinary = tmp_path/'ordinary-cwd'
+    data_dir = project/'relative-failure-data'
+    copy_script_project(project)
+    ordinary.mkdir()
+    data_dir.mkdir()
+    (data_dir/'worker.process.json').write_text('{not valid json', encoding='utf-8')
+
+    snapshot_path = tmp_path/'nonzero-exit-snapshot.json'
+    driver = tmp_path/'nonzero-exit-driver.ps1'
+    driver.write_text(f"""
+$ErrorActionPreference='Stop'
+$env:MVC_DATA_DIR='relative-failure-data'
+$env:PYTHONUTF8='0'
+$initialLocation=(Get-Location).Path
+$driverPid=$PID
+$stopScript={powershell_literal(project/'Stop-Studio.ps1')}
+$snapshotPath={powershell_literal(snapshot_path)}
+try{{
+    & $stopScript -WorkerOnly
+    $stopExitCode=$LASTEXITCODE
+}}finally{{
+    [pscustomobject]@{{
+        DriverPid=$driverPid
+        FinallyPid=$PID
+        Mvc=[Environment]::GetEnvironmentVariable('MVC_DATA_DIR',[EnvironmentVariableTarget]::Process)
+        PythonUtf8=[Environment]::GetEnvironmentVariable('PYTHONUTF8',[EnvironmentVariableTarget]::Process)
+        InitialLocation=$initialLocation
+        FinalLocation=(Get-Location).Path
+    }} | ConvertTo-Json -Compress | Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+}}
+exit $stopExitCode
+""", encoding='utf-8')
+
+    result = subprocess.run(
+        [POWERSHELL, '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+         '-File', str(driver)],
+        cwd=ordinary, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        creationflags=CREATE_FLAGS, timeout=30,
+    )
+    assert result.returncode == 2, decode_output(result.stdout) + decode_output(result.stderr)
+    payload = json.loads(snapshot_path.read_text(encoding='utf-8-sig'))
+    assert payload['DriverPid'] == payload['FinallyPid']
+    assert payload['Mvc'] == 'relative-failure-data'
+    assert payload['PythonUtf8'] == '0'
+    assert payload['FinalLocation'].casefold() == payload['InitialLocation'].casefold()
+    assert not (data_dir/'worker.process.json').exists()
+    print(json.dumps(payload, ensure_ascii=False))

@@ -1,5 +1,29 @@
 Set-StrictMode -Version Latest
 
+function Get-StudioProcessEnvironmentSnapshot([string[]]$Names){
+    $snapshot=@{}
+    foreach($name in $Names){
+        $value=[Environment]::GetEnvironmentVariable($name,[EnvironmentVariableTarget]::Process)
+        $snapshot[$name]=[pscustomobject]@{
+            Defined=$null -ne $value
+            Value=$value
+        }
+    }
+    return $snapshot
+}
+
+function Restore-StudioProcessEnvironment($Snapshot){
+    foreach($name in $Snapshot.Keys){
+        $state=$Snapshot[$name]
+        $value=if($state.Defined){[string]$state.Value}else{$null}
+        [Environment]::SetEnvironmentVariable(
+            [string]$name,
+            $value,
+            [EnvironmentVariableTarget]::Process
+        )
+    }
+}
+
 function Resolve-StudioDataDirectory([string]$Root){
     $targetRoot=[IO.Path]::GetFullPath($Root)
     $configured=[Environment]::GetEnvironmentVariable('MVC_DATA_DIR')
