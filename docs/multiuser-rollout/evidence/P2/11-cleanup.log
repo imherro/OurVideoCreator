@@ -1,0 +1,13 @@
+cleanup_target_verified=ovc_test_p2_evidence_938b665
+ pg_terminate_backend 
+----------------------
+(0 rows)
+
+cleanup_dropped=ovc_test_p2_evidence_938b665
+cleanup_target_verified=ovc_test_p2_evidence_a6820b0
+ pg_terminate_backend 
+----------------------
+(0 rows)
+
+cleanup_dropped=ovc_test_p2_evidence_a6820b0
+remaining_count=0

@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|---|
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
-| P2 | P2-PG-01 已授权 | 未验收 | | | | 否 |
+| P2 | P2-PG-01 READY_FOR_REVIEW | 未验收 | `a6820b045123ed73953cbe5667821225f8ceafb5` | `evidence/P2/REPORT.md` | 等待外部复核 | 否 |
 | P3 | 未提交 | 未验收 | | | | 否 |
 | P4 | 未提交 | 未验收 | | | | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
@@ -113,3 +113,15 @@
 非阻塞观察：`OVC-P1-R3-N01`（S3），首次全量测试的一次本机 HTTP 超时未归因；首轮失败日志必须保留，不能宣称根因已解决。P2 改造进程测试时补充失败出口的 Web/Worker/fake 日志、请求时间和安全可读数据库状态，不自动重试有副作用的 POST，也不以无限补跑掩盖。
 
 下一阶段授权：P2。下一单一任务：`P2-PG-01`，把现有保留业务完整切换到 PostgreSQL，建立空库、Web、独立 Worker 的运行闭环。P3、公网部署和真实付费 API 测试仍未授权。
+
+## P2-PG-01 待复验记录
+
+状态：**READY_FOR_REVIEW**（2026-09-16）
+
+被测试业务 SHA：`a6820b045123ed73953cbe5667821225f8ceafb5`
+
+报告：`evidence/P2/REPORT.md`；Schema/事务说明：`design/P2_STORAGE_CHANGELOG.md`；正式原始日志：`evidence/P2/00-context.log` 至 `11-cleanup.log`。
+
+开发侧已完成 PostgreSQL 唯一主库、独立 Alembic 空库迁移、完整保留业务表、并发 revision 冲突、事务回滚、同库单 Worker advisory lock、存储边界、离线 Stop、PowerShell 5.1/7 生命周期和全量回归。外部结论尚未填写，P3 仍未授权。
+
+取证时在旧业务 SHA `938b665e133ab014f1820991720da973082592a0` 的手工 Stop 中发现 PowerShell 7 时间精度缺陷；旧证据已废弃并保存在 `evidence/P2/attempts/938b665/`。修复后在新业务 SHA 上从空库重新运行全部正式证据。

@@ -1,0 +1,41 @@
+business_sha=a6820b045123ed73953cbe5667821225f8ceafb5
+manual_port=7879
+primary_data_dir=external-evidence-a6820b0-a
+secondary_data_dir=external-evidence-a6820b0-b
+primary_start_begin
+Web: http://127.0.0.1:7879 (PID 35224, instance ovc-e314c81718d6ce1fd0b3bf00cf2c74d3)
+Worker: PID 20536, instance ovc-e314c81718d6ce1fd0b3bf00cf2c74d3
+Web and Worker have separate lifecycle records. Other computers use this host LAN IP and port.
+primary_start_end
+web_pid=35224
+worker_pid=20536
+health_begin
+{
+  "status": "ok",
+  "app": "安影",
+  "version": "0.1.0",
+  "role": "web",
+  "instance_id": "ovc-e314c81718d6ce1fd0b3bf00cf2c74d3"
+}
+health_contains_database_url=False
+health_end
+database_identity_begin
+{"database_name": "ovc_test_p2_evidence_a6820b0", "pg_backend_pid": 9560, "schema_name": "public", "server_version": "18.6"}
+database_identity_end
+second_worker_begin
+worker process was not stopped: recorded process is no longer running.
+second_worker_unexpected_success=false
+second_worker_error=Worker exited: Worker refused to start: This PostgreSQL queue already has a Worker; the second Worker was refused.
+
+second_worker_end
+primary_stop_begin
+web stopped: PID 35224
+worker stopped: PID 20536
+primary_stop_end
+web_pid_alive_after_stop=False
+worker_pid_alive_after_stop=False
+web_record_exists_after_stop=False
+worker_record_exists_after_stop=False
+port_after_stop_begin
+listener_count=0
+port_after_stop_end

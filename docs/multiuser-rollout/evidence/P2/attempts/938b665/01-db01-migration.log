@@ -1,0 +1,100 @@
+db_name=ovc_test_p2_evidence_938b665
+business_sha=938b665e133ab014f1820991720da973082592a0
+created_utc=2026-09-16T08:28:04.8972377Z
+alembic_first_begin
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+alembic_first_end
+alembic_repeat_begin
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+alembic_repeat_end
+readiness_begin
+{"database_name": "ovc_test_p2_evidence_938b665", "pg_backend_pid": 36252, "schema_name": "public", "server_version": "18.6"}
+readiness_end
+metadata_begin
+ server_version |        database_name         | schema_name | backend_pid 
+----------------+------------------------------+-------------+-------------
+ 18.6           | ovc_test_p2_evidence_938b665 | public      |       37060
+(1 row)
+
+       version_num        
+--------------------------
+ 0001_postgresql_baseline
+(1 row)
+
+ application_table_count 
+-------------------------
+                      19
+(1 row)
+
+        table_name        |     column_name     | data_type 
+--------------------------+---------------------+-----------
+ assets                   | metadata            | jsonb
+ episode_script_revisions | snapshot            | jsonb
+ episode_scripts          | characters          | jsonb
+ episode_scripts          | metadata            | jsonb
+ episode_scripts          | paywall_beat        | jsonb
+ episode_scripts          | props               | jsonb
+ episode_scripts          | scenes              | jsonb
+ episode_scripts          | source_chapter_refs | jsonb
+ events                   | payload             | jsonb
+ job_private              | provider            | jsonb
+ jobs                     | input               | jsonb
+ jobs                     | result              | jsonb
+ jobs                     | telemetry           | jsonb
+ production_revisions     | shared_context      | jsonb
+ productions              | shared_context      | jsonb
+ projects                 | document            | jsonb
+ revisions                | document            | jsonb
+ settings                 | value               | jsonb
+ source_documents         | metadata            | jsonb
+ source_events            | characters          | jsonb
+ source_events            | continuity          | jsonb
+(21 rows)
+
+ schemaname |        tablename         |              indexname               
+------------+--------------------------+--------------------------------------
+ public     | alembic_version          | alembic_version_pkc
+ public     | assets                   | assets_pkey
+ public     | assets                   | assets_production_category_created
+ public     | assets                   | assets_production_created
+ public     | assets                   | assets_project_category_created
+ public     | assets                   | assets_project_created
+ public     | deleted_items            | deleted_items_pkey
+ public     | deleted_items            | deleted_items_project
+ public     | episode_script_revisions | episode_script_revisions_parent
+ public     | episode_script_revisions | episode_script_revisions_pkey
+ public     | episode_scripts          | episode_scripts_pkey
+ public     | episode_scripts          | episode_scripts_status
+ public     | events                   | events_pkey
+ public     | job_private              | job_private_pkey
+ public     | jobs                     | jobs_pkey
+ public     | jobs                     | jobs_production_created
+ public     | jobs                     | jobs_project_created
+ public     | jobs                     | jobs_status_created
+ public     | jobs                     | jobs_submission_id_key
+ public     | production_revisions     | production_revisions_parent_revision
+ public     | production_revisions     | production_revisions_pkey
+ public     | productions              | productions_pkey
+ public     | projects                 | projects_pkey
+ public     | projects                 | projects_production_episode
+ public     | projects                 | projects_production_updated
+ public     | provider_asset_groups    | provider_asset_groups_pkey
+ public     | provider_asset_mappings  | provider_asset_mappings_pkey
+ public     | provider_asset_mappings  | provider_asset_mappings_remote
+ public     | revisions                | revisions_pkey
+ public     | revisions                | revisions_project_revision
+ public     | sessions                 | sessions_pkey
+ public     | settings                 | settings_pkey
+ public     | source_chapters          | source_chapters_number
+ public     | source_chapters          | source_chapters_pkey
+ public     | source_chapters          | source_chapters_source_order
+ public     | source_documents         | source_documents_pkey
+ public     | source_documents         | source_documents_production
+ public     | source_events            | source_events_pkey
+ public     | source_events            | source_events_production_chapter
+(39 rows)
+
+metadata_end

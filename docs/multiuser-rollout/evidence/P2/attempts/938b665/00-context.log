@@ -1,0 +1,10 @@
+captured_utc=2026-09-16T08:26:22.0456414Z
+head=938b665e133ab014f1820991720da973082592a0
+origin=https://github.com/imherro/OurVideoCreator.git
+upstream_push=DISABLED
+status_begin
+status_end
+python=Python 3.14.2
+node=v24.13.0
+npm=11.8.0
+SQLAlchemy=2.0.50 Alembic=1.20.0 psycopg=3.3.5

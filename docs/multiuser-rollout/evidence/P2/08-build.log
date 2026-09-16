@@ -1,0 +1,24 @@
+
+> my-video-creator@0.1.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1825 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                         0.50 kB │ gzip:     0.37 kB
+dist/assets/EditorWorkspace-DzP7_-ja.css               25.67 kB │ gzip:     5.52 kB
+dist/assets/index-CkZDHKs9.css                        105.77 kB │ gzip:    20.53 kB
+dist/assets/internal-B6KRB6EV-BvBtLd70-KClykGxw.js     91.71 kB │ gzip:    29.95 kB
+dist/assets/index-CXhwwSX--SW4K-mAQ-BLqq3fxB.js       168.30 kB │ gzip:    58.50 kB
+dist/assets/DirectorStage-D79iR7DM.js                 533.50 kB │ gzip:   134.97 kB
+dist/assets/index-CYAIdSHL.js                         716.96 kB │ gzip:   221.05 kB
+dist/assets/EditorWorkspace-B1qyKh_P.js             3,912.43 kB │ gzip: 1,254.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.74s
+exit_code=0

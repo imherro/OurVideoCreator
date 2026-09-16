@@ -1,0 +1,32 @@
+{
+  "stage": "P2-PG-01",
+  "status": "READY_FOR_REVIEW",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "branch": "master",
+  "business_sha": "a6820b045123ed73953cbe5667821225f8ceafb5",
+  "database": {
+    "product": "PostgreSQL",
+    "server_version": "18.6",
+    "schema": "public",
+    "alembic_head": "0001_postgresql_baseline",
+    "business_tables": 18,
+    "public_tables_including_alembic": 19,
+    "jsonb_columns": 21,
+    "indexes_including_constraint_indexes": 39
+  },
+  "verification": {
+    "pytest_full": {"passed": 268, "failed": 0, "seconds": 249.32, "exit_code": 0},
+    "postgresql_targeted": {"passed": 10, "failed": 0, "seconds": 11.90, "exit_code": 0},
+    "process_lifecycle": {"passed": 10, "failed": 0, "seconds": 92.92, "exit_code": 0},
+    "ffmpeg": {"passed": 5, "failed": 0, "seconds": 13.08, "exit_code": 0},
+    "provider_db06": {"passed": 42, "failed": 0, "seconds": 16.49, "exit_code": 0},
+    "frontend": {"passed": 126, "failed": 0, "exit_code": 0},
+    "production_build": {"modules": 1825, "seconds": 6.74, "exit_code": 0},
+    "runtime_sqlite_matches": 0,
+    "tracked_sqlite_artifacts": 0,
+    "manual_lifecycle": "passed"
+  },
+  "paid_provider_calls": false,
+  "p3_started": false,
+  "external_verdict": null
+}

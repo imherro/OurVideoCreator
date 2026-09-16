@@ -1,0 +1,16 @@
+business_sha=938b665e133ab014f1820991720da973082592a0
+compileall_begin
+compileall_exit=0
+sqlite_specific_scan_begin
+tests\test_p2_postgresql.py:108:    sqlite = {**base, 'OVC_DATABASE_URL': 'sqlite:///forbidden.sqlite'}
+tests\test_p2_postgresql.py:304:    forbidden = ('sqlite3', 'PRAGMA', 'BEGIN IMMEDIATE', 'INSERT OR ', 'REPLACE INTO', 'lastrowid', 'studio.sqlite')
+rg_exit=0
+sqlite_specific_scan_note=exit 0 means matches; expected matches are negative-path assertions in tests/test_p2_postgresql.py only; runtime directories must have none
+runtime_only_scan_begin
+runtime_rg_exit=1
+runtime_only_scan_note=exit 1 means no matches
+tracked_sqlite_artifacts_begin
+tracked_artifacts_rg_exit=1
+tracked_sqlite_artifacts_note=exit 1 means none
+git_status_begin
+git_status_end
