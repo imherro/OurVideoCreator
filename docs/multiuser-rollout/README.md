@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2**
 
-状态：**P3-ID-01 READY_FOR_REVIEW**
+状态：**P3-R1 返修中**
 
 当前阶段：**P3-ID-01 — 邀请制账号、团队/作品隔离与基础页面闭环**
 
@@ -22,9 +22,9 @@ P1-R3 外部通过 HEAD：`6358c76f238a680dc9bd27b44968d5fe82db29d0`（`OVC-P1-R
 
 P2 外部通过 HEAD：`a70341bad5c0da23153ad6cd44b67f2cd863dde1`（业务 SHA `fc8feee3d9c3bfaffb39c55ab10d41e0fff7050f`）
 
-P3 被测试业务 SHA：`8b9c74607b46d8c09fb5d6445e46d57fead4f2b3`（等待外部验收）
+P3 首轮最终 HEAD：`dc1b0083db90ac1960b1f88117fa673e878c7baf`（外部不通过；阻塞 `OVC-P3-01…06`）
 
-下一阶段：**P4 未授权；等待 P3 外部验收**
+下一阶段：**P4 未授权；当前只实施 P3-R1**
 
 参考单机版基线：`464914c553f4c1856ca77da4a07e9d5fffb7f71e`
 

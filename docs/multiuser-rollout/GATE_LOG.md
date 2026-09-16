@@ -7,7 +7,7 @@
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
-| P3 | P3-ID-01 已提交待审 | 未验收 | `8b9c74607b46d8c09fb5d6445e46d57fead4f2b3` | `evidence/P3/REPORT.md` | 等待外部验收 | 否 |
+| P3 | P3-R1 返修中 | 不通过 | `dc1b0083db90ac1960b1f88117fa673e878c7baf` | `evidence/P3/REPORT.md` | `OVC-P3-01…06` | P3-R1 |
 | P4 | 未提交 | 未验收 | | | | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
@@ -187,3 +187,13 @@ P0/P1 继续保持通过。P2 阻塞项：`OVC-P2-01` Worker 锁连接死亡后�
 报告：`evidence/P3/REPORT.md`；正式原始日志：`evidence/P3/01-p3-targeted.log` 至 `06-compile.log`；浏览器补充：`evidence/P3/07-browser-manual.md`。
 
 开发侧已完成邀请制个人账号、团队/作品角色隔离、嵌套资源授权、素材读取与签名、SSE 撤权、管理/成员基础页面和 ACL-09 fail-closed 路由守卫。正式结果为 P3 定向 7/7、Python 全量 283/283、前端 126/126、构建通过、85/85 API 已分类。是否通过由外部验收人复核；P4 未开始。
+
+## P3-ID-01 外部验收记录
+
+结论：**不通过**（2026-09-16，主 ChatGPT 会话只审查协作版新仓库 `imherro/OurVideoCreator`）。
+
+绑定最终 HEAD：`dc1b0083db90ac1960b1f88117fa673e878c7baf`；被测试业务 SHA：`8b9c74607b46d8c09fb5d6445e46d57fead4f2b3`。
+
+P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 manager 限制；`OVC-P3-02` 团队撤权与作品授权并发可留下孤立授权；`OVC-P3-03` 旧密码登录可在重置后迟到签发 session；`OVC-P3-04` 最后 owner/admin 并发保护不足；`OVC-P3-05` 限流晚于密码哈希且成功登录错误清空共享 IP 记录；`OVC-P3-06` 管理页面缺少重置/撤权闭环，浏览器与 ACL-09 负向证据不足。
+
+下一单一授权任务：P3-R1，集中修复上述六项并在 `evidence/P3-R1/` 重新取证。P4、公网部署和真实付费 API 仍未授权。

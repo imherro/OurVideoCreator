@@ -24,6 +24,7 @@ SESSION_COOKIE = 'ovc_session'
 CSRF_COOKIE = 'ovc_csrf'
 SESSION_SECONDS = 7 * 86400
 AUTH_RECHECK_SECONDS = 5
+IDENTITY_INVARIANT_LOCK_KEY = 0x4F56435F494E5631
 _passwords = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2, type=Type.ID)
 _principal: contextvars.ContextVar['Principal | None'] = contextvars.ContextVar('ovc_principal', default=None)
 
@@ -213,6 +214,11 @@ def clear_rate_limit(connection, keys: Iterable[str]) -> None:
         connection.execute('DELETE FROM auth_rate_limits WHERE key=%s', (key,))
 
 
+def lock_identity_invariants(connection) -> None:
+    """Serialize mutations that can change admin or tenant membership invariants."""
+    connection.execute('SELECT pg_advisory_xact_lock(%s)', (IDENTITY_INVARIANT_LOCK_KEY,))
+
+
 def audit(connection, action: str, target_type: str, target_id: str | None = None, *,
           actor_user_id: str | None = None, workspace_id: str | None = None,
           production_id: str | None = None, payload: dict | None = None) -> None:
@@ -245,12 +251,16 @@ def can_production(connection, principal: Principal, production_id: str, needed:
     workspace_role, role = production_role(connection, principal, production_id)
     if workspace_role == 'owner':
         return True
+    if workspace_role is None:
+        return False
     return _ROLE_LEVEL.get(role or '', 0) >= _ROLE_LEVEL[needed]
 
 
 def require_production(connection, principal: Principal, production_id: str, needed: str = 'viewer') -> None:
     workspace_membership, production_membership = production_role(connection, principal, production_id)
-    visible = workspace_membership == 'owner' or production_membership is not None
+    visible = workspace_membership == 'owner' or (
+        workspace_membership is not None and production_membership is not None
+    )
     if not visible:
         # Do not disclose that a cross-workspace or unassigned Production ID exists.
         raise HTTPException(404, '资源不存在或无权访问')
@@ -295,7 +305,7 @@ def visible_production_ids(connection, principal: Principal) -> list[str]:
         '''SELECT DISTINCT p.id FROM productions p
            LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=%s
            LEFT JOIN production_members pm ON pm.production_id=p.id AND pm.user_id=%s
-           WHERE wm.role='owner' OR pm.user_id IS NOT NULL''',
+           WHERE wm.user_id IS NOT NULL AND (wm.role='owner' OR pm.user_id IS NOT NULL)''',
         (principal.user_id, principal.user_id),
     ).fetchall()
     return [row['id'] for row in rows]
@@ -345,6 +355,8 @@ def authorize_request(request: Request, principal: Principal) -> None:
             if method == 'DELETE' or (method == 'PATCH' and not suffix):
                 needed = 'manager'
             if method == 'POST' and suffix == 'episodes':
+                needed = 'manager'
+            if method == 'POST' and suffix == 'chapters/trash':
                 needed = 'manager'
             if suffix.endswith('/approve') or suffix.endswith('/needs-changes'):
                 needed = 'manager'

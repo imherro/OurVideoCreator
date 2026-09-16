@@ -136,17 +136,19 @@ class ResetPasswordBody(StrictBody):
 def register(body:RegisterBody,request:Request,response:Response):
     phone=identity.normalize_phone(body.phone);nickname=body.nickname.strip()
     if not nickname:raise ValueError('昵称不能为空')
-    encoded=identity.hash_password(body.password);now=time.time()
+    now=time.time()
     invite_hash=identity.digest(body.invitation_token)
     ip_key='register:ip:'+identity.client_ip(request)
+    invite_key='register:invite:'+invite_hash
     failure = None
     with s.db() as c:
-        identity.rate_limit(c,[ip_key,'register:invite:'+invite_hash],limit=8)
+        identity.rate_limit(c,[ip_key,invite_key],limit=8)
         invitation=c.execute('SELECT * FROM invitations WHERE token_hash=%s FOR UPDATE',(invite_hash,)).fetchone()
         if not invitation or invitation['revoked_at'] or invitation['consumed_at'] or invitation['expires']<=now:
-            identity.record_failure(c,[ip_key,'register:invite:'+invite_hash],limit=8)
+            identity.record_failure(c,[ip_key,invite_key],limit=8)
             failure = HTTPException(400,'邀请码无效或已失效')
         else:
+            encoded=identity.hash_password(body.password)
             user_id=s.uid('user-')
             try:
                 c.execute('''INSERT INTO users(id,phone,nickname,password_hash,platform_role,is_active,created,updated)
@@ -160,7 +162,8 @@ def register(body:RegisterBody,request:Request,response:Response):
                 (now,user_id,invitation['id'])).fetchone()
             if not changed:raise HTTPException(409,'邀请码已被使用')
             identity.audit(c,'user.register','user',user_id,actor_user_id=user_id,payload={'invitation_id':invitation['id']})
-            identity.clear_rate_limit(c,[ip_key,'register:invite:'+invite_hash])
+            # A successful invitation must not erase other clients' shared-IP history.
+            identity.clear_rate_limit(c,[invite_key])
             identity.issue_session(c,response,request,user_id)
     if failure:
         raise failure
@@ -174,12 +177,17 @@ def login(body:LoginBody,request:Request,response:Response):
     failure = None
     with s.db() as c:
         identity.rate_limit(c,keys)
-        user=c.execute('SELECT * FROM users WHERE phone=%s',(phone,)).fetchone()
+        # The user row is the credential serialization boundary shared with
+        # password reset and account deactivation. A verified old password
+        # cannot issue a session after a reset has committed.
+        user=c.execute('SELECT * FROM users WHERE phone=%s FOR UPDATE',(phone,)).fetchone()
         if not user or not user['is_active'] or not identity.verify_password(user['password_hash'],body.password):
             identity.record_failure(c,keys)
             failure = HTTPException(401,'手机号或密码不正确')
         else:
-            identity.clear_rate_limit(c,keys)
+            # Clear only this account's failures. The IP bucket represents
+            # attempts against every account sharing that address.
+            identity.clear_rate_limit(c,[keys[1]])
             identity.issue_session(c,response,request,user['id'])
             identity.audit(c,'session.login','user',user['id'],actor_user_id=user['id'])
     if failure:
@@ -194,7 +202,7 @@ def logout(request:Request,response:Response):
 
 @app.post('/api/auth/password-reset')
 def consume_password_reset(body:ResetPasswordBody,request:Request,response:Response):
-    encoded=identity.hash_password(body.password);now=time.time();token_hash=identity.digest(body.token)
+    now=time.time();token_hash=identity.digest(body.token)
     keys=['reset:ip:'+identity.client_ip(request),'reset:token:'+token_hash]
     failure = None
     with s.db() as c:
@@ -204,14 +212,16 @@ def consume_password_reset(body:ResetPasswordBody,request:Request,response:Respo
             identity.record_failure(c,keys,limit=8)
             failure = HTTPException(400,'重置链接无效或已失效')
         else:
-            c.execute('UPDATE users SET password_hash=%s,updated=%s WHERE id=%s AND is_active',
-                      (encoded,now,item['user_id']))
-            if c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(item['user_id'],)).fetchone() is None:
+            user=c.execute('SELECT id,is_active FROM users WHERE id=%s FOR UPDATE',(item['user_id'],)).fetchone()
+            if not user or not user['is_active']:
                 raise HTTPException(400,'账号不可用')
+            encoded=identity.hash_password(body.password)
+            c.execute('UPDATE users SET password_hash=%s,updated=%s WHERE id=%s',
+                      (encoded,now,item['user_id']))
             c.execute('UPDATE password_reset_tokens SET consumed_at=%s WHERE id=%s',(now,item['id']))
             c.execute('UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL',(now,item['user_id']))
             identity.audit(c,'user.password_reset','user',item['user_id'],actor_user_id=item['user_id'])
-            identity.clear_rate_limit(c,keys)
+            identity.clear_rate_limit(c,[keys[1]])
             identity.issue_session(c,response,request,item['user_id'])
     if failure:
         raise failure
@@ -270,6 +280,7 @@ class UserStateUpdate(StrictBody):
 def update_user_state(user_id:str,body:UserStateUpdate):
     principal=identity.current();now=time.time()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         user=c.execute('SELECT * FROM users WHERE id=%s FOR UPDATE',(user_id,)).fetchone()
         if not user:raise HTTPException(404,'用户不存在')
         if user['platform_role']=='platform_admin' and not body.is_active:
@@ -337,6 +348,7 @@ def admin_workspaces():
 def create_workspace(body:WorkspaceCreate):
     principal=identity.current();wid=s.uid('workspace-');now=time.time();name=body.name.strip()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(body.owner_user_id,)).fetchone():
             raise HTTPException(404,'Owner 用户不存在')
         c.execute('INSERT INTO workspaces(id,name,created_by,created,updated) VALUES(%s,%s,%s,%s,%s)',
@@ -368,6 +380,7 @@ class WorkspaceMemberUpdate(StrictBody):
 def put_workspace_member(workspace_id:str,user_id:str,body:WorkspaceMemberUpdate):
     principal=identity.current();now=time.time()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         identity.require_workspace_owner(c,principal,workspace_id)
         if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(user_id,)).fetchone():
             raise HTTPException(404,'用户不存在')
@@ -378,6 +391,12 @@ def put_workspace_member(workspace_id:str,user_id:str,body:WorkspaceMemberUpdate
                 WHERE wm.workspace_id=%s AND wm.role='owner' AND wm.user_id<>%s AND u.is_active LIMIT 1''',
                 (workspace_id,user_id)).fetchone()
             if not other_owner:raise HTTPException(409,'不能降级最后一位有效团队 owner')
+        if not existing:
+            # Defensive cleanup for pre-P3/manual orphan rows. Rejoining a
+            # Workspace must not silently revive historical Production roles.
+            c.execute('''DELETE FROM production_members WHERE user_id=%s AND production_id IN(
+                SELECT id FROM productions WHERE workspace_id=%s
+            )''',(user_id,workspace_id))
         c.execute('''INSERT INTO workspace_members(workspace_id,user_id,role,created) VALUES(%s,%s,%s,%s)
             ON CONFLICT(workspace_id,user_id) DO UPDATE SET role=excluded.role''',(workspace_id,user_id,body.role,now))
         identity.audit(c,'workspace_member.put','user',user_id,workspace_id=workspace_id,payload={'role':body.role})
@@ -388,6 +407,7 @@ def put_workspace_member(workspace_id:str,user_id:str,body:WorkspaceMemberUpdate
 def delete_workspace_member(workspace_id:str,user_id:str):
     principal=identity.current();now=time.time()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         identity.require_workspace_owner(c,principal,workspace_id)
         member=c.execute('SELECT role FROM workspace_members WHERE workspace_id=%s AND user_id=%s FOR UPDATE',(workspace_id,user_id)).fetchone()
         if not member:raise HTTPException(404,'成员不存在')
@@ -408,7 +428,10 @@ def production_members(production_id:str):
     with s.db() as c:
         identity.require_production(c,principal,production_id,'viewer')
         return [dict(row) for row in c.execute('''SELECT u.id,u.nickname,pm.role,u.is_active
-            FROM production_members pm JOIN users u ON u.id=pm.user_id
+            FROM production_members pm
+            JOIN productions p ON p.id=pm.production_id
+            JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=pm.user_id
+            JOIN users u ON u.id=pm.user_id
             WHERE pm.production_id=%s ORDER BY pm.role,u.nickname,u.id''',(production_id,))]
 
 
@@ -420,6 +443,7 @@ class ProductionMemberUpdate(StrictBody):
 def put_production_member(production_id:str,user_id:str,body:ProductionMemberUpdate):
     principal=identity.current();now=time.time()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         identity.require_production(c,principal,production_id,'manager')
         production_row=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
         if not production_row or not c.execute('SELECT 1 FROM workspace_members WHERE workspace_id=%s AND user_id=%s',(production_row['workspace_id'],user_id)).fetchone():
@@ -435,6 +459,7 @@ def put_production_member(production_id:str,user_id:str,body:ProductionMemberUpd
 def delete_production_member(production_id:str,user_id:str):
     principal=identity.current()
     with s.db() as c:
+        identity.lock_identity_invariants(c)
         identity.require_production(c,principal,production_id,'manager')
         p=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
         c.execute('DELETE FROM production_members WHERE production_id=%s AND user_id=%s',(production_id,user_id))
@@ -467,7 +492,8 @@ def project(pid):
         principal=identity.current(False)
         if principal and value.get('production_id'):
             workspace_role,production_role=identity.production_role(c,principal,value['production_id'])
-            level=3 if workspace_role=='owner' else identity._ROLE_LEVEL.get(production_role or '',0)
+            level=(3 if workspace_role=='owner' else
+                   identity._ROLE_LEVEL.get(production_role or '',0) if workspace_role is not None else 0)
             value['permissions']={
                 'role':'owner' if workspace_role=='owner' else production_role,
                 'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
@@ -485,7 +511,7 @@ def projects(workspace_id:str|None=None):
             FROM projects e JOIN productions p ON p.id=e.production_id
             LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=%s
             LEFT JOIN production_members pm ON pm.production_id=p.id AND pm.user_id=%s
-            WHERE (wm.role='owner' OR pm.user_id IS NOT NULL)
+            WHERE wm.user_id IS NOT NULL AND (wm.role='owner' OR pm.user_id IS NOT NULL)
             AND (%s::text IS NULL OR p.workspace_id=%s)
             AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=e.id)
             ORDER BY e.updated DESC''',(principal.user_id,principal.user_id,workspace_id,workspace_id))]
@@ -504,7 +530,8 @@ def production(production_id):
     if principal:
         with s.db() as c:
             workspace_role,production_role=identity.production_role(c,principal,production_id)
-        level=3 if workspace_role=='owner' else identity._ROLE_LEVEL.get(production_role or '',0)
+        level=(3 if workspace_role=='owner' else
+               identity._ROLE_LEVEL.get(production_role or '',0) if workspace_role is not None else 0)
         value['permissions']={'role':'owner' if workspace_role=='owner' else production_role,
                               'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
                               'legacy_document_write':level>=3}
@@ -531,7 +558,7 @@ def productions(workspace_id:str|None=None):
                     SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=e.id
                 )
             ))
-            AND (wm.role='owner' OR pm.user_id IS NOT NULL)
+            AND wm.user_id IS NOT NULL AND (wm.role='owner' OR pm.user_id IS NOT NULL)
             AND (%s::text IS NULL OR p.workspace_id=%s)
             ORDER BY p.updated DESC''',(principal.user_id,principal.user_id,workspace_id,workspace_id))]
 
@@ -1564,6 +1591,8 @@ def trash_source_chapters(production_id,chapter_ids):
 @app.post('/api/productions/{production_id}/chapters/trash')
 def delete_source_chapter_batch(production_id:str,body:ChapterTrashCreate):
     if len(set(body.chapter_ids))!=len(body.chapter_ids):raise ValueError('不能重复选择同一章节')
+    with s.db() as c:
+        identity.require_production(c,identity.current(),production_id,'manager')
     return trash_source_chapters(production_id,body.chapter_ids)
 
 @app.delete('/api/productions/{production_id}/chapters/{chapter_id}')

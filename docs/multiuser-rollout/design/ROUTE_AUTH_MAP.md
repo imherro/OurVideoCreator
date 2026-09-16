@@ -97,8 +97,8 @@
 | POST `/api/productions/{production_id}/sources` | Session | 分配到自己或 PM/WO | P3/P5 |
 | POST `/api/productions/{production_id}/sources/import` | Session | 同上；上传/文本限制 | P3/P7 |
 | DELETE `/api/productions/{production_id}/sources/{source_id}` | Session | 负责人/PM/WO；软删除 | P3/P5 |
-| POST `/api/productions/{production_id}/chapters/trash` | Session | 批量原子授权 | P3/P5 |
-| DELETE `/api/productions/{production_id}/chapters/{chapter_id}` | Session | 负责人/PM/WO | P3/P5 |
+| POST `/api/productions/{production_id}/chapters/trash` | PM/WO | 与单项删除一致；editor/viewer 不得借批量入口绕过 | P3/P5 |
+| DELETE `/api/productions/{production_id}/chapters/{chapter_id}` | PM/WO | P3 尚无对象负责人，保持 manager 删除边界 | P3/P5 |
 | GET `/api/productions/{production_id}/chapters` | Session | Production 成员 | P3 |
 | POST `/api/productions/{production_id}/sources/{source_id}/chapters` | Session | 负责人/PM/WO | P3/P5 |
 | PUT `/api/productions/{production_id}/chapters/{chapter_id}` | Session | assignee + expected_revision | P3/P5 |

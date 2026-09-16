@@ -49,4 +49,6 @@
 
 P3 已移除共享密码/session，所有现有 API 使用个人数据库 session、CSRF 与 Workspace/Production 服务端 ACL；列表、详情、嵌套 ID、历史、回收站、素材/Range、任务和 SSE 均按当前成员关系复核。平台管理员不在普通业务查询中拥有跨租户万能旁路；管理动作使用 `/api/admin/*` 并写审计。
 
+P3-R1 把会减少有效管理员或成员关系的写操作放入同一个数据库事务级身份不变量锁：团队 owner 降级/移除、用户停用、作品授权与团队撤权不会留下零 owner、零平台管理员或孤立作品授权。读端同时要求有效团队成员关系；仅有遗留 `production_members` 行不能获得列表、详情、文件或 SSE 权限。
+
 P3 仍处于内部试用边界。对象 assignee、接管、细粒度 revision 与 lease 在 P5 落地；在此之前 editor 可使用已有对象 API，但不能使用旧整份 `PUT /api/projects/{pid}`、删除/恢复资源或操作他人任务。Provider 凭证版本化和安全模型目录在 P4，多 Worker 执行前二次授权与额度在 P6。

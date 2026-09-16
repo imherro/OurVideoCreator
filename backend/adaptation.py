@@ -635,9 +635,15 @@ def apply_adaptation_generation(job, generated):
     if any(not set(plan['sourceChapterRefs']) <= allowed_chapters for plan in bundle['episodePlans']):
         raise ValueError('模型返回了任务快照中不存在的原著章节编号')
     with s.db() as connection:
-        active = connection.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
+        active = connection.execute(
+            'SELECT status,project_id,production_id,workspace_id FROM jobs WHERE id=%s FOR UPDATE',
+            (job['id'],),
+        ).fetchone()
         if not active or active['status'] != 'running':
             raise ValueError('改编策划任务已失效，未写入生成结果')
+        if (active['project_id'] != job['project_id'] or active['production_id'] != production_id or
+                job.get('production_id') != production_id or active['workspace_id'] != job.get('workspace_id')):
+            raise ValueError('改编策划任务归属已失效')
         production = connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
         if not production:
             raise ValueError('改编策划任务的 Production 已不存在')
@@ -730,9 +736,15 @@ def apply_episode_script_generation(job, generated):
     marker = job['input'].get('episode_script_generation') or {}
     production_id = marker.get('productionId'); episode_no = marker.get('episodeNo')
     with s.db() as connection:
-        active = connection.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
+        active = connection.execute(
+            'SELECT status,project_id,production_id,workspace_id FROM jobs WHERE id=%s FOR UPDATE',
+            (job['id'],),
+        ).fetchone()
         if not active or active['status'] != 'running':
             raise ValueError('逐集剧本任务已失效，未写入生成结果')
+        if (active['project_id'] != job['project_id'] or active['production_id'] != production_id or
+                job.get('production_id') != production_id or active['workspace_id'] != job.get('workspace_id')):
+            raise ValueError('逐集剧本任务归属已失效')
         project = connection.execute('SELECT * FROM projects WHERE id=%s AND production_id=%s',(job['project_id'],production_id)).fetchone()
         row = connection.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(job['project_id'],)).fetchone()
         if not project or project['episode_no'] != episode_no or not row:

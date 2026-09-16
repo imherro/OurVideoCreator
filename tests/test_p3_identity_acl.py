@@ -17,6 +17,7 @@ import psycopg
 import pytest
 import httpx
 import uvicorn
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
 from psycopg import sql
@@ -25,9 +26,9 @@ from starlette.requests import Request
 
 from backend import identity
 from backend import store as s
-from backend.app import app
+from backend.app import UserStateUpdate, app, update_user_state
 from backend.provider_assets import public_asset_url, valid_signature
-from scripts.audit_routes import unclassified_api_routes
+from scripts.audit_routes import export_routes, guard_exit_code, unclassified_api_routes
 from tests.auth_helpers import login_admin
 from tests.postgres_test_db import _assert_safe_target
 
@@ -388,6 +389,142 @@ def test_auth05_06_07_08_09_sessions_reset_rate_limit_csrf_and_last_role_guards(
     assert identity.client_ip(trusted) == "203.0.113.9" and identity.secure_cookie(trusted)
 
 
+def test_p3_r1_password_reset_serializes_old_password_login(admin, clients):
+    _, user, number = register(admin, clients, nickname="重置并发用户")
+    reset = admin.post("/api/admin/password-resets", json={"user_id": user["id"]}).json()
+    login_client, reset_client = clients(), clients()
+    barrier = threading.Barrier(3)
+    results: dict[str, int] = {}
+
+    def late_login():
+        barrier.wait()
+        results["login"] = login_client.post(
+            "/api/auth/login", json={"phone": number, "password": PASSWORD}
+        ).status_code
+
+    def reset_password():
+        barrier.wait()
+        results["reset"] = reset_client.post("/api/auth/password-reset", json={
+            "token": reset["token"], "password": "P3-R1-new-password!",
+        }).status_code
+
+    threads = [threading.Thread(target=late_login), threading.Thread(target=reset_password)]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=20)
+        assert not thread.is_alive()
+
+    assert results["reset"] == 200
+    assert results["login"] in {200, 401}
+    # If the old-password login won the row lock it committed first and the
+    # reset revoked it. If reset won, the old password was rejected. Either
+    # ordering leaves no usable old-credential session after reset commits.
+    assert not login_client.get("/api/auth/status").json()["authenticated"]
+    assert reset_client.get("/api/auth/status").json()["authenticated"]
+    assert clients().post("/api/auth/login", json={
+        "phone": number, "password": "P3-R1-new-password!",
+    }).status_code == 200
+
+
+def test_p3_r1_rate_limits_precede_hashing_and_success_preserves_shared_ip(admin, clients, monkeypatch):
+    _, user, number = register(admin, clients, nickname="限流顺序用户")
+    raw_invite = invite(admin)["token"]
+    reset = admin.post("/api/admin/password-resets", json={"user_id": user["id"]}).json()
+    now = time.time()
+    blocked = [
+        "register:invite:" + identity.digest(raw_invite),
+        "reset:token:" + identity.digest(reset["token"]),
+    ]
+    with s.db() as connection:
+        for key in blocked:
+            connection.execute(
+                "INSERT INTO auth_rate_limits(key,window_started,attempts,blocked_until) VALUES(%s,%s,8,%s)",
+                (key, now, now + 60),
+            )
+
+    calls = 0
+    original_hash = identity.hash_password
+
+    def observed_hash(password: str):
+        nonlocal calls
+        calls += 1
+        return original_hash(password)
+
+    monkeypatch.setattr(identity, "hash_password", observed_hash)
+    assert clients().post("/api/auth/register", json={
+        "invitation_token": raw_invite, "phone": phone(), "nickname": "应先限流", "password": PASSWORD,
+    }).status_code == 429
+    assert clients().post("/api/auth/password-reset", json={
+        "token": reset["token"], "password": "P3-R1-rate-password!",
+    }).status_code == 429
+    assert calls == 0
+
+    monkeypatch.setattr(identity, "client_ip", lambda _request: "198.51.100.77")
+    ip_key = "login:ip:198.51.100.77"
+    account_key = "login:account:" + identity.digest(identity.normalize_phone(number))
+    with s.db() as connection:
+        connection.execute("DELETE FROM auth_rate_limits")
+        identity.record_failure(connection, [ip_key, account_key])
+    assert clients().post("/api/auth/login", json={"phone": number, "password": PASSWORD}).status_code == 200
+    with s.db() as connection:
+        assert connection.execute("SELECT attempts FROM auth_rate_limits WHERE key=%s", (ip_key,)).fetchone()["attempts"] == 1
+        assert connection.execute("SELECT 1 FROM auth_rate_limits WHERE key=%s", (account_key,)).fetchone() is None
+
+
+def test_p3_r1_last_platform_admin_guard_is_concurrent(admin):
+    with s.db() as connection:
+        first = connection.execute(
+            "SELECT * FROM users WHERE platform_role='platform_admin' AND is_active ORDER BY created LIMIT 1"
+        ).fetchone()
+        second_id = s.uid("user-admin-race-")
+        now = time.time()
+        connection.execute(
+            """INSERT INTO users(id,phone,nickname,password_hash,platform_role,is_active,created,updated)
+               VALUES(%s,%s,'并发管理员',%s,'platform_admin',TRUE,%s,%s)""",
+            (second_id, identity.normalize_phone(phone()), identity.hash_password(PASSWORD), now, now),
+        )
+        second = connection.execute("SELECT * FROM users WHERE id=%s", (second_id,)).fetchone()
+
+    barrier = threading.Barrier(3)
+    outcomes: list[int] = []
+    lock = threading.Lock()
+
+    def deactivate(actor, target_id):
+        principal = identity.Principal(
+            actor["id"], actor["phone"], actor["nickname"], "platform_admin", "direct-test", time.time() + 60
+        )
+        token = identity.set_current(principal)
+        try:
+            barrier.wait()
+            try:
+                update_user_state(target_id, UserStateUpdate(is_active=False))
+                status = 200
+            except HTTPException as exc:
+                status = exc.status_code
+        finally:
+            identity.reset_current(token)
+        with lock:
+            outcomes.append(status)
+
+    threads = [
+        threading.Thread(target=deactivate, args=(first, second_id)),
+        threading.Thread(target=deactivate, args=(second, first["id"])),
+    ]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=20)
+        assert not thread.is_alive()
+    assert sorted(outcomes) == [200, 409]
+    with s.db() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) count FROM users WHERE platform_role='platform_admin' AND is_active"
+        ).fetchone()["count"] == 1
+
+
 def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(admin, clients):
     owner_a, owner_a_user, _ = register(admin, clients, nickname="A owner")
     owner_b, owner_b_user, _ = register(admin, clients, nickname="B owner")
@@ -426,6 +563,18 @@ def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(
         json={"title": "editor source", "type": "manual"},
     )
     assert editor_source.status_code == 200
+    chapter = editor.post(
+        f"/api/productions/{a1['production_id']}/sources/{editor_source.json()['id']}/chapters",
+        json={"title": "不得批量绕过", "content": "正文"},
+    ).json()
+    assert editor.post(
+        f"/api/productions/{a1['production_id']}/chapters/trash",
+        json={"chapter_ids": [chapter["id"]]},
+    ).status_code == 403
+    assert manager.post(
+        f"/api/productions/{a1['production_id']}/chapters/trash",
+        json={"chapter_ids": [chapter["id"]]},
+    ).status_code == 200
     assert editor.delete(
         f"/api/productions/{a1['production_id']}/sources/{editor_source.json()['id']}"
     ).status_code == 403
@@ -516,12 +665,125 @@ def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(
     assert owner_a.get(f"/api/projects/{a1['id']}").status_code == 200
 
 
+def test_p3_r1_workspace_removal_and_production_grant_leave_no_orphan_access(admin, clients):
+    owner, owner_user, owner_phone = register(admin, clients, nickname="撤权 owner")
+    target, target_user, _ = register(admin, clients, nickname="撤权目标")
+    workspace = add_workspace(admin, owner_user["id"], "撤权竞态团队")
+    project = create_project(owner, workspace, "撤权竞态作品")
+    add_team_member(owner, workspace, target_user["id"])
+    owner_two = clients()
+    assert owner_two.post("/api/auth/login", json={"phone": owner_phone, "password": PASSWORD}).status_code == 200
+    owner_two.headers.update({"X-CSRF-Token": owner_two.cookies.get(identity.CSRF_COOKIE)})
+    barrier = threading.Barrier(3)
+    outcomes: list[int] = []
+    lock = threading.Lock()
+
+    def grant():
+        barrier.wait()
+        status = owner.put(
+            f"/api/productions/{project['production_id']}/members/{target_user['id']}",
+            json={"role": "viewer"},
+        ).status_code
+        with lock:
+            outcomes.append(status)
+
+    def remove():
+        barrier.wait()
+        status = owner_two.delete(
+            f"/api/workspaces/{workspace}/members/{target_user['id']}"
+        ).status_code
+        with lock:
+            outcomes.append(status)
+
+    threads = [threading.Thread(target=grant), threading.Thread(target=remove)]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=20)
+        assert not thread.is_alive()
+    assert 200 in outcomes and all(status in {200, 409} for status in outcomes)
+    with s.db() as connection:
+        assert connection.execute(
+            "SELECT 1 FROM workspace_members WHERE workspace_id=%s AND user_id=%s",
+            (workspace, target_user["id"]),
+        ).fetchone() is None
+        assert connection.execute(
+            "SELECT 1 FROM production_members WHERE production_id=%s AND user_id=%s",
+            (project["production_id"], target_user["id"]),
+        ).fetchone() is None
+        # Even a legacy/orphan row cannot grant access at read time.
+        connection.execute(
+            "INSERT INTO production_members(production_id,user_id,role,created) VALUES(%s,%s,'viewer',%s)",
+            (project["production_id"], target_user["id"], time.time()),
+        )
+    assert target.get(f"/api/projects/{project['id']}").status_code == 404
+    assert project["id"] not in {item["id"] for item in target.get("/api/projects").json()}
+    add_team_member(owner, workspace, target_user["id"])
+    with s.db() as connection:
+        assert connection.execute(
+            "SELECT 1 FROM production_members WHERE production_id=%s AND user_id=%s",
+            (project["production_id"], target_user["id"]),
+        ).fetchone() is None
+    assert target.get(f"/api/projects/{project['id']}").status_code == 404
+
+
+def test_p3_r1_concurrent_owner_demotion_preserves_one_active_owner(admin, clients):
+    owner_a, user_a, _ = register(admin, clients, nickname="并发 owner A")
+    owner_b, user_b, _ = register(admin, clients, nickname="并发 owner B")
+    workspace = add_workspace(admin, user_a["id"], "owner 并发团队")
+    add_team_member(owner_a, workspace, user_b["id"], "owner")
+    barrier = threading.Barrier(3)
+    outcomes: list[int] = []
+    lock = threading.Lock()
+
+    def demote(client, user_id):
+        barrier.wait()
+        status = client.put(
+            f"/api/workspaces/{workspace}/members/{user_id}", json={"role": "member"}
+        ).status_code
+        with lock:
+            outcomes.append(status)
+
+    threads = [
+        threading.Thread(target=demote, args=(owner_a, user_a["id"])),
+        threading.Thread(target=demote, args=(owner_b, user_b["id"])),
+    ]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join(timeout=20)
+        assert not thread.is_alive()
+    assert sorted(outcomes) == [200, 409]
+    with s.db() as connection:
+        assert connection.execute(
+            """SELECT COUNT(*) count FROM workspace_members wm JOIN users u ON u.id=wm.user_id
+               WHERE wm.workspace_id=%s AND wm.role='owner' AND u.is_active""", (workspace,),
+        ).fetchone()["count"] == 1
+
+
 def test_acl09_route_guard_fails_for_a_new_unclassified_api_route():
-    documented = [{"path": "/api/health", "methods": ["GET"]}]
-    route_map = "| GET `/api/health` | Public |"
-    assert unclassified_api_routes(documented, route_map) == []
-    injected = [*documented, {"path": "/api/new-unclassified-resource", "methods": ["POST"]}]
-    assert unclassified_api_routes(injected, route_map) == ["POST /api/new-unclassified-resource"]
+    route_map = (ROOT / "docs" / "multiuser-rollout" / "design" / "ROUTE_AUTH_MAP.md").read_text(
+        encoding="utf-8"
+    )
+    assert guard_exit_code(export_routes(app), route_map) == 0
+    original_count = len(app.routes)
+
+    def fake_unclassified_resource():
+        return {"unexpected": True}
+
+    app.add_api_route(
+        "/api/new-unclassified-resource", fake_unclassified_resource,
+        methods=["POST"], name="p3_r1_unclassified_probe",
+    )
+    try:
+        actual_routes = export_routes(app)
+        assert "POST /api/new-unclassified-resource" in unclassified_api_routes(actual_routes, route_map)
+        assert guard_exit_code(actual_routes, route_map) == 1
+    finally:
+        del app.router.routes[original_count:]
+    assert guard_exit_code(export_routes(app), route_map) == 0
 
 
 def test_media04_signed_capability_binds_asset_method_purpose_expiry_and_revocation(admin, clients):

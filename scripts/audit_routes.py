@@ -34,6 +34,11 @@ def unclassified_api_routes(routes: list[dict], route_map: str) -> list[str]:
     return unclassified
 
 
+def guard_exit_code(routes: list[dict], route_map: str) -> int:
+    """Return the process exit status used by CI's fail-closed route guard."""
+    return 1 if unclassified_api_routes(routes, route_map) else 0
+
+
 def main() -> int:
     repo = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repo))
@@ -77,7 +82,7 @@ def main() -> int:
             "routes": routes,
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 1 if unclassified else 0
+    return guard_exit_code(routes, route_map)
 
 
 if __name__ == "__main__":
