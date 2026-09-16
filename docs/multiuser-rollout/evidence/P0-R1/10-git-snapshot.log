@@ -1,0 +1,109 @@
+$ git status --short --branch
+[exit 0]
+## master...origin/master
+ M docs/multiuser-rollout/GATE_LOG.md
+ M docs/multiuser-rollout/README.md
+ M docs/multiuser-rollout/design/API_CONTRACT.md
+ M docs/multiuser-rollout/design/CODE_MAP.md
+ M docs/multiuser-rollout/design/DATA_OWNERSHIP.md
+ M docs/multiuser-rollout/design/FEATURE_MATRIX.md
+ M docs/multiuser-rollout/design/PERMISSIONS.md
+ M docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md
+ M docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md
+ M docs/multiuser-rollout/evidence/P0/REPORT.md
+?? docs/multiuser-rollout/evidence/P0-R1/
+?? scripts/audit_routes.py
+?? scripts/capture_p0_evidence.py
+
+
+$ git diff --stat
+[exit 0]
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/GATE_LOG.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/README.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/API_CONTRACT.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/CODE_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/DATA_OWNERSHIP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/FEATURE_MATRIX.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PERMISSIONS.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/evidence/P0/REPORT.md.
+The file will have its original line endings in your working directory
+ docs/multiuser-rollout/GATE_LOG.md                 |  8 +++---
+ docs/multiuser-rollout/README.md                   |  3 +-
+ docs/multiuser-rollout/design/API_CONTRACT.md      |  9 ++++++
+ docs/multiuser-rollout/design/CODE_MAP.md          |  2 +-
+ docs/multiuser-rollout/design/DATA_OWNERSHIP.md    | 16 +++++++++++
+ docs/multiuser-rollout/design/FEATURE_MATRIX.md    |  7 +++--
+ docs/multiuser-rollout/design/PERMISSIONS.md       |  4 ++-
+ .../design/PROVIDER_CAPABILITIES.md                |  5 ++--
+ docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md    | 33 +++++++++++++---------
+ docs/multiuser-rollout/evidence/P0/REPORT.md       |  4 +++
+ 10 files changed, 65 insertions(+), 26 deletions(-)
+
+
+$ git diff --name-status
+[exit 0]
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/GATE_LOG.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/README.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/API_CONTRACT.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/CODE_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/DATA_OWNERSHIP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/FEATURE_MATRIX.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PERMISSIONS.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/evidence/P0/REPORT.md.
+The file will have its original line endings in your working directory
+M	docs/multiuser-rollout/GATE_LOG.md
+M	docs/multiuser-rollout/README.md
+M	docs/multiuser-rollout/design/API_CONTRACT.md
+M	docs/multiuser-rollout/design/CODE_MAP.md
+M	docs/multiuser-rollout/design/DATA_OWNERSHIP.md
+M	docs/multiuser-rollout/design/FEATURE_MATRIX.md
+M	docs/multiuser-rollout/design/PERMISSIONS.md
+M	docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md
+M	docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md
+M	docs/multiuser-rollout/evidence/P0/REPORT.md
+
+
+$ git diff --check
+[exit 0]
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/GATE_LOG.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/README.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/API_CONTRACT.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/CODE_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/DATA_OWNERSHIP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/FEATURE_MATRIX.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PERMISSIONS.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md.
+The file will have its original line endings in your working directory
+warning: LF will be replaced by CRLF in docs/multiuser-rollout/evidence/P0/REPORT.md.
+The file will have its original line endings in your working directory

@@ -1,0 +1,15 @@
+{
+  "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+  "started_utc": "2026-09-16T04:37:11.725661+00:00",
+  "duration_seconds": 0.082,
+  "exit_code": 1,
+  "retry": false
+}
+
+Traceback (most recent call last):
+  File "C:\Users\kunpeng\Documents\ChatGPT\OurVideoCreator\scripts\audit_routes.py", line 52, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "C:\Users\kunpeng\Documents\ChatGPT\OurVideoCreator\scripts\audit_routes.py", line 14, in main
+    from backend.app import app
+ModuleNotFoundError: No module named 'backend'
