@@ -53,6 +53,10 @@ def test_secret_ciphertext_and_safe_projection(admin):
 @pytest.mark.parametrize('mode', ['missing', 'wrong', 'malformed', 'corrupt'])
 def test_secret_failure_is_closed_and_atomic(admin, monkeypatch, mode):
     provider = create_provider(admin)
+    model = create_model(admin, provider)
+    jid, _ = job_binding(admin, model)
+    with s.db() as c:
+        job = s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s', (jid,)).fetchone())
     if mode == 'missing':
         monkeypatch.delenv(secrets.KEY_ENV)
     elif mode == 'wrong':
@@ -76,6 +80,16 @@ def test_secret_failure_is_closed_and_atomic(admin, monkeypatch, mode):
                       ('model_providers', 'provider_config_versions', 'provider_credential_versions', 'audit_events'))
         assert after == counts
     assert admin.post('/api/admin/model-providers/' + provider['id'] + '/check').status_code == 400
+    # Prove the real Worker path also stops before HTTP, not only admin saves.
+    from backend.worker import Worker
+    calls = []
+    def forbidden_http(*args, **kwargs):
+        calls.append('unexpected-http')
+        raise AssertionError('unavailable secrets must never reach HTTP')
+    monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', forbidden_http)
+    with pytest.raises(secrets.SecretUnavailable):
+        Worker().execute(job)
+    assert calls == []
 
 
 def test_rotation_keeps_original_identity_and_revocation_blocks(admin):
