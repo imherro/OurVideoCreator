@@ -1,0 +1,19 @@
+{
+  "stage": "P3-R1",
+  "status": "READY_FOR_REVIEW",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "branch": "master",
+  "business_sha": "a8cd59e8247b915737084383f5b53df1f831f4fe",
+  "external_pass_claimed": false,
+  "next_stage_started": false,
+  "blockers_addressed": ["OVC-P3-01", "OVC-P3-02", "OVC-P3-03", "OVC-P3-04", "OVC-P3-05", "OVC-P3-06"],
+  "results": {
+    "p3_r1_targeted": {"passed": 12, "exit_code": 0},
+    "python_full": {"passed": 288, "exit_code": 0},
+    "frontend": {"passed": 126, "failed": 0, "exit_code": 0},
+    "build": {"modules": 1825, "exit_code": 0},
+    "route_audit": {"api_routes": 85, "classified": 85, "unclassified": 0, "exit_code": 0},
+    "compile": {"exit_code": 0},
+    "browser": {"real_browsers": 2, "isolated_port": 7894, "cleanup_complete": true}
+  }
+}

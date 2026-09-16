@@ -1,0 +1,19 @@
+Business SHA: a8cd59e8247b915737084383f5b53df1f831f4fe
+Command: python -m pytest -q
+Exit code: 0
+
+........................................................................ [ 25%]
+........................................................................ [ 50%]
+........................................................................ [ 75%]
+........................................................................ [100%]
+============================== warnings summary ===============================
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+288 passed, 2 warnings in 338.72s (0:05:38)

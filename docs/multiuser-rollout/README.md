@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2**
 
-状态：**P3-R1 返修中**
+状态：**P3-R1 READY_FOR_REVIEW**
 
 当前阶段：**P3-ID-01 — 邀请制账号、团队/作品隔离与基础页面闭环**
 
@@ -23,6 +23,8 @@ P1-R3 外部通过 HEAD：`6358c76f238a680dc9bd27b44968d5fe82db29d0`（`OVC-P1-R
 P2 外部通过 HEAD：`a70341bad5c0da23153ad6cd44b67f2cd863dde1`（业务 SHA `fc8feee3d9c3bfaffb39c55ab10d41e0fff7050f`）
 
 P3 首轮最终 HEAD：`dc1b0083db90ac1960b1f88117fa673e878c7baf`（外部不通过；阻塞 `OVC-P3-01…06`）
+
+P3-R1 被测试业务 SHA：`a8cd59e8247b915737084383f5b53df1f831f4fe`（六项阻塞已提交待外部复验）
 
 下一阶段：**P4 未授权；当前只实施 P3-R1**
 
@@ -50,9 +52,10 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P1-R3/REPORT.md`](evidence/P1-R3/REPORT.md)（调用者环境恢复、同一 PowerShell PID 连续调用及非零出口回归）
 - [`evidence/P2/REPORT.md`](evidence/P2/REPORT.md)（PostgreSQL 唯一主库、空库迁移、完整业务与 Web/Worker 证据）
 - [`evidence/P3/REPORT.md`](evidence/P3/REPORT.md)（邀请制身份、团队/作品 ACL、SSE 撤权和基础页面闭环）
+- [`evidence/P3-R1/REPORT.md`](evidence/P3-R1/REPORT.md)（六项外部阻塞返修、并发不变量、真实浏览器与重新取证）
 
 ## 阶段边界
 
-P1 已完成内置推理移除并建立独立 Web/Worker 进程边界；P2 已把保留业务切换到 PostgreSQL 唯一主库。P3 已完成开发侧实现与取证并等待外部验收，继续保持单 Worker、内部试用且不调用真实付费 API；P4 之后的凭证平台化、多 Worker 与公网发布尚未实施。
+P1 已完成内置推理移除并建立独立 Web/Worker 进程边界；P2 已把保留业务切换到 PostgreSQL 唯一主库。P3-R1 已完成开发侧返修与重新取证并等待外部复验，继续保持单 Worker、内部试用且不调用真实付费 API；P4 的平台统一 Provider/Key/模型后台、多 Worker 与公网发布尚未实施。
 
 P0 首次外部验收在 `3c0e5ca` 给出 OVC-P0-01 至 OVC-P0-05；P0-R1 在 `b957e39` 复验通过。P1 经 P1-R1 至 P1-R3 最终在 `6358c76` 通过。P2 经 P2-R1、P2-R2 最终在 `a70341b` 通过，阻塞项全部关闭；保留非阻塞观察 `OVC-P2-R2-N01`。P3 是否通过仍由外部验收人基于协作版仓库和证据决定，开发侧不自行宣称通过或进入 P4。

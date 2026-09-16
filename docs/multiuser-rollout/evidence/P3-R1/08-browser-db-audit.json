@@ -1,0 +1,34 @@
+{
+  "business_sha": "a8cd59e8247b915737084383f5b53df1f831f4fe",
+  "environment": {
+    "port": 7894,
+    "isolated_database": "ovc_test_p3r1_browser_9c1a4e2f",
+    "production_service_port_touched": false,
+    "cleanup": {
+      "web_listener_stopped": true,
+      "isolated_database_dropped": true
+    }
+  },
+  "observed_audit_actions": [
+    "user.register",
+    "workspace_member.put",
+    "production_member.put",
+    "workspace.create",
+    "password_reset.issue",
+    "user.password_reset",
+    "production_member.remove",
+    "workspace_member.remove"
+  ],
+  "final_default_workspace_relationships": {
+    "workspace_members": 0,
+    "production_members": 0
+  },
+  "browser_assertions": {
+    "viewer_production_visible_before_revoke": true,
+    "two_workspace_switch_isolated": true,
+    "old_session_returned_to_login_after_reset": true,
+    "new_password_login_succeeded": true,
+    "revoked_workspace_and_production_absent_after_refresh": true
+  },
+  "secrets_recorded": false
+}
