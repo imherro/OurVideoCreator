@@ -4,9 +4,9 @@
 
 已通过阶段：**P0、P1、P2、P3**
 
-状态：**P4-MODEL-01 READY_FOR_REVIEW**（P4 未验收）
+状态：**P4 外部不通过；P4-R1 返修中**（三个 S2，P5 未授权）
 
-当前阶段：**P4-MODEL-01 — 平台统一 Provider/Key/模型后台与受控调用闭环**
+当前阶段：**P4-R1 — 修复受限缺省参数、认证模式与发布用途的执行不一致**
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 
@@ -30,7 +30,7 @@ P3-R1 外部复验 HEAD：`5e0c5e36d37415d4867d380f4e86dd47c87eebce`（关闭 `O
 
 P3 外部通过 HEAD：`de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6`（被测业务 `cd61996bf6908f66cfd3429d27fa42acb03c144d`，全部六项及三个残留问题关闭）。
 
-当前仅授权 **P4-MODEL-01**；P5 及后续阶段未授权。
+当前仅授权 **P4-R1**；P5 及后续阶段未授权。
 
 参考单机版基线：`464914c553f4c1856ca77da4a07e9d5fffb7f71e`
 
@@ -62,6 +62,8 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`prompts/P4_CODEX_PROMPT.md`](prompts/P4_CODEX_PROMPT.md)（本次外部授权完整任务原文，网页文本格式化归档）
 - [`design/P4_MODEL_CONFIG.md`](design/P4_MODEL_CONFIG.md)（P4 实现契约与入口/验证映射，非完成声明）
 - [`evidence/P4/REPORT.md`](evidence/P4/REPORT.md)（平台模型治理、独立 Worker 真实 UI 闭环及安全矩阵；最终业务 `3a73165f74520d0c15ec6f0750d7b2c105108744`，待外部验收）
+- [`reviews/P4/REVIEW.md`](reviews/P4/REVIEW.md)（P4 外部不通过原件；三个 S2，已有闭环与安全证据认可）
+- [`prompts/P4_R1_CODEX_PROMPT.md`](prompts/P4_R1_CODEX_PROMPT.md)（下载并完整读取的 P4-R1 原始提示词）
 
 ## 阶段边界
 

@@ -55,10 +55,12 @@ def publish_test_model(client, model_id, *, kind='text', provider_type='openai',
     provider_id = 'test-provider-' + model_id
     existing = client.get('/api/admin/model-providers').json()['providers']
     old = next((item for item in existing if item['id'] == provider_id), None)
+    native_anonymous = provider_type in {'comfy', 'maestro'}
     response = client.put('/api/admin/model-providers/' + provider_id, json={
         'revision': old['revision'] if old else 0, 'name': 'Synthetic ' + model_id,
-        'enabled': True, 'api_key': api_key,
-        'config': {'type': provider_type, 'url': url, 'options': options or {}},
+        'enabled': True, 'api_key': '' if native_anonymous else api_key,
+        'config': {'type': provider_type, 'url': url, 'options': options or {},
+                   'auth_mode': 'none' if native_anonymous else 'api_key'},
     })
     assert response.status_code == 200, response.text
     existing = client.get('/api/admin/models').json()['models']

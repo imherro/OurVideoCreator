@@ -8,7 +8,7 @@
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
 | P3 | P3-R2 已复验 | 通过 | `de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6` | `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md` | 无；原六项及 R1-01/02/03 全部关闭 | P4 |
-| P4 | READY_FOR_REVIEW | 未验收 | 业务 `3a73165f74520d0c15ec6f0750d7b2c105108744` | `evidence/P4/REPORT.md` | 待外部审核 | 否 |
+| P4 | P4-R1 返修中 | 不通过 | `c7d6a88a06a01035fd44e45309414c05e061ab64` | `reviews/P4/REVIEW.md` | `OVC-P4-01/02/03`（S2） | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
 | P7 | 未提交 | 未验收 | | | | 否 |
@@ -245,3 +245,17 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 报告及证据：`evidence/P4/REPORT.md`、`SUMMARY.json` 和原始日志/浏览器记录。最终真实 PG 后端 351 passed、前端 128 passed、构建和编译 exit 0，96/96 API 分类。实际 UI 保存 Provider/Key/发布模型后，普通获权账号选择并提交文本、异步图片，独立 Worker 成功返回结果；四角色管理拒绝、嵌套覆盖、密钥异常、A/B HTTP 轮换/吊销和出站边界有对应负向测试。浏览器/前端 SHA 与最终业务间仅测试断言不同，运行时代码相同，明确记录而不冒称重跑。
 
 尚未获 P4 外部验收；P5、上线和真实付费 API 仍未授权。只向协作版新仓库提交，外部审核应聚焦已冻结功能与实际缺陷，避免过度设计。
+
+## P4-MODEL-01 外部验收：不通过，授权 P4-R1
+
+2026-09-17 用户指定 ChatGPT 主会话正式结论：**P4 不通过，暂不允许进入 P5**。绑定业务 `3a73165f74520d0c15ec6f0750d7b2c105108744`、证据 HEAD `c7d6a88a06a01035fd44e45309414c05e061ab64`。
+
+仅授权下一单一任务 **P4-R1**，集中修复三个 S2：
+
+- `OVC-P4-01`：省略参数后适配器缺省值可越过平台发布范围（max_tokens 上限 200 实际发 4096）。
+- `OVC-P4-02`：Maestro/Comfy 接受 api_key 认证模式，却发送匿名请求。
+- `OVC-P4-03`：Replicate audio 可发布和入队，但结果以 PNG 图像登记。
+
+外部认可既有平台权限、CSRF、秘密加密/失败关闭、出站保护、A/B 版本轮换及真实文本/图片浏览器闭环证据；不新增浏览器证据缺口，不要求新增音频供应商或认证平台。P0/P1/P2/P3 历史通过不变。
+
+已下载并完整读取原始审核包及返修提示词。原件见 `reviews/P4/REVIEW.md`、`MATRIX.md`、`GATE_DECISION.json`；完整执行要求见 `prompts/P4_R1_CODEX_PROMPT.md`。新证据写入 `evidence/P4-R1/`，保留旧证据和 7868/7895/6313/6185 实例。当前仅返修开始，不声称三个问题已经修复。

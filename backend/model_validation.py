@@ -11,7 +11,7 @@ from .provider_egress import validate_url
 PROVIDER_KINDS = {
     'openai': {'text', 'image'}, 'volcengine_ark': {'text', 'image', 'video'},
     'hc_atom': {'text', 'image', 'video'}, 'runninghub': {'text', 'image', 'video'},
-    'volcengine_speech': {'audio'}, 'replicate': {'text', 'image', 'video', 'audio'},
+    'volcengine_speech': {'audio'}, 'replicate': {'text', 'image', 'video'},
     'minimax': {'video'}, 'comfy': {'image', 'video'}, 'maestro': {'image', 'video'},
     'video_api': {'video'},
 }
@@ -58,6 +58,17 @@ def _string(value, label, maximum=200):
     return value.strip()
 
 
+def supported_protocol(config, kind=None):
+    """Reject combinations not implemented by the existing adapters, also on restore."""
+    provider_type = config.get('type')
+    if provider_type not in PROVIDER_KINDS:
+        raise ValueError('不支持的 Provider 类型')
+    if provider_type in {'comfy', 'maestro'} and config.get('auth_mode', 'api_key') != 'none':
+        raise ValueError('当前 Maestro/Comfy 适配器仅支持无认证 API，不支持 API Key 模式')
+    if kind is not None and kind not in PROVIDER_KINDS[provider_type]:
+        raise ValueError('Provider 不支持该模型用途')
+
+
 def provider_config(body):
     _object(body, {'type', 'url', 'options', 'auth_mode'}, 'Provider 配置')
     provider_type = body.get('type')
@@ -72,6 +83,7 @@ def provider_config(body):
         raise ValueError('认证方式无效')
     if auth_mode == 'none' and provider_type not in {'openai', 'comfy', 'maestro', 'video_api'}:
         raise ValueError('该适配器要求 API Key')
+    supported_protocol({'type': provider_type, 'auth_mode': auth_mode})
     options = copy.deepcopy(body.get('options', {}))
     _object(options, {'structured', 'resource_id', 'public_base_url', 'asset_group_id',
                       'parameters', 'workflow', 'request_defaults', 'submit_path', 'status_path'}, '协议选项')
@@ -140,8 +152,7 @@ def validate_parameter(value, rule):
 
 def model_definition(body, config, kind):
     _object(body, {'name', 'upstream_model', 'capabilities', 'defaults', 'rules'}, '模型定义')
-    if kind not in PROVIDER_KINDS[config['type']]:
-        raise ValueError('Provider 不支持该模型用途')
+    supported_protocol(config, kind)
     value = copy.deepcopy(body)
     value['name'] = _string(body.get('name'), '模型名称', 100)
     value['upstream_model'] = _string(body.get('upstream_model'), '上游模型标识', 500)
@@ -187,6 +198,10 @@ def model_definition(body, config, kind):
     _object(defaults, set(rules), '默认参数')
     if kind=='audio' and config['type']=='volcengine_speech' and not rules.get('voice_type',{}).get('enum'):
         raise ValueError('语音模型必须发布 voice_type 允许音色枚举')
+    if kind == 'audio' and config['type'] == 'volcengine_speech':
+        voices = rules['voice_type']['enum']
+        if not isinstance(voices, list) or any(not isinstance(v, str) or not v or v != v.strip() for v in voices):
+            raise ValueError('音色枚举必须是非空且无首尾空白的音色 ID，不能触发协议回退')
     for name, rule in rules.items():
         validate_rule(rule)
         if name in defaults:
@@ -201,12 +216,14 @@ def model_definition(body, config, kind):
 
 def shot_parameters(definition, submitted, kind, document, node_id):
     """Recompute linked-shot controls from canonical state and frozen model rules."""
-    result = parameters(definition, submitted)
+    # Canonical shot controls may fill missing fields. Require completeness only
+    # after that derivation, before freezing or making any external request.
+    result = parameters(definition, submitted, complete=False)
     shot = next((item for item in document.get('shots', [])
                  if item.get(kind + 'Node') == node_id
                  or (item.get('pipeline') or {}).get(kind + 'NodeId') == node_id), None)
     if not shot:
-        return result
+        return parameters(definition, result)
     caps, rules = definition['capabilities'], definition['rules']
     if kind == 'video' and 'fps' in caps and float(shot.get('duration', 0)) > 0:
         minimum, step, maximum = caps['min_frames'], caps['frame_step'], caps['max_frames']
@@ -223,9 +240,12 @@ def shot_parameters(definition, submitted, kind, document, node_id):
     return parameters(definition, result)
 
 
-def parameters(definition, submitted):
+def parameters(definition, submitted, *, complete=True):
     _object(submitted, set(definition['rules']), '生成参数')
     result = {**definition['defaults'], **submitted}
     for name, value in result.items():
         validate_parameter(value, definition['rules'][name])
+    missing = set(definition['rules']) - set(result)
+    if complete and missing:
+        raise ValueError('缺少平台受限参数，请填写或由管理员设置合法默认值：' + ', '.join(sorted(missing)))
     return result

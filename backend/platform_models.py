@@ -234,8 +234,11 @@ def catalog(connection=None):
         provider = connection.execute('''SELECT p.* FROM model_providers p
             JOIN model_versions v ON v.provider_id=p.id WHERE v.id=%s''', (row['version_id'],)).fetchone()
         try:
+            config = json.loads(connection.execute('SELECT config FROM provider_config_versions WHERE id=%s',
+                                (provider['config_version_id'],)).fetchone()['config'])
+            validation.supported_protocol(config, row['kind'])
             provider_secrets.decrypt(connection, _credential(connection, provider['credential_version_id']))
-        except provider_secrets.SecretUnavailable:
+        except (provider_secrets.SecretUnavailable, ValueError):
             continue
         models.append(_model_view(connection, row))
     ids = {item['id'] for item in models}
@@ -265,6 +268,9 @@ def resolve(connection, model_id, kind, inp, *, document=None, node_id=None):
     provider = connection.execute('SELECT * FROM model_providers WHERE id=%s FOR SHARE', (version['provider_id'],)).fetchone()
     if not provider['enabled']:
         raise ValueError('模型服务已停用；不会创建新任务')
+    config = json.loads(connection.execute('SELECT config FROM provider_config_versions WHERE id=%s',
+                        (provider['config_version_id'],)).fetchone()['config'])
+    validation.supported_protocol(config, kind)
     credential = _credential(connection, provider['credential_version_id'])
     if credential['state'] != 'current':
         raise provider_secrets.SecretUnavailable('当前模型凭证不可用')
@@ -312,7 +318,7 @@ def compiler_catalog():
 
 def config_for_binding(connection, binding, *, remote=False, decrypt=False):
     row = {'model_version_id': binding.model_version_id, 'config_version_id': binding.config_version_id,
-           'credential_version_id': binding.credential_version_id}
+           'credential_version_id': binding.credential_version_id, 'parameters': s.dumps(binding.parameters)}
     return _load_binding(connection, row, remote=remote, decrypt=decrypt)
 
 
@@ -342,13 +348,19 @@ def _load_binding(connection, row, *, remote, decrypt):
     if credential['state'] == 'revoked':
         raise provider_secrets.SecretUnavailable('任务原凭证已吊销；不会换账号查询或重新生成')
     config, definition = json.loads(config_version['config']), json.loads(model_version['definition'])
+    validation.supported_protocol(config, model['kind'])
+    job_parameters = json.loads(row.get('parameters') or '{}')
+    if not remote:
+        # Old queued jobs must not reach adapter fallback defaults either. Use
+        # only their frozen snapshot; do not silently refill it at execution.
+        validation.parameters({**definition, 'defaults': {}}, job_parameters)
     result = {**config['options'], 'id': provider['id'], 'name': provider['name'], 'type': config['type'],
               'url': config['url'], 'kind': model['kind'], 'model': definition['upstream_model'],
               'models': {model['kind']: definition['upstream_model']}, 'local': False,
               'config_version_id': config_version['id'], 'credential_version_id': credential['id'],
               'model_version_id': model_version['id'], 'model_id': model['id'],
               'capabilities': definition['capabilities'],
-              'job_parameters': json.loads(row.get('parameters') or '{}')}
+              'job_parameters': job_parameters}
     if decrypt:
         result['api_key'] = provider_secrets.decrypt(connection, credential)
     return result
