@@ -1,0 +1,38 @@
+business_sha=246db511bd950e649f59600a5f6cd2ed183be71e
+baseline_evidence_sha=a8f532e390706e00cee28585a01f0ece332e94d8
+show_stat_begin
+246db51 fix(p2-r1): close PostgreSQL concurrency gaps
+ backend/adaptation.py                              |   4 +-
+ backend/app.py                                     |  57 +--
+ backend/database.py                                |  49 ++-
+ backend/source_library.py                          |   4 +-
+ backend/store.py                                   |  40 +-
+ backend/worker.py                                  |  85 ++--
+ backend/worker_cli.py                              |  12 +-
+ .../design/P2_STORAGE_CHANGELOG.md                 |   2 +-
+ tests/test_event_retention.py                      |  25 +-
+ tests/test_p2_r1.py                                | 437 +++++++++++++++++++++
+ tests/test_volcengine_ark.py                       |   6 +-
+ 11 files changed, 626 insertions(+), 95 deletions(-)
+show_stat_end
+changed_files_begin
+M	backend/adaptation.py
+M	backend/app.py
+M	backend/database.py
+M	backend/source_library.py
+M	backend/store.py
+M	backend/worker.py
+M	backend/worker_cli.py
+M	docs/multiuser-rollout/design/P2_STORAGE_CHANGELOG.md
+M	tests/test_event_retention.py
+A	tests/test_p2_r1.py
+M	tests/test_volcengine_ark.py
+changed_files_end
+compileall_exit=0
+runtime_forbidden_match_count=0
+out_of_scope_diff_match_count=2
+-P2 未实现 P3 身份/ACL、P4 凭证加密、P5 多 Worker lease/fencing/quota、P6 对象级协作 API、P7 公网部署与 P8 总体验收。真实付费 Provider 未调用；Provider 契约使用 monkeypatch、本机 fake server 和禁止非 loopback 出站的测试复验。
++P2 未实现 P3 身份/ACL、P4 凭证加密、P5 对象级协作 API、P6 多 Worker 调度/lease/fencing/quota、P7 公网部署与 P8 总体验收。真实付费 Provider 未调用；Provider 契约使用 monkeypatch、本机 fake server 和禁止非 loopback 出站的测试复验。
+replacement_character_match_count=0
+exit_code=0
+post_report_replacement_character_match_count=0

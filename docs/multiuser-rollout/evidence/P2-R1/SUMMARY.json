@@ -1,0 +1,27 @@
+{
+  "stage": "P2-R1",
+  "status": "READY_FOR_REVIEW",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "branch": "master",
+  "business_sha": "246db511bd950e649f59600a5f6cd2ed183be71e",
+  "closed_by_implementation": [
+    "OVC-P2-01",
+    "OVC-P2-02",
+    "OVC-P2-03",
+    "OVC-P2-04",
+    "OVC-P2-05"
+  ],
+  "verification": {
+    "p2_r1_targeted": {"passed": 10, "failed": 0, "seconds": 9.45, "exit_code": 0},
+    "pytest_full": {"passed": 273, "failed": 0, "seconds": 240.80, "exit_code": 0},
+    "p2_process_regression": {"passed": 13, "failed": 0, "seconds": 19.49, "exit_code": 0},
+    "frontend": {"passed": 126, "failed": 0, "exit_code": 0},
+    "production_build": {"modules": 1825, "seconds": 7.22, "exit_code": 0},
+    "runtime_sqlite_matches": 0,
+    "replacement_character_matches": 0
+  },
+  "schema_changed": false,
+  "paid_provider_calls": false,
+  "p3_started": false,
+  "external_verdict": null
+}

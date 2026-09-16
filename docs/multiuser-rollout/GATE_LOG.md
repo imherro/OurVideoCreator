@@ -125,3 +125,23 @@
 开发侧已完成 PostgreSQL 唯一主库、独立 Alembic 空库迁移、完整保留业务表、并发 revision 冲突、事务回滚、同库单 Worker advisory lock、存储边界、离线 Stop、PowerShell 5.1/7 生命周期和全量回归。外部结论尚未填写，P3 仍未授权。
 
 取证时在旧业务 SHA `938b665e133ab014f1820991720da973082592a0` 的手工 Stop 中发现 PowerShell 7 时间精度缺陷；旧证据已废弃并保存在 `evidence/P2/attempts/938b665/`。修复后在新业务 SHA 上从空库重新运行全部正式证据。
+
+## P2-PG-01 外部复验记录
+
+结论：**不通过**（2026-09-16，主 ChatGPT 会话审查协作版新仓库 `imherro/OurVideoCreator`）。
+
+绑定 evidence HEAD：`a8f532e390706e00cee28585a01f0ece332e94d8`；被测试业务 SHA：`a6820b045123ed73953cbe5667821225f8ceafb5`。
+
+P0/P1 继续保持通过。P2 阻塞项：`OVC-P2-01` Worker 锁连接死亡后仍可能领取；`OVC-P2-02` prompt 首次写和两个 `MAX+1` 路径存在并发竞态；`OVC-P2-03` resume/cancel 可由 stale resume 覆盖；`OVC-P2-04` 多个 event 与业务状态不在同一事务；`OVC-P2-05` SSE identity ID 与提交顺序不一致可永久漏事件。
+
+下一单一授权任务：P2-R1，只修上述五项、补真实 PostgreSQL 并发/失败注入/游标测试并在新目录取证。P3 仍未授权。
+
+## P2-R1 待复验记录
+
+状态：**READY_FOR_REVIEW**（2026-09-16）
+
+被测试业务 SHA：`246db511bd950e649f59600a5f6cd2ed183be71e`
+
+报告：`evidence/P2-R1/REPORT.md`；结构化并发轨迹：`evidence/P2-R1/01-p2-r1-targeted.log`；正式全量：`evidence/P2-R1/02-pytest-full.log`。
+
+开发侧已逐项处理 `OVC-P2-01` 至 `OVC-P2-05`，正式验证为 P2-R1 定向 10/10、Python 全量 273/273、原 P2/进程回归 13/13、前端 126/126、构建通过。是否关闭和 P2 是否通过由外部验收人复核；未开始 P3。

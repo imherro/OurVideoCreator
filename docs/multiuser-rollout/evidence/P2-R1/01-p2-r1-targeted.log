@@ -1,0 +1,12 @@
+business_sha=246db511bd950e649f59600a5f6cd2ed183be71e
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+{"case": "worker_lock_loss", "cli_returncode": 3, "database": "ovc_test_37692_84bba012019d", "replacement_lock_backend_pid": 30692, "state_after_explicit_restart": "succeeded", "state_before_restart": "queued", "terminated_backend_pid": 33492}
+.{"case": "first_write_and_sequences", "chapter_numbers": [1, 2], "episode_numbers": [1, 2], "prompt_outcomes": [["conflict", 409], ["success", 1]]}
+.{"cancel_first": [["cancelled", "cancelled"], ["queued", 409]], "case": "resume_cancel", "duplicate_resume_progress": 37.0, "duplicate_resume_state": "running", "resume_first": [["cancelled", "cancelled"], ["queued", "queued"]]}
+.{"adaptation_rolled_back": true, "case": "transactional_events", "job_state_after_event_failure": "interrupted", "script_history_after": 0, "script_history_before": 0, "script_revision_after_event_failure": 1}
+.{"case": "sse_commit_cursor", "committed_ids": [7, 8], "latest_id": 10, "reconnect_cursor": 8, "retained_revisions": [2, 4, 5], "rollback_gap_revisions": [1, 2, 4], "rollback_gap_visible_ids": [7, 8, 10]}
+......
+10 passed in 9.45s
+exit_code=0
