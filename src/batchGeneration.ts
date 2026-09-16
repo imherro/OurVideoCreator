@@ -20,7 +20,7 @@ export type BatchGenerationPlan = {
 };
 
 function providerFor(data: Value, providers: Value[]) {
-  return providers.find((provider) => provider.id === data.provider);
+  return providers.find((provider) => provider.id === data.model_id);
 }
 
 function isCloud(provider: Value | undefined) {
@@ -100,7 +100,7 @@ function planVisualAssets(
         providers,
         localModels,
       );
-      const provider = providers.find((item) => item.id === target.providerId);
+      const provider = providers.find((item) => item.id === target.model_id);
       if (!provider) throw new Error("图片生成服务不存在");
       result.readyIds.push(version.id);
       if (isCloud(provider)) result.cloudCount += 1;
@@ -178,7 +178,7 @@ function planShotNodes(
       }
     }
     const provider = providerFor(node.data, providers);
-    if (!provider || node.data.provider === "local") {
+    if (!provider || node.data.model_id === "local") {
       result.blocked.push({ id: node.id, label, reason: "尚未选择可用的媒体生成服务" });
       continue;
     }

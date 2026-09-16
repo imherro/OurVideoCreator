@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import quote
 import httpx
 from . import store as s
+from . import platform_models, provider_egress
+from .provider_redaction import protect, scrub
 from .prompts import TEMPLATES, SHOT_SCHEMA, validate_shots
 from .media import ffmpeg_executable,probe
 from .database import WorkerAdvisoryLock
@@ -92,10 +94,10 @@ class Worker:
 
     def ark_job(self,job):
         with s.db() as c:
-            row=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(job['id'],)).fetchone()
-        if not row:return False
-        try:return json.loads(row['provider']).get('type') in ('volcengine_ark','volcengine_speech')
-        except (TypeError,ValueError):return False
+            row=c.execute("""SELECT cv.config FROM job_private j
+                JOIN provider_config_versions cv ON cv.id=j.config_version_id WHERE j.job_id=%s""",
+                (job['id'],)).fetchone()
+        return bool(row and json.loads(row['config']).get('type') in ('volcengine_ark','volcengine_speech'))
     def loop(self):
         try:
             self._loop()
@@ -215,13 +217,17 @@ class Worker:
         self.progress(job,'准备任务')
         if kind=='export':
             return self.export(job)
-        provider_id=str(inp.get('provider') or '').strip()
-        if not provider_id or provider_id=='local':
-            raise ValueError('未配置外部模型服务；系统不会自动回退到本地或其他付费模型')
         with s.db() as c:
-            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(job['id'],)).fetchone()
-        provider=json.loads(snapshot['provider']) if snapshot else None
-        if not provider: raise ValueError('任务缺少冻结的外部 Provider 配置')
+            provider=platform_models.load_job_provider(c,job['id'],remote=bool(job.get('provider_job_id')))
+        platform_models.validate_capabilities(provider['capabilities'],inp)
+        # Only immutable, server-validated parameters drive the protocol.
+        inp={**inp,**provider['job_parameters'],'parameters':dict(provider['job_parameters'])}
+        job={**job,'input':inp}
+        with protect(provider.get('api_key','')), provider_egress.before_call(lambda: platform_models.check_job_call(job['id'])):
+            return scrub(self.dispatch(job,provider))
+
+    def dispatch(self,job,provider):
+        kind=job['kind']
         if provider['type']=='replicate':
             from .replicate_api import execute
             return execute(self,job,provider)
@@ -262,12 +268,13 @@ class Worker:
         headers={'Authorization':'Bearer '+p['api_key']} if p.get('api_key') else {}
         if schema and not p.get('structured'):
             user_prompt+='\n\n必须严格输出以下 JSON Schema 对应的单个 JSON 值，不要输出 Markdown 或解释：\n'+json.dumps(schema,ensure_ascii=False)
-        body={'model':inp.get('model') or p.get('model',''),'messages':[{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}], 'temperature':0.6,'max_tokens':min(int(inp.get('max_tokens',4096)),12000),'stream':True}
+        body={'model':p.get('model',''),'messages':[{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}], 'temperature':inp.get('temperature',0.6),'max_tokens':int(inp.get('max_tokens',4096)),'stream':True}
+        if 'top_p' in inp: body['top_p']=inp['top_p']
         if schema and p.get('structured'):
             body['response_format']={'type':'json_schema','json_schema':{'name':'structured_result','strict':True,'schema':schema}}
         self.progress(job,phase)
         chunks=[]; last=0
-        with httpx.Client(timeout=httpx.Timeout(3600,connect=10),trust_env=not p.get('local',False)) as client:
+        with provider_egress.client(origin=p['url'],timeout=httpx.Timeout(3600,connect=10),trust_env=not p.get('local',False)) as client:
             with client.stream('POST',p['url'].rstrip('/')+'/chat/completions',headers=headers,json=body) as response:
                 if not response.is_success:
                     response.read(); checked(response)
@@ -285,7 +292,7 @@ class Worker:
                         last=time.time()
         text=''.join(chunks).strip()
         if not text: raise ValueError('文本模型没有返回正文，请检查模型聊天模板或切换模型。')
-        return text
+        return scrub(text)
 
     def text(self,job,p):
         inp=job['input']; kind=job['kind']
@@ -336,8 +343,8 @@ class Worker:
                     if error:entry['validation_error']=error[:1200]
                     publish_trace()
             return extract_storyboard(
-                inp['prompt'],inp.get('target_duration'),inp.get('provider',''),
-                inp.get('model') or p.get('model',''),
+                inp['prompt'],inp.get('target_duration'),'',
+                inp.get('model_id',''),
                 request_stage,inp.get('prompt_stages'),report_stage,
             )
         prompt=inp['prompt']
@@ -373,8 +380,8 @@ class Worker:
         if assets_for(job): raise ValueError('此图像服务当前为文生图接口，图生图请选择 ComfyUI 或 Maestro。')
         inp=job['input']; headers={'Authorization':'Bearer '+p['api_key']} if p.get('api_key') else {}
         self.progress(job,'云端生成图像')
-        with httpx.Client(timeout=600,trust_env=not p.get('local',False)) as client:
-            result=checked(client.post(p['url'].rstrip('/')+'/images/generations',headers=headers,json={'model':inp.get('model') or p.get('model'),'prompt':inp['prompt'],'n':1,'size':inp.get('size','1024x1024')}))
+        with provider_egress.client(origin=p['url'],timeout=600,trust_env=not p.get('local',False)) as client:
+            result=checked(client.post(p['url'].rstrip('/')+'/images/generations',headers=headers,json={'model':p.get('model'),'prompt':inp['prompt'],'n':inp.get('n',1),'size':inp.get('size','1024x1024')}))
         outputs=[]
         for item in result.get('data',[]):
             if self.cancelled(job): raise InterruptedError()
@@ -390,10 +397,10 @@ class Worker:
 
     def maestro(self,job,p):
         inp=job['input']; url=p['url'].rstrip('/')
-        with httpx.Client(timeout=httpx.Timeout(3600,connect=10),trust_env=not p.get('local',False)) as client:
+        with provider_egress.client(origin=p['url'],timeout=httpx.Timeout(3600,connect=10),trust_env=not p.get('local',False)) as client:
             remote=job.get('provider_job_id')
             if not remote:
-                model=inp.get('model') or p.get('model')
+                model=p.get('model')
                 if not model: raise ValueError('请先选择 Maestro 模型')
                 from .capabilities import maestro_model,validate_media
                 catalogue=checked(client.get(url+'/api/v1/models')).get('models',[])
@@ -476,7 +483,7 @@ class Worker:
         refs=assets_for(job); url=p['url'].rstrip('/')
         width,height=(int(v) for v in inp.get('resolution','832x480').split('x'))
         values={'prompt':inp['prompt'],'seed':int(inp.get('seed',0)),'width':width,'height':height,'frames':int(inp.get('frames',121)),'image':''}
-        with httpx.Client(timeout=120,trust_env=not p.get('local',False)) as client:
+        with provider_egress.client(origin=p['url'],timeout=120,trust_env=not p.get('local',False)) as client:
             remote=job.get('provider_job_id')
             if not remote:
                 if refs:
@@ -522,9 +529,9 @@ class Worker:
         inp=job['input']; url=p['url'].rstrip('/')
         if inp.get('end_asset_id'):raise ValueError('当前视频网关未配置尾帧协议，请清除尾帧或选择支持尾帧的外部 Provider')
         headers={'Authorization':'Bearer '+p['api_key']} if p.get('api_key') else {}
-        body={**p.get('request_defaults',{}),**inp.get('parameters',{}),'model':inp.get('model') or p.get('model'),'prompt':inp['prompt']}
+        body={**p.get('request_defaults',{}),**inp.get('parameters',{}),'model':p.get('model'),'prompt':inp['prompt']}
         if assets_for(job): raise ValueError('此视频网关尚未配置媒体上传协议，请使用文生视频或本地参考图适配器')
-        with httpx.Client(timeout=120,headers=headers,trust_env=not p.get('local',False)) as client:
+        with provider_egress.client(origin=p['url'],timeout=120,headers=headers,trust_env=not p.get('local',False)) as client:
             remote=job.get('provider_job_id')
             if not remote:
                 result=checked(client.post(url+p.get('submit_path','/videos'),json=body))

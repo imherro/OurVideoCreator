@@ -2,11 +2,11 @@
 
 本目录记录协作版 `imherro/OurVideoCreator` 的分阶段实施产物。冻结需求、P0–P8 提示词、验收矩阵和证据模板的完整原文在 [`../MyVideoCreator_Codex_Full_Playbook_v1.md`](../MyVideoCreator_Codex_Full_Playbook_v1.md)。
 
-已通过阶段：**P0、P1、P2**
+已通过阶段：**P0、P1、P2、P3**
 
-状态：**P3-R2 READY_FOR_REVIEW**（外部复验待定）
+状态：**P4-MODEL-01 实施中**（P4 未验收）
 
-当前阶段：**P3-ID-01 — 邀请制账号、团队/作品隔离与基础页面闭环**
+当前阶段：**P4-MODEL-01 — 平台统一 Provider/Key/模型后台与受控调用闭环**
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 
@@ -28,7 +28,9 @@ P3-R1 被测试业务 SHA：`a8cd59e8247b915737084383f5b53df1f831f4fe`（六项�
 
 P3-R1 外部复验 HEAD：`5e0c5e36d37415d4867d380f4e86dd47c87eebce`（关闭 `OVC-P3-01/02/04`；剩余 `OVC-P3-R1-01…03`）
 
-下一阶段：**P4 未授权；当前只实施 P3-R2**
+P3 外部通过 HEAD：`de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6`（被测业务 `cd61996bf6908f66cfd3429d27fa42acb03c144d`，全部六项及三个残留问题关闭）。
+
+当前仅授权 **P4-MODEL-01**；P5 及后续阶段未授权。
 
 参考单机版基线：`464914c553f4c1856ca77da4a07e9d5fffb7f71e`
 
@@ -56,9 +58,12 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P3/REPORT.md`](evidence/P3/REPORT.md)（邀请制身份、团队/作品 ACL、SSE 撤权和基础页面闭环）
 - [`evidence/P3-R1/REPORT.md`](evidence/P3-R1/REPORT.md)（六项外部阻塞返修、并发不变量、真实浏览器与重新取证）
 - [`evidence/P3-R2/REPORT.md`](evidence/P3-R2/REPORT.md)（限流/重签同步、确定性 PG 红绿测试、可追溯页面和审计原始证据；业务 SHA `cd61996`）
+- [`evidence/P3-R2/EXTERNAL_ACCEPTANCE.md`](evidence/P3-R2/EXTERNAL_ACCEPTANCE.md)（ChatGPT 外部通过记录及 P4 授权）
+- [`prompts/P4_CODEX_PROMPT.md`](prompts/P4_CODEX_PROMPT.md)（本次外部授权完整任务原文，网页文本格式化归档）
+- [`design/P4_MODEL_CONFIG.md`](design/P4_MODEL_CONFIG.md)（P4 实现契约与入口/验证映射，非完成声明）
 
 ## 阶段边界
 
-P1 已完成内置推理移除并建立独立 Web/Worker 进程边界；P2 已把保留业务切换到 PostgreSQL 唯一主库。P3-R2 只补首次限流并发入场、重置令牌签发/消费一致性与真实浏览器原始证据，继续保持单 Worker、内部试用且不调用真实付费 API；P4 的平台统一 Provider/Key/模型后台、多 Worker 与公网发布尚未实施。
+P1 已完成内置推理移除并建立独立 Web/Worker 进程边界；P2 已把保留业务切换到 PostgreSQL 唯一主库；P3 身份、团队/作品隔离已通过。当前 P4 仅实施平台统一 Provider/Key/模型后台、受控模型调用与凭证版本/出站保护，继续保持单 Worker、内部试用且不调用真实付费 API。多 Worker、对象协作与公网发布不在本轮。
 
-P0 首次外部验收在 `3c0e5ca` 给出 OVC-P0-01 至 OVC-P0-05；P0-R1 在 `b957e39` 复验通过。P1 经 P1-R1 至 P1-R3 最终在 `6358c76` 通过。P2 经 P2-R1、P2-R2 最终在 `a70341b` 通过，阻塞项全部关闭；保留非阻塞观察 `OVC-P2-R2-N01`。P3 是否通过仍由外部验收人基于协作版仓库和证据决定，开发侧不自行宣称通过或进入 P4。
+P0 首次外部验收在 `3c0e5ca` 给出 OVC-P0-01 至 OVC-P0-05；P0-R1 在 `b957e39` 复验通过。P1 经 P1-R1 至 P1-R3 最终在 `6358c76` 通过。P2 经 P2-R1、P2-R2 最终在 `a70341b` 通过，阻塞项全部关闭；保留非阻塞观察 `OVC-P2-R2-N01`。P3 经 P3-R1/P3-R2 在 `de5ef13` 外部通过。P4 是否完成仍由外部验收决定，开发侧不得自行宣称通过或进入 P5。

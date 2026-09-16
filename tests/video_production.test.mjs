@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { deriveVideoProductionRows, selectedVideoNodeIds, validateVideoSubmission, videoSubmissionSummary } from "../src/videoProduction.ts";
 
 const providers = [
-  { id: "ark", name: "火山方舟", kind: "video", local: false, type: "volcengine_ark" },
+  { id: "video-model", name: "火山方舟", kind: "video", local: false, type: "volcengine_ark" },
   { id: "local-video", name: "本地视频", kind: "video", local: true },
 ];
 const assets = [
@@ -11,7 +11,7 @@ const assets = [
   { id: "tail-a", kind: "image", name: "尾帧 A", url: "/tail.png" },
   { id: "clip-a", kind: "video", name: "视频 A", url: "/a.mp4" },
 ];
-const capabilities = { [["ark", "seedance-2"].join("\u0000")]: { end_frame: true } };
+const capabilities = { "video-model": { end_frame: true } };
 
 function fixture() {
   const shots = [
@@ -28,7 +28,7 @@ function fixture() {
     const frame = suffix === "blocked" ? undefined : "frame-a";
     return [
       { id: `i-${suffix}`, data: { kind: "image", prompt: suffix === "review" ? "室内灯完全熄灭" : "当前画面", assetId: frame, state_reviewed: false } },
-      { id: `v-${suffix}`, data: { kind: "video", provider: "ark", model: "seedance-2", prompt: "人物移动", ...(suffix === "failed" ? { assetId: "clip-a" } : {}), ...(suffix === "stale" ? { stale: true, assetId: "clip-a" } : {}), ...(suffix === "complete" ? { assetId: "clip-a", end_asset_id: "tail-a" } : {}) } },
+      { id: `v-${suffix}`, data: { kind: "video", model_id: "video-model", prompt: "人物移动", ...(suffix === "failed" ? { assetId: "clip-a" } : {}), ...(suffix === "stale" ? { stale: true, assetId: "clip-a" } : {}), ...(suffix === "complete" ? { assetId: "clip-a", end_asset_id: "tail-a" } : {}) } },
     ];
   });
   const jobs = [
@@ -64,7 +64,7 @@ test("batch review names count provider model and cloud use before submission", 
   const summary = videoSubmissionSummary(rows, ["u-ready", "u-complete"]);
   assert.equal(summary.count, 2);
   assert.equal(summary.cloudCount, 2);
-  assert.deepEqual(summary.groups, [{ providerId: "ark", providerName: "火山方舟", modelId: "seedance-2", count: 2, cloud: true }]);
+  assert.deepEqual(summary.groups, [{ providerId: "video-model", providerName: "火山方舟", modelId: "video-model", count: 2, cloud: true }]);
 });
 
 test("Ark end frame visibility follows the selected model capability, not provider type", () => {

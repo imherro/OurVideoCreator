@@ -31,7 +31,7 @@ def test_visual_cards_create_immutable_draft_versions_and_frozen_state_parent():
     assert bible['versions'][state_version]['parentVersionId']==hero_version
     assert bible['versions'][state_version]['status']=='draft'
     assert bible['versions'][state_version]['references']==[]
-    assert bible['versions'][state_version]['provenance']['providerId']=='ark'
+    assert bible['versions'][state_version]['provenance']['model_id']=='doubao'
     assert all(card['source']=={'type':'script_extraction'} for card in bible['cards'].values())
 
 

@@ -1,6 +1,7 @@
 import { planShotTimeline } from "./shotTimeline";
 import { ensureShotNodes, importStoryboardShots } from "./shotNodes";
 import { autoLayoutCanvas } from "./canvasLayout";
+import {shotParameters} from './generationParameters';
 import { imageSizeForRatio, VIDEO_FORMATS, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from "./mediaSpecs";
 import {
   planBatchGeneration,
@@ -88,7 +89,7 @@ import {
 } from "./graph";
 import { PromptLibrary } from "./PromptLibrary";
 import { ModelSelector } from "./ModelSelector";
-import { ArkProviderSettings } from "./ArkProviderSettings";
+import { PlatformModels } from "./PlatformModels";
 import { GenerationPolicyPanel } from "./GenerationPolicyPanel";
 import { VisualStylePicker } from "./VisualStylePicker";
 import type { GenerationPolicy } from "./generationPolicy";
@@ -129,7 +130,7 @@ import {
 } from "./filmBible/VisualAssetNode";
 import { visualBibleOf } from "./filmBible/types";
 import type { VoiceProfile } from "./filmBible/types";
-import { acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf } from "./filmBible/voices";
+import { acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf, voiceParameters } from "./filmBible/voices";
 import { catalogVoice, CUSTOM_VOICE_ID, DOUBAO_TTS2_VOICES } from "./filmBible/voiceCatalog";
 import { StoryboardWorkspace } from "./pages/StoryboardWorkspace";
 import { VideoProductionWorkspace } from "./pages/VideoProductionWorkspace";
@@ -422,7 +423,7 @@ function MediaNode({ data, selected }: { data: Any; selected?: boolean }) {
         <Icon size={15} />
         <span>{data.label || titles[data.kind]}</span>
         <small>
-          {data.provider && data.provider !== "local" ? "外部 API" : "未配置"}
+          {data.model_id && data.model_id !== "local" ? "外部 API" : "未配置"}
         </small>
       </div>
       <div
@@ -613,6 +614,7 @@ function AdminConsole({ session, onLogout }: { session: Any; onLogout: () => voi
   return <div className="admin-page">
     <header><div><span className="eyebrow">PLATFORM ADMIN</span><h1>平台管理</h1></div><div><a className="quiet" href="/">返回工作室</a><button onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出</button></div></header>
     {error&&<div className="error">{error}</div>}{notice&&<div className="notice">{notice}</div>}
+    <PlatformModels request={api}/>
     <section><h2>注册邀请</h2><p>原始令牌只显示一次，不写入日志。</p><button className="primary" onClick={async()=>{try{const item=await api('/admin/invitations',send('POST',{expires_hours:48}));setInviteToken(item.token);setNotice('已创建 48 小时一次性邀请');await load();}catch(e:any){setError(e.message);}}}>创建邀请</button>{inviteToken&&<code className="one-time-token">{inviteToken}</code>}
       <div className="admin-list">{invitations.map(i=><div key={i.id}><code>{i.id}</code><span>{i.consumed_at?'已使用':i.revoked_at?'已撤销':'可用'}</span>{!i.consumed_at&&!i.revoked_at&&<button onClick={async()=>{await api(`/admin/invitations/${i.id}`,send('DELETE'));await load();}}>撤销</button>}</div>)}</div>
     </section>
@@ -680,7 +682,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       templates: {},
     }),
     [config, setConfig] = useState<Any>({
-      providers: [],
+      models: [],
     });
   const [activeWorkspaceId,setActiveWorkspaceId]=useState<string>(session.workspaces[0].id);
   const canCreateProduction = session.workspaces.some(
@@ -906,7 +908,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       setProductions(productionList);
       setProjects(list);
       setSystem(sys);
-      setConfig(settings);
+      setConfig({...settings,models:(settings.models||[]).map((model:Any)=>({...model,is_default:settings.defaults?.[model.kind]===model.id}))});
       if (list.length) await openProject(list[0].id);
       else setProjectSetupOpen(false);
     } catch (e) {
@@ -1184,7 +1186,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           next = importStoryboardShots(
             withFilmBible,
             job.result.shots,
-            config.providers,
+            config.models,
             system.models,
             id,
             storyboardNode?.id,
@@ -1201,7 +1203,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     if (importedStoryboard) {
       setNotice(`分镜规划已完成并自动导入 ${importedStoryboard.result.shots.length} 个分镜，画布节点和连线已同步建立`);
     }
-  }, [jobs, doc?.applied, config.providers, system.models]);
+  }, [jobs, doc?.applied, config.models, system.models]);
   useEffect(() => {
     const completed = jobs.filter((job) => job.status === "succeeded");
     const newlyCompleted = completed.filter((job) => !observedCompletedJobs.current.has(job.id));
@@ -1315,7 +1317,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             kind: n.kind,
             label: n.label || titles[n.kind],
             prompt: n.prompt,
-            ...nodeDefaults(n.kind, config.providers, system.models, current.current.doc?.generationPolicy),
+            ...nodeDefaults(n.kind, config.models, system.models, current.current.doc?.generationPolicy),
           },
         }));
         update((d) => ({ ...d, nodes: [...d.nodes, ...nodes] }));
@@ -1327,7 +1329,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       },
     });
     return () => lifecycle.abort();
-  }, [project?.id, update, config.providers, system.models]);
+  }, [project?.id, update, config.models, system.models]);
   const node = doc?.nodes.find((n) => n.id === selected);
   const data = (node?.data || {}) as Any;
   function pendingInitialStateChecks(targetId: string) {
@@ -1361,17 +1363,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     if (!selected) return;
     if (data.canonicalScriptProjection)
       patch = { ...patch, generationPolicyInherited: false };
-    const provider = patch.provider
-      ? config.providers.find((item: Any) => item.id === patch.provider)
-      : undefined;
-    // A tail frame is not supported by the native Hailuo path. Clear a stale
-    // setting immediately when the user switches services, rather than fail
-    // only after a cloud submission has been attempted.
+    // Public capabilities decide whether a tail frame survives a model change.
+    const clearTail = 'model_id' in patch && patch.model_capabilities?.end_frame !== true;
     update((d) =>
       patchNode(
         d,
         selected,
-        provider?.type === "minimax" ? { ...patch, end_asset_id: "" } : patch,
+        clearTail ? { ...patch, end_asset_id: "" } : patch,
       ),
     );
   }
@@ -1398,7 +1396,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             kind,
             label: titles[kind],
             prompt,
-            ...nodeDefaults(kind, config.providers, system.models, doc?.generationPolicy),
+            ...nodeDefaults(kind, config.models, system.models, doc?.generationPolicy),
             ...extra,
           },
         },
@@ -1427,10 +1425,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       sourceNode.id,
     );
     if (existingId) {
-      const defaults = nodeDefaults("storyboard", config.providers, system.models, doc.generationPolicy);
+      const defaults = nodeDefaults("storyboard", config.models, system.models, doc.generationPolicy);
       update((document) => patchNode(document, existingId, {
-        provider: defaults.provider,
-        model: defaults.model,
+        model_id: defaults.model_id,
+        parameters: defaults.parameters,
         model_capabilities: undefined,
       }));
     }
@@ -1721,21 +1719,17 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       }
       await save();
       if (dirty.current) throw new Error("项目尚未保存，请先解决保存冲突");
-      const targetProvider = config.providers.find(
-        (provider: Any) => provider.id === n.data.provider,
+      const targetProvider = config.models.find(
+        (provider: Any) => provider.id === n.data.model_id,
       );
-      if (!targetProvider || n.data.provider === "local")
+      if (!targetProvider || n.data.model_id === "local")
         throw new Error("该节点未配置外部 Provider；系统不会自动回退到其他模型");
       const input = {
         ...n.data,
-        provider: n.data.provider,
+        model_id: n.data.model_id,
         asset_ids: sourceAssets(n.id),
-        parameters: n.data.kind === "video" && ["volcengine_ark", "hc_atom", "runninghub"].includes(targetProvider?.type)
-          ? { resolution: doc?.videoResolution || "720p", outputFormat: doc?.videoFormat || "mp4", ...(n.data.parameters || {}) }
-          : n.data.parameters,
+        parameters: {...targetProvider.defaults,...(n.data.parameters as Any || {})},
         prompt: String(n.data.prompt || ""),
-        ratio: n.data.kind === "video" ? (doc?.videoRatio || doc?.ratio || "16:9") : (doc?.ratio || "16:9"),
-        size: n.data.resolution || "1024x1024",
         target_duration:
           n.data.kind === "text" || n.data.kind === "storyboard"
             ? n.data.target_duration || doc?.duration
@@ -1799,7 +1793,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       return importStoryboardShots(
         withFilmBible,
         job.result.shots,
-        config.providers,
+        config.models,
         system.models,
         id,
         storyboardNode?.id,
@@ -1813,7 +1807,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     update((d) =>
       ensureShotNodes(
         d,
-        config.providers,
+        config.models,
         system.models,
         id,
         [shot.id],
@@ -1839,7 +1833,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     update((d) =>
       ensureShotNodes(
         d,
-        config.providers,
+        config.models,
         system.models,
         id,
         undefined,
@@ -1881,7 +1875,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     let prepared = deriveManagedGraph(
       ensureShotNodes(
         snapshot.doc,
-        config.providers,
+        config.models,
         system.models,
         id,
         targetShots.map((shot) => shot.id),
@@ -1891,22 +1885,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const nodeIds = selectedShotImageNodeIds(prepared, shotUids);
     if (nodeIds.length !== targetShots.length)
       throw new Error("部分镜头缺少分镜图生成节点");
-    const selectedNodeIds = new Set(nodeIds);
-    const storyboardSize = imageSizeForRatio(snapshot.doc.ratio || "16:9");
-    prepared = {
-      ...prepared,
-      nodes: prepared.nodes.map((item) => selectedNodeIds.has(item.id)
-        ? { ...item, data: { ...item.data, resolution: storyboardSize } }
-        : item),
-    };
     for (const nodeId of nodeIds) {
       const imageNode = prepared.nodes.find((item) => item.id === nodeId);
       if (!String(imageNode?.data?.prompt || "").trim())
         throw new Error("所选镜头存在空的 Image Prompt，请先填写后再生成");
-      const provider = config.providers.find(
-        (item: Any) => item.id === imageNode?.data?.provider,
+      const provider = config.models.find(
+        (item: Any) => item.id === imageNode?.data?.model_id,
       );
-      if (!provider || imageNode?.data?.provider === "local")
+      if (!provider || imageNode?.data?.model_id === "local")
         throw new Error("所选镜头尚未选择可用的图片生成服务");
     }
     current.current = { project: snapshot.project, doc: prepared };
@@ -1953,14 +1939,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     let prepared = deriveManagedGraph(
       ensureShotNodes(
         snapshot.doc,
-        config.providers,
+        config.models,
         system.models,
         id,
         targetShots.map((shot) => shot.id),
         storyboardContextId(snapshot.doc),
       ),
     ) as Doc;
-    const rows = deriveVideoProductionRows(prepared, assets, jobs, config.providers);
+    const rows = deriveVideoProductionRows(prepared, assets, jobs, config.models);
     const targets = validateVideoSubmission(rows, shotUids);
     let extendedCount = 0;
     for (const target of targets) {
@@ -2057,20 +2043,20 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const target = resolveVisualGenerationTarget(
       card,
       snapshot.doc.generationPolicy,
-      config.providers,
+      config.models,
       system.models,
     );
-    const provider = config.providers.find(
-      (item: Any) => item.id === target.providerId,
+    const provider = config.models.find(
+      (item: Any) => item.id === target.model_id,
     );
     if (!provider) throw new Error("图片生成服务已不存在，请重新选择");
     let capabilities: Any | undefined;
     if (isStateCard(card)) {
       const catalog = await api(
-        `/providers/${encodeURIComponent(target.providerId)}/models?kind=image`,
+        "/models",
       );
       const model = (catalog.models || []).find(
-        (item: Any) => item.id === target.modelId,
+        (item: Any) => item.id === target.model_id,
       );
       capabilities = model?.capabilities;
     }
@@ -2090,13 +2076,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         kind: "image",
         submission_id: submissionId,
         input: {
-          provider: plan.providerId,
-          model: plan.modelId,
+          model_id: plan.model_id,
           prompt: plan.prompt,
           asset_ids: plan.assetIds,
           asset_category: plan.assetCategory,
-          ratio: snapshot.doc.ratio || "16:9",
-          size: imageSizeForRatio(snapshot.doc.ratio || "16:9"),
+          parameters: {...provider.defaults},
           visual_reference: {
             versionId,
             targetSource: plan.targetSource,
@@ -2144,7 +2128,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const plan = planBatchGeneration(
       snapshot.doc,
       jobs,
-      config.providers,
+      config.models,
       system.models,
       kind,
     );
@@ -2368,7 +2352,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         </>}
         {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
           key={projectSetupKey}
-          providers={config.providers}
+          providers={config.models}
           localModels={system.models}
           onClose={projects.length ? () => setProjectSetupOpen(false) : undefined}
           onCreate={createProduction}
@@ -2376,13 +2360,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       </div>
     );
   const assetBatchPlan = planBatchGeneration(
-    doc, jobs, config.providers, system.models, "assets",
+    doc, jobs, config.models, system.models, "assets",
   );
   const imageBatchPlan = planBatchGeneration(
-    doc, jobs, config.providers, system.models, "shot_images",
+    doc, jobs, config.models, system.models, "shot_images",
   );
   const videoBatchPlan = planBatchGeneration(
-    doc, jobs, config.providers, system.models, "shot_videos",
+    doc, jobs, config.models, system.models, "shot_videos",
   );
   const persistedEditorTimeline = doc.editor?.timeline;
   const exportEditorTimeline = editorExportTimeline || persistedEditorTimeline;
@@ -2405,7 +2389,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     assets,
     jobs,
     generationPolicy: doc.generationPolicy,
-    providers: config.providers,
+    providers: config.models,
     localModels: system.models,
     request: api,
     voiceProfiles: voiceProfilesOf(doc),
@@ -2430,17 +2414,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         submission_id: id(),
         input: {
           prompt: savedProfile.previewText,
-          provider: savedProfile.providerId,
-          model: savedProfile.voiceType,
+          model_id: savedProfile.model_id,
           voice_type: savedProfile.voiceType,
           voice_version: savedProfile.version,
           character_name: card.name,
           output_name: `${card.name} · 声音 V${savedProfile.version} 试听.mp3`,
           asset_category: "voice",
-          parameters: {
-            speech_rate: savedProfile.parameters.speechRate,
-            emotion: savedProfile.parameters.emotion,
-          },
+          parameters: voiceParameters(config.models,savedProfile),
           voice_profile: { cardId, version: savedProfile.version },
         },
       }));
@@ -2481,29 +2461,28 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       const needed = dialogues.filter(({dialogue})=>!existing.has(dialogue.id) && !pending.has(dialogue.id));
       if (!needed.length) throw new Error("该角色本集对白已经生成或正在生成");
       await save();
-      await Promise.all(needed.map(({shot,dialogue,index})=>{
+      const audioJobs=needed.map(({shot,dialogue,index})=>{
         const performance = dialoguePerformance(shot, dialogue, profile);
-        return api(`/projects/${project.id}/jobs`,send("POST",{
+        return {
         node_id:`dialogue:${dialogue.id}`,
         kind:"audio",
         submission_id:id(),
         input:{
           prompt:dialogue.text,
-          provider:profile.providerId,
-          model:profile.voiceType,
+          model_id:profile.model_id,
           voice_type:profile.voiceType,
           voice_version:profile.version,
           character_name:card?.name || dialogue.characterName,
           output_name:`${shot.id || "分镜"} · ${card?.name || "角色"}对白 ${index+1}.mp3`,
           asset_category:"voice",
-          emotion:performance.emotion,
-          parameters:{speech_rate:profile.parameters.speechRate,emotion:performance.emotion,context_texts:performance.contextTexts},
+          parameters:voiceParameters(config.models,profile,performance),
           dialogue:{id:dialogue.id,shotUid:String(shot.uid||shot.id),characterCardId:cardId,voiceVersion:profile.version,text:dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
         },
-      }));
-      }));
+      };
+      });
+      await api(`/projects/${project.id}/audio-jobs`,send("POST",{jobs:audioJobs}));
       await refresh(project.id);
-      setNotice(`已并发提交 ${needed.length} 条${card?.name || "角色"}对白`);
+      setNotice(`已批量提交 ${needed.length} 条${card?.name || "角色"}对白`);
       return needed.length;
     },
     onRegenerateDialogue: async (cardId, dialogueId) => {
@@ -2527,15 +2506,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         submission_id:id(),
         input:{
           prompt:match.dialogue.text,
-          provider:profile.providerId,
-          model:profile.voiceType,
+          model_id:profile.model_id,
           voice_type:profile.voiceType,
           voice_version:profile.version,
           character_name:card?.name || match.dialogue.characterName,
           output_name:`${match.shot.id || "分镜"} · ${card?.name || "角色"}对白 · 新版本.mp3`,
           asset_category:"voice",
-          emotion:performance.emotion,
-          parameters:{speech_rate:profile.parameters.speechRate,emotion:performance.emotion,context_texts:performance.contextTexts},
+          parameters:voiceParameters(config.models,profile,performance),
           dialogue:{id:dialogueId,shotUid:String(match.shot.uid||match.shot.id),characterCardId:cardId,voiceVersion:profile.version,text:match.dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
         },
       }));
@@ -2636,7 +2613,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     <div className="studio-shell">
       {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
         key={projectSetupKey}
-        providers={config.providers}
+        providers={config.models}
         localModels={system.models}
         onClose={() => setProjectSetupOpen(false)}
         onCreate={createProduction}
@@ -2858,7 +2835,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           <SourceLibraryPage
             productionId={project.production_id}
             projectId={project.id}
-            providers={config.providers}
+            providers={config.models}
             defaultTarget={(doc as Any).generationPolicy?.text}
             refreshKey={workflowDataRevision.source}
             request={api}
@@ -2869,7 +2846,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           <AdaptationPage
             productionId={project.production_id}
             projectId={project.id}
-            providers={config.providers}
+            providers={config.models}
             defaultTarget={(doc as Any).generationPolicy?.text}
             refreshKey={workflowDataRevision.adaptation}
             request={api}
@@ -2886,7 +2863,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           <ScriptRoomPage
             productionId={project.production_id}
             currentEpisodeNo={project.episode_no}
-            providers={config.providers}
+            providers={config.models}
             defaultTarget={(doc as Any).generationPolicy?.text}
             refreshKey={workflowDataRevision.script}
             request={api}
@@ -2994,7 +2971,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             document={doc}
             assets={assets}
             jobs={jobs}
-            providers={config.providers}
+            providers={config.models}
             busy={busy}
             request={api}
             onPatchShot={(uid, patch) =>
@@ -3559,20 +3536,20 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             )}
             <ModelSelector
               data={data}
-              providers={config.providers}
+              providers={config.models}
               localModels={system.models}
               request={api}
               onChange={changeModel}
             />
             {data.kind === "video" &&
               ["minimax", "volcengine_ark"].includes(
-                config.providers.find((p: Any) => p.id === data.provider)
+                config.models.find((p: Any) => p.id === data.model_id)
                   ?.type,
               ) &&
               (() => {
                 const references = sourceAssets(node.id) as string[];
-                const providerType = config.providers.find(
-                  (p: Any) => p.id === data.provider,
+                const providerType = config.models.find(
+                  (p: Any) => p.id === data.model_id,
                 )?.type;
                 const providerName =
                   providerType === "volcengine_ark" ? "Seedance" : "MiniMax";
@@ -3607,8 +3584,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 );
               })()}
             {data.kind === "video" &&
-              config.providers.find((p: Any) => p.id === data.provider)
-                ?.type && ["volcengine_ark", "runninghub"].includes(config.providers.find((p: Any) => p.id === data.provider)?.type) && (
+              config.models.find((p: Any) => p.id === data.model_id)?.capabilities?.end_frame && (
                 <label>
                   尾帧（可选，首尾帧视频）
                   <select
@@ -3636,41 +3612,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               !(
                 data.kind === "video" &&
                 ["minimax", "volcengine_ark"].includes(
-                  config.providers.find((p: Any) => p.id === data.provider)
+                  config.models.find((p: Any) => p.id === data.model_id)
                     ?.type,
                 )
               ) && (
                 <>
-                  <div className="two-fields">
-                    <label>
-                      分辨率
-                      <select
-                        value={data.resolution || "832x480"}
-                        onChange={(e) =>
-                          editNode({ resolution: e.target.value })
-                        }
-                      >
-                        <option>832x480</option>
-                        <option>864x480</option>
-                        <option>512x512</option>
-                        <option>1280x720</option>
-                        <option>720x1280</option>
-                        <option>1024x1024</option>
-                        <option>1024x512</option>
-                      </select>
-                    </label>
-                    <label>
-                      随机种子
-                      <input
-                        type="number"
-                        value={data.seed ?? -1}
-                        onChange={(e) =>
-                          editNode({ seed: Number(e.target.value) })
-                        }
-                      />
-                    </label>
-                  </div>
-                  {data.kind === "video" && (
+                  {data.kind === "video" && config.models.find((model:Any)=>model.id===data.model_id)?.capabilities?.end_frame && (
                     <label>
                       尾帧（可选，仅适用模型）
                       <select
@@ -3946,7 +3893,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               <RunWorkflow
                 nodes={doc.nodes}
                 edges={doc.edges}
-                providers={config.providers}
+                providers={config.models}
                 selected={selected}
                 onRun={runGraph}
               />
@@ -4116,7 +4063,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                     <button disabled={!visualStyleDraft.trim() || visualStyleDraft.trim() === doc.style} onClick={()=>{update((document)=>setProjectVisualStyle(document,visualStyleDraft.trim()));setNotice("视觉风格已应用；旧媒体保留，相关生成结果已标记为待更新");}}>应用风格</button>
                     <small>修改后会把已生成的分镜图和视频标记为待更新；旧媒体和剪辑内容会保留，不会自动生成。</small>
                   </div>
-                  <GenerationPolicyPanel value={doc.generationPolicy} providers={config.providers} localModels={system.models} onChange={(generationPolicy)=>update((document)=>({...document,generationPolicy}))}/>
+                  <GenerationPolicyPanel value={doc.generationPolicy} providers={config.models} localModels={system.models} onChange={(generationPolicy)=>update((document)=>({...document,generationPolicy}))}/>
                   <div className="project-bible-heading"><div><span className="eyebrow">PROJECT BIBLE</span><h3>创作约束</h3></div><button className="quiet" onClick={()=>setPanel("filmBible")}><BookOpen size={15}/>打开塑角造景 {Object.keys(visualBibleOf(doc).cards).length || ""}<ChevronRight size={14}/></button></div>
                   <p className="muted">这里只修改文字约束，不会覆盖已有 VisualCard、VisualVersion 或锁定参考图。</p>
                   <label>世界 / 时代<input value={projectBibleFields.worldEra} onChange={(event)=>update((document)=>mergeBibleFields(document,{...bibleFields(document),worldEra:event.target.value}))}/></label>
@@ -4160,11 +4107,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 uploadCategory={uploadCategory}
                 onUploadCategory={setUploadCategory}
                 onUpload={() => fileInput.current?.click()}
-                onCreatePanorama={() => newNode(
+                onCreatePanorama={() => {
+                  const defaults=nodeDefaults('image',config.models,system.models,doc.generationPolicy);
+                  const model=config.models.find((item:Any)=>item.id===defaults.model_id)||{};
+                  newNode(
                   "image",
                   "生成 360 度等距柱状全景环境图，2:1 画幅，完整覆盖四周环境，上下分别为天空与地面，左右边缘连续，地平线位于画面中线，无文字。场景：",
-                  { resolution: "1024x512" },
-                )}
+                  {parameters:shotParameters('image',model,defaults.parameters,{},'2:1')},
+                );}}
                 onOpenArt={(versionId) => {
                   setVisualFocus(versionId);
                   activateWorkflowStage("art");
@@ -4188,7 +4138,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 currentProjectId={project.id}
                 currentDocument={doc}
                 currentJobs={jobs}
-                providers={config.providers}
+                providers={config.models}
                 request={api}
                 onRefreshCurrent={() => refresh(project.id)}
                 onOpenNode={async (projectId, nodeId) => {
@@ -4342,6 +4292,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             )}
             {panel === "prompts" && (
               <PromptLibrary
+                canManage={session.user?.platform_role === 'platform_admin'}
                 templates={system.templates}
                 request={api}
                 newId={id}
@@ -4645,611 +4596,21 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   );
 }
 
-function SettingsPanel({
-  config,
-  system,
-  onSave,
-  onRefresh,
-  onError,
-  onLogout,
-}: {
-  config: Any;
-  system: Any;
-  onSave: (v: Any) => Promise<void>;
-  onRefresh: () => Promise<void>;
-  onError: (e: any) => void;
-  onLogout: () => void;
-}) {
-  const [value, setValue] = useState<Any>(config),
-    [status, setStatus] = useState(""),
-    [busy, setBusy] = useState(false),
-    [arkCatalogs, setArkCatalogs] = useState<Record<string, Any[]>>({}),
-    [arkVerified, setArkVerified] = useState<Record<string, boolean>>({}),
-    [arkChecks, setArkChecks] = useState<Record<string, Record<string, Any>>>({});
-  function patchProvider(index: number, patch: Any) {
-    const current = value.providers[index];
-    const changedKind = patch.changed_model_kind;
-    if (changedKind) {
-      const { changed_model_kind: _changedModelKind, ...cleanPatch } = patch;
-      patch = cleanPatch;
-      setArkChecks((checks) => ({
-        ...checks,
-        [current.id]: { ...checks[current.id], [changedKind]: undefined },
-      }));
-    }
-    if (["volcengine_ark", "volcengine_speech", "hc_atom", "runninghub"].includes(current?.type) && ("api_key" in patch || "url" in patch)) {
-      setArkVerified((verified) => ({ ...verified, [current.id]: false }));
-      setArkCatalogs((catalogs) => ({ ...catalogs, [current.id]: [] }));
-      setArkChecks((checks) => ({ ...checks, [current.id]: {} }));
-    }
-    setValue({
-      ...value,
-      providers: value.providers.map((p: Any, i: number) =>
-        i === index ? { ...p, ...patch } : p,
-      ),
-    });
-  }
-  function clearEnteredApiKeys() {
-    setValue((current: Any) => ({
-      ...current,
-      providers: current.providers.map((provider: Any) => {
-        if (!("api_key" in provider)) return provider;
-        const { api_key, ...masked } = provider;
-        return { ...masked, api_key_set: Boolean(api_key || provider.api_key_set) };
-      }),
-    }));
-  }
-  async function save() {
-    setBusy(true);
-    try {
-      await onSave(value);
-      clearEnteredApiKeys();
-      setStatus("设置已保存");
-    } catch (e) {
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function verifyArk(providerId: string) {
-    setBusy(true);
-    try {
-      await onSave(value);
-      clearEnteredApiKeys();
-      const result = await api(`/providers/${encodeURIComponent(providerId)}/verify`, send("POST"));
-      setArkCatalogs((catalogs) => ({ ...catalogs, [providerId]: result.models || [] }));
-      setArkVerified((verified) => ({ ...verified, [providerId]: true }));
-      setArkChecks((checks) => ({ ...checks, [providerId]: {} }));
-      setStatus(result.message || "ARK API Key 可用");
-    } catch (e: any) {
-      setArkVerified((verified) => ({ ...verified, [providerId]: false }));
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function testArkModel(providerId: string, kind: "text" | "image" | "video") {
-    setBusy(true);
-    try {
-      await onSave(value);
-      clearEnteredApiKeys();
-      const result = await api(
-        `/providers/${encodeURIComponent(providerId)}/test?kind=${encodeURIComponent(kind)}`,
-        send("POST"),
-      );
-      setArkChecks((checks) => ({
-        ...checks,
-        [providerId]: { ...checks[providerId], [kind]: result },
-      }));
-      setStatus(result.message);
-    } catch (e: any) {
-      setArkChecks((checks) => ({
-        ...checks,
-        [providerId]: {
-          ...checks[providerId],
-          [kind]: { status: "failed", message: e.message || "模型检测失败" },
-        },
-      }));
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <div className="hardware-card">
-        <Link2 size={23} />
-        <div><b>外部 API-only</b><span>Web 与任务 Worker 独立运行，不加载模型或管理本地推理环境</span></div>
-        <button
-          className="icon-button"
-          onClick={() => onRefresh().catch(onError)}
-          title="刷新状态"
-        >
-          <RefreshCw size={16} />
-        </button>
-      </div>
-      <p className="muted">
-        所有生成任务必须显式选择已连接的外部 Provider；没有配置时会明确报错，
-        不会自动回退到其他模型或产生意外付费请求。
-      </p>
-      <h3>模型服务</h3>
-      <p className="muted">配置文本、图像和视频服务，并在项目设置中选择默认模型。</p>
-      {value.providers.map((p: Any, i: number) => (
-        <article className="provider-card" key={p.id}>
-          <div className="field-heading">
-            <input
-              aria-label="服务名称"
-              value={p.name}
-              onChange={(e) => patchProvider(i, { name: e.target.value })}
-            />
-            <button
-              className="icon-button"
-              title="移除服务配置"
-              onClick={() =>
-                setValue({
-                  ...value,
-                  providers: value.providers.filter(
-                    (_: Any, k: number) => k !== i,
-                  ),
-                })
-              }
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="two-fields">
-            <label>
-              接口类型
-              <select
-                value={p.type}
-                onChange={(e) =>
-                  patchProvider(
-                    i,
-                    ["volcengine_ark", "hc_atom", "runninghub"].includes(e.target.value)
-                      ? {
-                          type: e.target.value,
-                          kind: undefined,
-                          local: false,
-                          url: e.target.value === "hc_atom" ? "https://api-aigc.fzyinghe.com" : e.target.value === "runninghub" ? "https://www.runninghub.ai" : "https://ark.cn-beijing.volces.com/api/v3",
-                          models: p.models || { text: "", image: "", video: "" },
-                        }
-                      : e.target.value === "volcengine_speech"
-                        ? {
-                            type: e.target.value,
-                            kind: "audio",
-                            local: false,
-                            url: "https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse",
-                            model: p.model || "zh_female_vv_uranus_bigtts",
-                            resource_id: p.resource_id || "seed-tts-2.0",
-                          }
-                      : ["volcengine_ark", "hc_atom", "runninghub"].includes(p.type)
-                        ? { type: e.target.value, kind: "text", model: p.models?.text || "", models: undefined }
-                        : { type: e.target.value },
-                  )
-                }
-              >
-                <option value="openai">OpenAI 兼容文本 / 图像</option>
-                <option value="maestro">Maestro / WanGP 兼容 API</option>
-                <option value="comfy">ComfyUI 工作流</option>
-                <option value="video_api">异步视频 JSON 网关</option>
-                <option value="minimax">MiniMax 原生视频</option>
-                <option value="replicate">Replicate 模型平台</option>
-                <option value="volcengine_ark">火山方舟（文本 / 图像 / 视频）</option>
-                <option value="hc_atom">幻场 AI / HC-ATOM（文本 / 图像 / 视频）</option>
-                <option value="runninghub">RunningHub（文本 / 图像 / 视频）</option>
-                <option value="volcengine_speech">豆包语音（角色固定音色）</option>
-              </select>
-            </label>
-            {["volcengine_ark", "hc_atom", "runninghub"].includes(p.type) ? (
-              <label>用途<input value="统一：文本、图像、视频" readOnly /></label>
-            ) : p.type === "volcengine_speech" ? (
-              <label>用途<input value="角色对白与旁白" readOnly /></label>
-            ) : (
-              <label>
-                用途
-                <select
-                  value={p.kind || "text"}
-                  onChange={(e) => patchProvider(i, { kind: e.target.value })}
-                >
-                  <option value="text">文本</option>
-                  <option value="image">图像</option>
-                  <option value="video">视频</option>
-                </select>
-              </label>
-            )}
-          </div>
-          <label>
-            服务地址
-            <input
-              value={p.url}
-              onChange={(e) => patchProvider(i, { url: e.target.value })}
-              placeholder="http://127.0.0.1:8188"
-            />
-          </label>
-          {!["volcengine_ark", "hc_atom", "runninghub"].includes(p.type) && (
-            <label>
-              {p.type === "volcengine_speech" ? "默认音色 ID" : "默认模型 ID"}
-              {p.type === "volcengine_speech" ? <>
-                <select value={catalogVoice(p.model || "")?.id || CUSTOM_VOICE_ID} onChange={(e)=>patchProvider(i,{model:e.target.value === CUSTOM_VOICE_ID ? "" : e.target.value})}>
-                  {[...new Set(DOUBAO_TTS2_VOICES.map((item)=>item.category))].map((category)=><optgroup key={category} label={category}>{DOUBAO_TTS2_VOICES.filter((item)=>item.category===category).map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</optgroup>)}
-                  <option value={CUSTOM_VOICE_ID}>自定义 / 声音复刻 ID…</option>
-                </select>
-                {!catalogVoice(p.model || "") && <input value={p.model || ""} placeholder="粘贴自定义 Speaker ID" onChange={(e)=>patchProvider(i,{model:e.target.value})}/>}
-              </> : <input value={p.model || ""} onChange={(e) => patchProvider(i, { model: e.target.value })}/>}
-            </label>
-          )}
-          <label>
-            API Key
-            <input
-              type="password"
-              autoComplete="off"
-              placeholder={
-                p.api_key_set ? "已保存，留空保持不变" : "服务无需密钥时可留空"
-              }
-              value={p.api_key || ""}
-              onChange={(e) => patchProvider(i, { api_key: e.target.value })}
-            />
-          </label>
-          {["volcengine_ark", "hc_atom", "runninghub"].includes(p.type) ? (
-            <>
-              {p.type === "hc_atom" && <label>
-                安影公网访问地址
-                <input
-                  value={p.public_base_url || ""}
-                  onChange={(e) => patchProvider(i, { public_base_url: e.target.value })}
-                  placeholder="https://vc.goroc.com"
-                />
-                <small>幻场 Seedance V3 用它读取带签名的首帧素材；应填写可从公网访问本工作室的 HTTPS 地址。</small>
-              </label>}
-              <ArkProviderSettings
-                provider={p}
-                catalog={arkCatalogs[p.id] || []}
-                verified={!!arkVerified[p.id]}
-                checks={arkChecks[p.id] || {}}
-                busy={busy}
-                onPatch={(patch) => patchProvider(i, patch)}
-                onVerify={() => void verifyArk(p.id)}
-                onTest={(kind) => void testArkModel(p.id, kind)}
-                serviceName={p.type === "hc_atom" ? "幻场 AI" : p.type === "runninghub" ? "RunningHub" : "火山方舟"}
-              />
-              <p className="muted">{p.type === "hc_atom" ? "一个幻场 AI Key 统一调用文本、图片和异步视频模型；Seedance 首帧会自动登记到同一账号的虚拟人像素材库，审核通过后再提交视频任务。" : p.type === "runninghub" ? "一个 RunningHub Enterprise-Shared Key 统一调用文本、Seedream 5 Pro 图片与 Seedance 2.5 视频；本地参考素材会先安全上传。" : "一个 ARK API Key 统一调用豆包文本、Seedream 图片与 Seedance 视频。"}</p>
-            </>
-          ) : p.type === "volcengine_speech" ? (
-            <>
-              <label>
-                Resource ID
-                <input value={p.resource_id || "seed-tts-2.0"} onChange={(e) => patchProvider(i, { resource_id: e.target.value })}/>
-                <small>常用值为 seed-tts-2.0；必须与已开通的豆包语音实例和音色匹配。</small>
-              </label>
-              <div className="two-fields">
-                <label>输出格式<select value={p.parameters?.format || "mp3"} onChange={(e)=>patchProvider(i,{parameters:{...p.parameters,format:e.target.value}})}><option value="mp3">MP3</option><option value="ogg_opus">OGG Opus</option></select></label>
-                <label>采样率<select value={p.parameters?.sample_rate || 24000} onChange={(e)=>patchProvider(i,{parameters:{...p.parameters,sample_rate:Number(e.target.value)}})}><option value={24000}>24 kHz</option><option value={48000}>48 kHz</option></select></label>
-              </div>
-              <button className="secondary full" disabled={busy} onClick={()=>void verifyArk(p.id)}><Check size={14}/>检查语音配置</button>
-              <p className="muted">Speech API Key 与 ARK API Key 是两套凭证。配置检查不生成音频；角色卡中的试听会调用语音服务。</p>
-            </>
-          ) : (
-            <label className="check-label">
-              <input
-                type="checkbox"
-                checked={!!p.local}
-                onChange={(e) => patchProvider(i, { local: e.target.checked })}
-              />
-              直连受控网关（绕过系统代理；不代表免计费）
-            </label>
-          )}
-          {p.type === "comfy" && (
-            <label>
-              API 工作流 JSON
-              <textarea
-                className="code-input"
-                defaultValue={JSON.stringify(p.workflow || {}, null, 2)}
-                onBlur={(e) => {
-                  try {
-                    patchProvider(i, { workflow: JSON.parse(e.target.value) });
-                  } catch {
-                    onError(new Error("工作流 JSON 格式不正确"));
-                  }
-                }}
-              />
-              <small>
-                使用{" "}
-                {
-                  "{{prompt}}、{{seed}}、{{width}}、{{height}}、{{frames}}、{{image}}"
-                }{" "}
-                占位符。
-              </small>
-            </label>
-          )}
-          {p.type === "minimax" && (
-            <>
-              <p className="muted">
-                地址填写 https://api.minimax.io/v1 或国内
-                https://api.minimax.cn/v1，用途选视频，模型填
-                MiniMax-Hailuo-2.3。支持文生视频与单首帧图生视频；停止本地等待不会取消供应商计费。
-              </p>
-              <label>
-                云端视频时长
-                <select
-                  value={p.parameters?.duration || 6}
-                  onChange={(e) =>
-                    patchProvider(i, {
-                      parameters: {
-                        ...p.parameters,
-                        duration: Number(e.target.value),
-                      },
-                    })
-                  }
-                >
-                  <option value={6}>6 秒</option>
-                  <option value={10}>10 秒（768P）</option>
-                </select>
-              </label>
-              <label>
-                云端分辨率
-                <select
-                  value={p.parameters?.resolution || "768P"}
-                  onChange={(e) =>
-                    patchProvider(i, {
-                      parameters: {
-                        ...p.parameters,
-                        resolution: e.target.value,
-                      },
-                    })
-                  }
-                >
-                  <option>768P</option>
-                  <option>1080P</option>
-                </select>
-              </label>
-            </>
-          )}
-          {p.type === "replicate" && (
-            <>
-              <p className="muted">
-                地址默认 https://api.replicate.com/v1。官方模型填写 owner/model，例如
-                bytedance/seedance-1-pro、kwaiyeij/kling-v2.1 或
-                black-forest-labs/flux-1.1-pro；社区模型填写 owner/model:版本 ID。取消会请求停止对应云端 prediction。
-              </p>
-              <label>
-                输入模板 JSON
-                <textarea
-                  className="code-input"
-                  defaultValue={JSON.stringify(
-                    p.parameters?.input || { prompt: "{{prompt}}" },
-                    null,
-                    2,
-                  )}
-                  onBlur={(e) => {
-                    try {
-                      const input = JSON.parse(e.target.value);
-                      if (!input || Array.isArray(input) || typeof input !== "object") throw new Error();
-                      patchProvider(i, { parameters: { ...p.parameters, input } });
-                    } catch {
-                      onError(new Error("Replicate 输入模板必须是 JSON 对象"));
-                    }
-                  }}
-                />
-                <small>
-                  使用 {"{{prompt}}、{{image}}、{{images}}"}。各模型的输入字段不同；单图可映射到 image、first_frame 等字段。
-                </small>
-              </label>
-            </>
-          )}
-          {p.type === "video_api" && (
-            <>
-              <label>
-                提交路径
-                <input
-                  value={p.submit_path || "/videos"}
-                  onChange={(e) =>
-                    patchProvider(i, { submit_path: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                查询路径
-                <input
-                  value={p.status_path || "/videos/{id}"}
-                  onChange={(e) =>
-                    patchProvider(i, { status_path: e.target.value })
-                  }
-                />
-              </label>
-              <small>需匹配返回 id、status 与 video_url 的网关协议。</small>
-            </>
-          )}
-        </article>
-      ))}
-      <div className="settings-actions">
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "新服务",
-                  type: "openai",
-                  url: "http://127.0.0.1:8080/v1",
-                  local: true,
-                  kind: "text",
-                  model: "",
-                },
-              ],
-            })
-          }
-        >
-          <Plus size={15} />
-          添加服务
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "Replicate 视频",
-                  type: "replicate",
-                  url: "https://api.replicate.com/v1",
-                  local: false,
-                  kind: "video",
-                  model: "bytedance/seedance-1-pro",
-                  parameters: { input: { prompt: "{{prompt}}" } },
-                },
-              ],
-            })
-          }
-        >
-          添加 Replicate
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "火山方舟",
-                  type: "volcengine_ark",
-                  url: "https://ark.cn-beijing.volces.com/api/v3",
-                  local: false,
-                  models: {
-                    text: "doubao-seed-2-1-pro-260628",
-                    image: "doubao-seedream-5-0-pro-260628",
-                    video: "doubao-seedance-2-5-260628",
-                  },
-                  parameters: {
-                    image: { size: "2K", watermark: false, max_references: 10 },
-                    video: { duration: 5, resolution: "720p", ratio: "16:9", generate_audio: true },
-                  },
-                },
-              ],
-            })
-          }
-        >
-          添加火山方舟
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "幻场 AI",
-                  type: "hc_atom",
-                  url: "https://api-aigc.fzyinghe.com",
-                  local: false,
-                  models: { text: "", image: "", video: "" },
-                  parameters: {
-                    image: { size: "1024x1024", n: 1 },
-                    video: { duration: 5, ratio: "16:9" },
-                  },
-                },
-              ],
-            })
-          }
-        >
-          添加幻场 AI
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "RunningHub",
-                  type: "runninghub",
-                  url: "https://www.runninghub.ai",
-                  local: false,
-                  models: {
-                    text: "bytedance/doubao-seed-2.1-pro",
-                    image: "seedream-v5-pro",
-                    video: "bytedance/seedance-2.5-token",
-                  },
-                  parameters: {
-                    image: { size: "1024x1024", resolution: "2k", outputFormat: "jpeg", max_references: 10 },
-                    video: { duration: 5, resolution: "720p", ratio: "16:9", generateAudio: true },
-                  },
-                },
-              ],
-            })
-          }
-        >
-          添加 RunningHub
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "豆包语音",
-                  type: "volcengine_speech",
-                  url: "https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse",
-                  local: false,
-                  kind: "audio",
-                  model: "zh_female_vv_uranus_bigtts",
-                  resource_id: "seed-tts-2.0",
-                  parameters: { format: "mp3", sample_rate: 24000, speech_rate: 0 },
-                },
-              ],
-            })
-          }
-        >
-          添加豆包语音
-        </button>
-        <button
-          onClick={() =>
-            setValue({
-              ...value,
-              providers: [
-                ...value.providers,
-                {
-                  id: id(),
-                  name: "Maestro 图像",
-                  type: "maestro",
-                  url: "http://127.0.0.1:7860",
-                  local: true,
-                  kind: "image",
-                  model: "",
-                },
-              ],
-            })
-          }
-        >
-          连接 Maestro API
-        </button>
-      </div>
-      <label>
-        FFmpeg 路径
-        <input
-          value={value.ffmpeg || "ffmpeg"}
-          onChange={(e) => setValue({ ...value, ffmpeg: e.target.value })}
-        />
-      </label>
-      {status && <p className="success-text">{status}</p>}
-      <button className="primary full" disabled={busy} onClick={save}>
-        <Save size={16} />
-        保存设置
-      </button>
-      <hr />
-      <button className="quiet" onClick={onLogout}>
-        <LogOut size={16} />
-        退出工作室
-      </button>
-    </>
-  );
+function SettingsPanel({config,onSave,onRefresh,onError,onLogout}:{
+ config:Any;system:Any;onSave:(value:Any)=>Promise<void>;onRefresh:()=>Promise<void>;onError:(e:any)=>void;onLogout:()=>void;
+}){
+ const [ffmpeg,setFfmpeg]=useState(config.ffmpeg||'ffmpeg'),[busy,setBusy]=useState(false),[status,setStatus]=useState('');
+ async function saveFfmpeg(){
+  setBusy(true);try{await onSave({ffmpeg});setStatus('FFmpeg 设置已保存')}catch(error){onError(error)}finally{setBusy(false)}
+ }
+ return <><h3>平台模型目录</h3><p className="muted">外部 API-only：Provider、Key 和上游模型由平台管理员统一管理。创作页面只选择已发布的平台模型。</p>
+ {!config.read_only&&<a href="/admin">进入平台模型管理</a>}
+ {!config.models?.length&&<p className="error">暂无可用平台模型，请联系管理员；不会自动回退其他服务。</p>}
+ {(config.models||[]).map((model:Any)=><p key={model.id}>{model.name} · {model.kind}</p>)}
+ <button className="quiet" onClick={()=>void onRefresh().catch(onError)}><RefreshCw size={14}/>刷新目录</button>
+ {!config.read_only&&<><hr/><label>FFmpeg 路径<input value={ffmpeg} onChange={e=>setFfmpeg(e.target.value)}/></label>
+ <button className="primary" disabled={busy} onClick={()=>void saveFfmpeg()}>保存 FFmpeg 设置</button></>}
+ {status&&<p className="success-text">{status}</p>}<hr/><button className="quiet" onClick={onLogout}><LogOut size={16}/>退出工作室</button></>;
 }
 
 createRoot(document.getElementById("root")!).render(<Studio />);

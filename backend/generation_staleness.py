@@ -23,16 +23,7 @@ def _video_node_id(shot):
 def _resolved_image_target(node, providers, saved):
     data = node.get('data') or {}
     inputs = saved.get('inputs') or {}
-    provider_id = str(data.get('provider') or inputs.get('providerId') or '')
-    provider = next((item for item in providers if item.get('id') == provider_id), None)
-    model_id = str(
-        data.get('model')
-        or ((provider or {}).get('models') or {}).get('image')
-        or (provider or {}).get('model')
-        or inputs.get('modelId')
-        or ''
-    )
-    return provider_id, model_id
+    return '', str(data.get('model_id') or inputs.get('model_id') or '')
 
 
 def _descendants(edges, roots):

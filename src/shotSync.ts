@@ -1,5 +1,6 @@
 import {patchNode,invalidate} from './graph.ts';
 import type {Node,Edge} from '@xyflow/react';
+import {shotParameters} from './generationParameters.ts';
 type Value=Record<string,any>;
 export function framesForDuration(model:string,duration:number,caps:Value={}){
  const fps=caps.fps||(model==='minimax_h3'?24:model.startsWith('ltx2')?25:24);
@@ -16,8 +17,11 @@ export function updateShot<T extends {shots:Value[];nodes:Node[];edges:Edge[]}>(
  if('image_prompt' in patch&&imageNodeId)next=patchNode(next,imageNodeId,{prompt:patch.image_prompt});
  if('video_prompt' in patch&&videoNodeId)next=patchNode(next,videoNodeId,{prompt:patch.video_prompt});
  if('duration' in patch&&videoNodeId){
-  const node=next.nodes.find(n=>n.id===videoNodeId);
-  if(node)next=patchNode(next,node.id,{frames:framesForDuration(String(node.data.model||''),patch.duration,node.data.model_capabilities as Value||{})});
+  const data=document.nodes.find(node=>node.id===videoNodeId)?.data;
+  if(data)next=patchNode(next,videoNodeId,{parameters:shotParameters('video',
+   {rules:data.model_rules,capabilities:data.model_capabilities},data.parameters as Value||{}, {...shot,...patch},undefined,(document as Value).videoDuration)});
+  // The server independently derives this from its frozen platform version.
+  next=invalidate(next,[videoNodeId]);
  }
  const semanticChanged=['scene','characters','action','emotion','camera'].some(
   field=>field in patch&&JSON.stringify(patch[field])!==JSON.stringify(shot[field])

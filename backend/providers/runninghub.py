@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 
 from .. import store as s
+from .. import provider_egress
 from . import common
 
 
@@ -21,7 +22,9 @@ def _root(provider):
 
 
 def text_base_url(provider):
-    return 'https://llm.runninghub.cn/v1' if _root(provider).endswith('.cn') else 'https://llm.runninghub.ai/v1'
+    # Text and media hosts require separate explicit platform Provider configs.
+    # Never silently move a frozen account to another origin.
+    return str(provider['url']).rstrip('/')
 
 
 def _headers(provider, content_type=True):
@@ -65,7 +68,7 @@ def _media_models():
 def list_models(provider):
     """Read RunningHub's public LLM catalogue and add supported media profiles."""
     try:
-        with httpx.Client(timeout=30, trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=30, trust_env=True) as client:
             response = client.get(_root(provider) + '/llm/api/models')
             response.raise_for_status()
             value = response.json()
@@ -96,7 +99,7 @@ def list_models(provider):
 def verify(provider):
     key = str(provider.get('api_key') or '').strip()
     try:
-        with httpx.Client(timeout=30, headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=30, headers=_headers(provider), trust_env=True) as client:
             value = common.checked(client.post(_root(provider) + '/uc/openapi/accountStatus', json={'apikey': key}))
     except httpx.HTTPError as exc:
         raise ValueError('RunningHub 连接失败，请检查网络、服务地址和代理设置') from exc
@@ -158,6 +161,7 @@ def _upload(client, root, asset):
     url = data.get('download_url') or data.get('downloadUrl')
     if not url:
         raise ValueError('RunningHub 素材上传成功，但未返回下载地址')
+    provider_egress.validate_url(url,resolve=True)
     return url
 
 
@@ -211,7 +215,7 @@ def _dimensions(job, params):
 
 
 def generate_image(worker, job, provider):
-    model = str(job['input'].get('model') or model_for(provider, 'image')).strip()
+    model = str(model_for(provider, 'image')).strip()
     if model != DEFAULT_IMAGE_MODEL:
         raise ValueError('当前 RunningHub 图片适配器仅支持 Seedream 5 Pro 配置')
     refs = common.assets_for(job)
@@ -220,7 +224,7 @@ def generate_image(worker, job, provider):
     params = {**((provider.get('parameters') or {}).get('image') or {}), **(job['input'].get('parameters') or {})}
     width, height = _dimensions(job, params)
     root = _root(provider)
-    with httpx.Client(timeout=120, headers=_headers(provider, False), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider, False), trust_env=True) as client:
         remote = job.get('provider_job_id')
         if not remote:
             body = {
@@ -241,7 +245,7 @@ def generate_image(worker, job, provider):
 
 
 def generate_video(worker, job, provider):
-    model = str(job['input'].get('model') or model_for(provider, 'video')).strip()
+    model = str(model_for(provider, 'video')).strip()
     if model not in (DEFAULT_VIDEO_MODEL, 'bytedance/seedance-2.5-global-token'):
         raise ValueError('当前 RunningHub 视频适配器仅支持 Seedance 2.5 Token 配置')
     refs = common.assets_for(job)
@@ -264,7 +268,7 @@ def generate_video(worker, job, provider):
     }
     root = _root(provider)
     global_segment = 'seedance-2.5-global-token' if 'global' in model else 'seedance-2.5-token'
-    with httpx.Client(timeout=120, headers=_headers(provider, False), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider, False), trust_env=True) as client:
         remote = job.get('provider_job_id')
         if not remote:
             dialogue_reference = bool(job['input'].get('dialogue_audio'))

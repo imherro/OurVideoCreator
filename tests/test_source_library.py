@@ -9,17 +9,14 @@ from backend.app import app
 from backend.source_library import replace_events, split_chapters
 from backend.worker import Worker
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
 
 
 @pytest.fixture(scope="module")
 def source_client():
     with TestClient(app) as client:
         login_admin(client)
-        response = client.put("/api/settings", json={"providers": [{
-            "id": "p1-test-openai", "name": "P1 test gateway", "type": "openai",
-            "kind": "text", "url": "http://127.0.0.1:1/v1", "local": False,
-        }]})
-        assert response.status_code == 200, response.text
+        publish_test_model(client, "p1-test-openai")
         yield client
 
 
@@ -86,8 +83,7 @@ def test_import_120_chapters_and_create_recoverable_text_jobs_only(source_client
     body = {
         "project_id": episode["id"],
         "chapter_ids": [chapter["id"] for chapter in chapters],
-        "provider": "p1-test-openai",
-        "model": "test-text",
+        "model_id": "p1-test-openai",
         "allow_cloud": False,
         "submission_id": "phase2-batch-120",
     }
@@ -137,8 +133,7 @@ def test_invalid_or_stale_extraction_preserves_existing_events(source_client, mo
         json={
             "project_id": episode["id"],
             "chapter_ids": [chapter["id"]],
-            "provider": "p1-test-openai",
-            "model": "test-text",
+            "model_id": "p1-test-openai",
             "allow_cloud": False,
             "submission_id": "phase2-atomic-invalid",
         },
@@ -206,7 +201,7 @@ def test_valid_extraction_atomically_replaces_events_with_chapter_ownership(sour
         f'/api/productions/{production["id"]}/source-extractions',
         json={
             "project_id": episode["id"], "chapter_ids": [chapter["id"]],
-            "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False,
+            "model_id": "p1-test-openai", "allow_cloud": False,
             "submission_id": "phase2-atomic-success",
         },
     ).json()["jobs"][0]
@@ -244,7 +239,7 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
         f'/api/productions/{production["id"]}/source-extractions',
         json={
             "project_id": episode["id"], "chapter_ids": [chapter["id"]],
-            "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False,
+            "model_id": "p1-test-openai", "allow_cloud": False,
             "submission_id": "source-delete-running",
         },
     ).json()["jobs"][0]
@@ -280,7 +275,7 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
         f'/api/productions/{production["id"]}/source-extractions',
         json={
             "project_id": episode["id"], "chapter_ids": [chapter["id"]],
-            "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False,
+            "model_id": "p1-test-openai", "allow_cloud": False,
             "submission_id": "source-delete-hidden",
         },
     )

@@ -214,18 +214,10 @@ def compile_shot_image_input(
     if not compiled:
         return result
 
-    provider_id = str(result.get('provider') or '')
-    provider = next((item for item in providers if item.get('id') == provider_id), None)
+    model_id = str(result.get('model_id') or '')
+    provider = next((item for item in providers if item.get('id') == model_id and item.get('kind') == 'image'), None)
     if not provider:
-        raise ValueError('分镜图片模型服务已不存在，无法应用视觉圣经参考图')
-    model_id = str(
-        result.get('model')
-        or (provider.get('models') or {}).get('image')
-        or provider.get('model')
-        or ''
-    )
-    if not model_id:
-        raise ValueError('请选择具体图片模型后再应用视觉圣经参考图')
+        raise ValueError('分镜图片平台模型不存在或已停用')
     capabilities = (capability_resolver or resolve_image_model_capabilities)(provider, model_id)
     if not isinstance(capabilities, dict) or capabilities.get('image_reference') is not True:
         raise ValueError('所选图片模型未明确支持参考图；高一致性模式不会自动降级为纯文生图')
@@ -240,7 +232,7 @@ def compile_shot_image_input(
 
     asset_ids = [item['assetId'] for item in compiled]
     result.update({
-        'model': model_id,
+        'model_id': model_id,
         'prompt': compile_shot_prompt(document, shot, constraint_lines),
         'asset_ids': asset_ids,
         'image_reference_sources': [
@@ -251,13 +243,12 @@ def compile_shot_image_input(
             'source': 'shot.assetBindings',
             'shotUid': str(shot.get('uid') or shot.get('id') or ''),
             'consistency': 'high',
-            'providerId': provider_id,
-            'modelId': model_id,
+            'model_id': model_id,
             'maximumReferences': maximum,
             'bindings': compiled,
         },
         'generation_fingerprint': build_generation_fingerprint(
-            document, shot, provider_id, model_id, PROMPT_COMPILER_VERSION,
+            document, shot, '', model_id, PROMPT_COMPILER_VERSION,
         ),
     })
     return result

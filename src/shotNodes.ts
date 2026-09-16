@@ -1,6 +1,5 @@
 import { nodeDefaults } from "./nodeDefaults.ts";
-import { framesForDuration } from "./shotSync.ts";
-import { imageSizeForRatio } from "./mediaSpecs.ts";
+import { shotParameters } from "./generationParameters.ts";
 
 type Value = Record<string, any>;
 
@@ -72,6 +71,8 @@ export function ensureShotNodes<
       (node) => node.id === videoNodeId && node.data.kind === "video",
     );
     if (!image) {
+      const defaults = nodeDefaults("image", providers, models, (doc as Value).generationPolicy);
+      const model = providers.find(item=>item.id===defaults.model_id)||{};
       image = {
         id: newId(),
         type: "media",
@@ -80,14 +81,15 @@ export function ensureShotNodes<
           kind: "image",
           label: `${shot.id} · 分镜图`,
           prompt: shot.image_prompt,
-          ...nodeDefaults("image", providers, models, (doc as Value).generationPolicy),
-          resolution: imageSizeForRatio((doc as Value).ratio || "16:9"),
+          ...defaults,
+          parameters:shotParameters('image',model,defaults.parameters,shot,(doc as Value).ratio),
         },
       };
       nodes.push(image);
     }
     if (!video) {
       const defaults = nodeDefaults("video", providers, models, (doc as Value).generationPolicy);
+      const model = providers.find(item=>item.id===defaults.model_id)||{};
       video = {
         id: newId(),
         type: "media",
@@ -97,7 +99,7 @@ export function ensureShotNodes<
           label: `${shot.id} · 视频`,
           prompt: shot.video_prompt,
           ...defaults,
-          frames: framesForDuration(defaults.model, shot.duration),
+          parameters:shotParameters('video',model,defaults.parameters,shot,undefined,(doc as Value).videoDuration),
         },
       };
       nodes.push(video);

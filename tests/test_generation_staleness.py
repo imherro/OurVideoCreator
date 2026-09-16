@@ -15,7 +15,7 @@ def fixture():
     document = {
         'filmBible': {'styleVersion': 1}, 'shots': [shot],
         'nodes': [
-            {'id': 'image-A', 'data': {'kind': 'image', 'provider': 'ark', 'model': 'seedream', 'assetId': 'frame-A', 'resultJob': 'image-job'}},
+            {'id': 'image-A', 'data': {'kind': 'image', 'model_id': 'seedream', 'assetId': 'frame-A', 'resultJob': 'image-job'}},
             {'id': 'video-A', 'data': {'kind': 'video', 'assetId': 'clip-A', 'resultJob': 'video-job', 'generationFingerprint': {'hash': 'video-history'}}},
         ],
         'edges': [{'source': 'image-A', 'target': 'video-A'}],
@@ -59,7 +59,7 @@ def test_reopen_reconciliation_detects_compiler_change_and_preserves_downstream_
 
 
 def test_reconciliation_detects_current_provider_or_model_change():
-    for field, value in [('provider', 'other-provider'), ('model', 'other-model')]:
+    for field, value in [('model_id', 'other-platform-model')]:
         document = fixture()
         document['nodes'][0]['data'][field] = value
         result = reconcile_generation_staleness(document, prompt_compiler_version=1)

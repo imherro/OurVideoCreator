@@ -24,9 +24,9 @@ export function ScriptRoomPage({
     () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
   );
-  const configuredDefaultProvider = textProviders.find((provider) => provider.id === defaultTarget?.providerId);
+  const configuredDefaultProvider = textProviders.find((provider) => provider.id === defaultTarget?.model_id);
   const defaultProviderId = configuredDefaultProvider?.id || "";
-  const defaultModelId = defaultTarget?.modelId || configuredDefaultProvider?.models?.text || configuredDefaultProvider?.model || "";
+  const defaultModelId = configuredDefaultProvider?.id || "";
 
   async function loadList(preferred = active) {
     const [scripts, sourceChapters] = await Promise.all([
@@ -78,14 +78,14 @@ export function ScriptRoomPage({
     const normalized = normalizeEpisodeSelection(episodeNos, items.length);
     if (!normalized.length) return;
     const provider = configuredDefaultProvider;
-    if (!provider) throw new Error("项目默认外部文本 Provider 尚未配置，请到作品设置中选择");
+    if (!provider) throw new Error("项目默认平台文本模型 尚未配置，请到作品设置中选择");
     const providerId = provider.id;
-    const modelId = defaultModelId || provider?.models?.text || provider?.model || "";
-    if (!modelId) throw new Error("项目默认外部文本模型 ID 尚未配置，请到作品设置中填写");
+    const modelId = provider?.id || "";
+    if (!modelId) throw new Error("项目默认平台文本模型 尚未配置，请到作品设置中填写");
     if (!window.confirm(`将使用项目默认模型生成 ${normalized.length} 集剧本：${normalized.map((no) => `EP${String(no).padStart(2, "0")}`).join("、")}\n服务：${provider.name}\n模型：${modelId}\n确认创建 ${normalized.length} 个文本任务？`)) return;
     const result = await request(`/productions/${productionId}/script-generations`, {
       method: "POST",
-      body: JSON.stringify({ episode_nos: normalized, provider: providerId, model: modelId, submission_id: `scripts-${Date.now()}` }),
+      body: JSON.stringify({ episode_nos: normalized, model_id: modelId, submission_id: `scripts-${Date.now()}` }),
     });
     await onChanged(); await loadList(active);
     notify(`已创建 ${result.count} 个剧本任务，可在任务中心查看`);

@@ -10,6 +10,7 @@ import mimetypes
 from urllib.parse import quote
 import httpx
 from . import store as s
+from . import provider_egress
 
 
 def _data_uri(asset):
@@ -36,13 +37,14 @@ def prediction_input(job,provider,assets):
     if not isinstance(template,dict):raise ValueError('Replicate 输入模板必须是 JSON 对象')
     images=[_data_uri(asset) for asset in assets]
     from .prompts import TEMPLATES
-    return _replace(template,{
+    resolved = _replace(template,{
         '{{prompt}}':job['input']['prompt'],
         '{{system_prompt}}':job['input'].get('system_prompt') or TEMPLATES.get(job['kind'],''),
         '{{target_duration}}':job['input'].get('target_duration',''),
         '{{image}}':images[0] if images else None,
         '{{images}}':images,
     })
+    return {**resolved, **job['input'].get('parameters',{})}
 
 
 def _endpoint(provider):
@@ -79,7 +81,7 @@ def execute(worker,job,provider):
     from .worker import assets_for,checked,download_result
     remote=job.get('provider_job_id');root=provider.get('url','https://api.replicate.com/v1').rstrip('/')
     headers={'Authorization':'Bearer '+provider.get('api_key',''),'Content-Type':'application/json'}
-    with httpx.Client(timeout=120,headers=headers,trust_env=not provider.get('local',False)) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120,headers=headers,trust_env=not provider.get('local',False)) as client:
         if not remote:
             endpoint,body=_endpoint(provider)
             body['input']=prediction_input(job,provider,assets_for(job))
@@ -118,7 +120,7 @@ def cancel(job,provider):
     root=provider.get('url','https://api.replicate.com/v1').rstrip('/')
     headers={'Authorization':'Bearer '+provider.get('api_key','')}
     try:
-        with httpx.Client(timeout=20,headers=headers,trust_env=not provider.get('local',False)) as client:
+        with provider_egress.client(origin=provider['url'],timeout=20,headers=headers,trust_env=not provider.get('local',False)) as client:
             client.post(root+'/predictions/'+quote(str(remote),safe='')+'/cancel')
     except httpx.HTTPError:
         # Local cancellation still wins, even when the remote service is unreachable.

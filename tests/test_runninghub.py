@@ -5,6 +5,8 @@ import uuid
 import httpx
 from PIL import Image
 
+from tests.platform_model_helpers import bind_adapter_job
+from tests.egress_helpers import mock_egress
 from backend import store as s
 from backend import worker as worker_module
 from backend.providers import common, runninghub
@@ -48,7 +50,7 @@ def stored_job(kind, provider_value, provider_job_id=None):
             'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (jid, 'rh-submit-' + uuid.uuid4().hex, pid, 'node', kind, 'running', s.dumps(inp), provider_job_id, now, now),
         )
-        db.execute('INSERT INTO job_private VALUES(%s,%s)', (jid, s.dumps(provider_value)))
+        bind_adapter_job(db,jid,kind,provider_value,inp)
     return {'id': jid, 'submission_id': 'rh-submit-test', 'project_id': pid, 'node_id': 'node', 'kind': kind, 'status': 'running', 'input': inp, 'provider_job_id': provider_job_id}
 
 
@@ -74,14 +76,15 @@ def test_verify_reads_account_and_public_model_catalog(monkeypatch):
         assert request.url.path == '/llm/api/models'
         return httpx.Response(200, json={'data': [{'modelKey': 'qwen/qwen3.8-max', 'displayName': 'Qwen 3.8 Max', 'capabilities': {'chat': True}}]})
 
-    monkeypatch.setattr(runninghub.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     result = runninghub.verify(provider())
     assert result['api_type'] == 'ENTERPRISE_SHARED'
     assert {row['kind'] for row in result['models']} == {'text', 'image', 'video'}
 
 
 def test_text_reuses_runninghub_openai_stream(monkeypatch):
-    item = stored_job('text', provider())
+    configured=provider();configured['url']='https://llm.runninghub.ai/v1'
+    item = stored_job('text', configured)
     original = httpx.Client
 
     def handle(request):
@@ -89,7 +92,7 @@ def test_text_reuses_runninghub_openai_stream(monkeypatch):
         assert json.loads(request.read())['model'] == 'bytedance/doubao-seed-2.1-pro'
         return httpx.Response(200, content=b'data: {"choices":[{"delta":{"content":"OK"}}]}\n\ndata: [DONE]\n\n')
 
-    monkeypatch.setattr(worker_module.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     assert Worker().execute(item) == {'text': 'OK'}
 
 
@@ -110,7 +113,7 @@ def test_image_reference_upload_submit_poll_and_download(monkeypatch):
             return httpx.Response(200, json={'taskId': 'image-task', 'status': 'RUNNING'})
         return httpx.Response(200, json={'taskId': 'image-task', 'status': 'SUCCESS', 'results': [{'fileUrl': 'https://result.example/result.png'}]})
 
-    monkeypatch.setattr(runninghub.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common, 'download_result', lambda job, url, ext, recoverable=False: {'id': 'image-asset', 'kind': 'image'})
     worker = Worker(); worker.halt = NoWait()
     assert runninghub.generate_image(worker, item, provider())['assets'][0]['id'] == 'image-asset'
@@ -133,7 +136,7 @@ def test_video_selects_text_first_frame_and_multireference_endpoints(monkeypatch
             submitted.append(request.url.path)
             return httpx.Response(200, json={'taskId': 'video-task', 'status': 'RUNNING'})
 
-        monkeypatch.setattr(runninghub.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+        mock_egress(monkeypatch,handle)
         monkeypatch.setattr(common, 'download_result', lambda job, url, ext, recoverable=False: {'id': 'video-asset', 'kind': 'video'})
         worker = Worker(); worker.halt = NoWait()
         assert runninghub.generate_video(worker, item, provider())['assets'][0]['id'] == 'video-asset'

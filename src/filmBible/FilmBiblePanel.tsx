@@ -141,10 +141,11 @@ export function FilmBiblePanel({
   });
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [referenceError, setReferenceError] = useState("");
-  const speechProviders = providers.filter((item) => item.type === "volcengine_speech");
+  const speechProviders = providers.filter((item) => item.type === "volcengine_speech" && item.kind === "audio");
+  const defaultSpeech = speechProviders.find(item=>item.is_default);
   const storedVoice = card ? voiceProfiles[card.id] : undefined;
   const [voiceDraft, setVoiceDraft] = useState<VoiceProfile>(() =>
-    defaultVoiceProfile("", speechProviders[0]?.id || ""),
+    defaultVoiceProfile("", defaultSpeech?.id || "",defaultSpeech?.defaults),
   );
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [voiceError, setVoiceError] = useState("");
@@ -179,9 +180,9 @@ export function FilmBiblePanel({
   }, [selected?.id]);
   useEffect(() => {
     if (!card) return;
-    setVoiceDraft(storedVoice || defaultVoiceProfile(card.id, speechProviders[0]?.id || ""));
+    setVoiceDraft(storedVoice || defaultVoiceProfile(card.id, defaultSpeech?.id || "",defaultSpeech?.defaults));
     setVoiceError("");
-  }, [card?.id, storedVoice, speechProviders[0]?.id]);
+  }, [card?.id, storedVoice, speechProviders.find(item=>item.is_default)?.id]);
   if (!versions.length)
     return (
       <div className="empty-state film-bible-empty">
@@ -231,7 +232,7 @@ export function FilmBiblePanel({
     targetError = reason?.message || String(reason);
   }
   const targetProvider = providers.find(
-    (item) => item.id === resolvedTarget?.providerId,
+    (item) => item.id === resolvedTarget?.model_id,
   );
   const override = card.generation?.image;
   const perform = async (action: () => Promise<void>) => {
@@ -390,15 +391,22 @@ export function FilmBiblePanel({
         {card.kind === "character" && <>
           <hr />
           <div className="film-bible-section-title"><b>角色固定音色</b><small>跨镜头统一对白声纹</small></div>
-          {!speechProviders.length ? <p className="warning-text">尚未配置豆包语音。请到“设置 → 模型服务”添加豆包语音并填写独立 Speech API Key。</p> : <>
-            <label>语音服务<select value={voiceDraft.providerId} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,providerId:event.target.value})}>{speechProviders.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-            <label>预置音色<select value={catalogVoice(voiceDraft.voiceType)?.id || CUSTOM_VOICE_ID} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,voiceType:event.target.value === CUSTOM_VOICE_ID ? "" : event.target.value})}>{[...new Set(DOUBAO_TTS2_VOICES.map((item)=>item.category))].map((category)=><optgroup key={category} label={category}>{DOUBAO_TTS2_VOICES.filter((item)=>item.category===category).map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</optgroup>)}<option value={CUSTOM_VOICE_ID}>自定义 / 声音复刻 ID…</option></select></label>
-            {!catalogVoice(voiceDraft.voiceType) && <label>自定义 Speaker ID<input value={voiceDraft.voiceType} disabled={voiceDraft.status === "locked"} placeholder="粘贴声音复刻或音色设计返回的 ID" onChange={(event)=>setVoiceDraft({...voiceDraft,voiceType:event.target.value})}/><small>声音复刻训练完成后，把控制台返回的 Speaker ID 粘贴到这里。</small></label>}
-            {catalogVoice(voiceDraft.voiceType) && <p className="muted">Speaker ID：{voiceDraft.voiceType}</p>}
+          {!speechProviders.length ? <p className="warning-text">暂无已发布的语音模型，请联系平台管理员配置模型和允许音色。</p> : <>
+            <label>平台语音模型<select value={voiceDraft.model_id} disabled={voiceDraft.status === "locked"}
+              onChange={event=>{const model=speechProviders.find(item=>item.id===event.target.value);
+                setVoiceDraft({...voiceDraft,model_id:event.target.value,voiceType:model?.defaults?.voice_type||"",parameters:{speechRate:model?.defaults?.speech_rate??0,emotion:model?.defaults?.emotion||""}});}}>
+              <option value="">请选择平台语音模型</option>{speechProviders.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+            </select></label>
+            <label>平台允许音色<select value={voiceDraft.voiceType} disabled={voiceDraft.status === "locked"}
+              onChange={event=>setVoiceDraft({...voiceDraft,voiceType:event.target.value})}>
+              <option value="">请选择允许的音色</option>
+              {(speechProviders.find(item=>item.id===voiceDraft.model_id)?.rules?.voice_type?.enum||[]).map((voice:string)=>
+                <option key={voice} value={voice}>{catalogVoice(voice)?.name||voice}</option>)}
+            </select></label>
             <label>试听台词<textarea value={voiceDraft.previewText} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,previewText:event.target.value})}/></label>
             <div className="two-fields">
-              <label>语速<select value={voiceDraft.parameters.speechRate} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,speechRate:Number(event.target.value)}})}><option value={-25}>较慢</option><option value={0}>正常</option><option value={25}>较快</option></select></label>
-              <label>情绪<input value={voiceDraft.parameters.emotion} disabled={voiceDraft.status === "locked"} placeholder="留空自动演绎" onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,emotion:event.target.value}})}/></label>
+              {speechProviders.find(item=>item.id===voiceDraft.model_id)?.rules?.speech_rate&&<label>语速<select value={voiceDraft.parameters.speechRate} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,speechRate:Number(event.target.value)}})}><option value={-25}>较慢</option><option value={0}>正常</option><option value={25}>较快</option></select></label>}
+              {speechProviders.find(item=>item.id===voiceDraft.model_id)?.rules?.emotion&&<label>情绪<input value={voiceDraft.parameters.emotion} disabled={voiceDraft.status === "locked"} placeholder="留空自动演绎" onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,emotion:event.target.value}})}/></label>}
             </div>
             <div className="film-bible-actions">
               {voiceDraft.status !== "locked" && <button onClick={()=>onSaveVoice(card.id,voiceDraft)}>保存声音设定</button>}
@@ -443,22 +451,10 @@ export function FilmBiblePanel({
                   onSetImageOverride(card.id, { mode: "inherit" });
                   return;
                 }
-                const fallback =
-                  resolvedTarget ||
-                  (() => {
-                    const provider = providers.find(
-                      (item) => !item.kind || item.kind === "image",
-                    );
-                    return {
-                      providerId: provider?.id || "",
-                      modelId:
-                        provider?.models?.image || provider?.model || "",
-                    };
-                  })();
+                const fallback = resolvedTarget || {model_id:""};
                 onSetImageOverride(card.id, {
                   mode: "override",
-                  providerId: fallback.providerId,
-                  modelId: fallback.modelId,
+                  model_id: fallback.model_id,
                 });
               }}
             >
@@ -470,8 +466,7 @@ export function FilmBiblePanel({
             <ModelSelector
               data={{
                 kind: "image",
-                provider: override.providerId,
-                model: override.modelId,
+                model_id: override.model_id,
               }}
               providers={providers}
               localModels={localModels}
@@ -479,20 +474,19 @@ export function FilmBiblePanel({
               onChange={(patch) =>
                 onSetImageOverride(card.id, {
                   mode: "override",
-                  providerId: String(patch.provider || override.providerId),
-                  modelId: String(patch.model ?? override.modelId),
+                  model_id: String(patch.model_id ?? override.model_id),
                 })
               }
             />
           )}
           {override?.mode === "override" && !editable && (
             <p className="muted">
-              已锁定自定义：{targetProvider?.name || override.providerId} · {override.modelId || "服务默认模型"}
+              已锁定自定义：{targetProvider?.name || override.model_id} · {override.model_id || "服务默认模型"}
             </p>
           )}
           {override?.mode !== "override" && resolvedTarget && (
             <p className="muted">
-              当前继承：{targetProvider?.name || resolvedTarget.providerId} · {resolvedTarget.modelId || "服务默认模型"}
+              当前继承：{targetProvider?.name || resolvedTarget.model_id} · {resolvedTarget.model_id || "服务默认模型"}
             </p>
           )}
           {targetError && <p className="error">{targetError}</p>}
@@ -516,9 +510,9 @@ export function FilmBiblePanel({
             <div>
               <b>{reference.source === "generated" ? "模型生成" : "本地上传"}</b>
               <small>{referenceAsset?.name || reference.assetId}</small>
-              {reference.provenance.providerId && (
+              {reference.provenance.model_id && (
                 <small>
-                  {reference.provenance.providerId} · {reference.provenance.modelId}
+                  {reference.provenance.model_id} · {reference.provenance.model_id}
                 </small>
               )}
             </div>
@@ -549,8 +543,7 @@ export function FilmBiblePanel({
                 generationRunning ||
                 stateReferenceBlocked ||
                 Boolean(targetError) ||
-                !resolvedTarget?.providerId ||
-                !resolvedTarget?.modelId
+                !resolvedTarget?.model_id
               }
               onClick={() =>
                 void perform(() =>

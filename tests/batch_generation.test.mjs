@@ -10,7 +10,7 @@ const providers=[
 test('asset batch queues missing roots and waits for parent approval before states',()=>{
   const document={
     nodes:[],shots:[],
-    generationPolicy:{text:null,image:{providerId:'ark',modelId:'seedream'},video:null},
+    generationPolicy:{text:null,image:{model_id:'ark'},video:null},
     filmBible:{visual:{
       cards:{
         hero:{id:'hero',kind:'character',name:'主角',parentCardId:null,currentVersionId:'hero-v1',status:'active'},
@@ -36,10 +36,10 @@ test('shot batches are incremental and video waits for a reviewed current frame'
       {id:'S2',imageNode:'image-2',videoNode:'video-2'},
     ],
     nodes:[
-      {id:'image-1',data:{kind:'image',prompt:'灯完全熄灭',provider:'ark',assetId:'frame-1',stale:false,state_reviewed:false}},
-      {id:'video-1',data:{kind:'video',prompt:'灯亮起',provider:'video-local'}},
-      {id:'image-2',data:{kind:'image',prompt:'街景',provider:'ark',assetId:'old-frame',stale:true}},
-      {id:'video-2',data:{kind:'video',prompt:'推进镜头',provider:'video-local'}},
+      {id:'image-1',data:{kind:'image',prompt:'灯完全熄灭',model_id:'ark',assetId:'frame-1',stale:false,state_reviewed:false}},
+      {id:'video-1',data:{kind:'video',prompt:'灯亮起',model_id:'video-local'}},
+      {id:'image-2',data:{kind:'image',prompt:'街景',model_id:'ark',assetId:'old-frame',stale:true}},
+      {id:'video-2',data:{kind:'video',prompt:'推进镜头',model_id:'video-local'}},
     ],
   };
   const images=planBatchGeneration(document,[],providers,[],'shot_images');
@@ -55,7 +55,7 @@ test('running work is skipped to prevent duplicate batch submissions',()=>{
   const document={
     filmBible:{visual:{cards:{},versions:{}}},generationPolicy:{text:null,image:null,video:null},
     shots:[{id:'S1',imageNode:'image-1'}],
-    nodes:[{id:'image-1',data:{kind:'image',prompt:'画面',provider:'ark'}}],
+    nodes:[{id:'image-1',data:{kind:'image',prompt:'画面',model_id:'ark'}}],
   };
   const jobs=[{node_id:'image-1',status:'queued'}];
   const plan=planBatchGeneration(document,jobs,providers,[],'shot_images');
@@ -64,7 +64,7 @@ test('running work is skipped to prevent duplicate batch submissions',()=>{
 });
 
 test('shot image batch blocks missing or unapproved film bible bindings',()=>{
-  const document={filmBible:{visual:{cards:{hero:{id:'hero',status:'active'}},versions:{'hero-v1':{id:'hero-v1',cardId:'hero',status:'draft',references:[]}}}},shots:[{id:'S1',imageNode:'image-1',assetBindings:{characters:[],scene:null,props:[]}}],nodes:[{id:'image-1',data:{kind:'image',prompt:'主角入场',provider:'ark'}}]};
+  const document={filmBible:{visual:{cards:{hero:{id:'hero',status:'active'}},versions:{'hero-v1':{id:'hero-v1',cardId:'hero',status:'draft',references:[]}}}},shots:[{id:'S1',imageNode:'image-1',assetBindings:{characters:[],scene:null,props:[]}}],nodes:[{id:'image-1',data:{kind:'image',prompt:'主角入场',model_id:'ark'}}]};
   const missing=planBatchGeneration(document,[],providers,[],'shot_images');
   assert.match(missing.blocked[0].reason,/尚未绑定/);
   document.shots[0].assetBindings.characters=[{versionId:'hero-v1'}];

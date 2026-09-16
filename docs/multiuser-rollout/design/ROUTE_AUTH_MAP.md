@@ -1,8 +1,25 @@
-# P3 路由认证与授权地图
+# P3/P4 路由认证与授权地图
 
 实际注册源：`backend/app.py`。P3 已切换为个人数据库 session、CSRF 和 Workspace/Production 服务端授权；“Signed”表示不依赖用户 Cookie、但绑定素材/方法/用途/期限的 HMAC capability。`scripts/audit_routes.py` 以实际 `app.routes` 为输入，任何未在本文分类的 `/api` 路由都会令检查失败。
 
 目标角色缩写：PA=platform_admin，WO=workspace owner，PM=production manager，ED=对象 editor，VI=viewer，SYS=受限系统身份。
+
+## 平台模型（P4 实施中）
+
+| 方法与路径 | 服务端守卫 | 数据与副作用 |
+| --- | --- | --- |
+| GET `/api/models` | 已登录 | 仅安全模型目录；无凭证/URL/上游标识 |
+| GET `/api/admin/model-providers` | PA | 私有配置及凭证版本状态，不含密文或明文 |
+| POST `/api/admin/model-providers` | PA + CSRF | 配置/凭证/审计同事务新建 |
+| PUT `/api/admin/model-providers/{provider_id}` | PA + CSRF | 乐观版本更新/显式轮换 |
+| POST `/api/admin/model-providers/{provider_id}/check` | PA + CSRF | 格式/解密/DNS 检查，无 HTTP 鉴权/生成 |
+| POST `/api/admin/model-providers/{provider_id}/credentials/{credential_id}/revoke` | PA + CSRF | 吊销明确版本，保留引用 |
+| GET `/api/admin/models` | PA | 模型版本管理视图 |
+| POST `/api/admin/models` | PA + CSRF | 模型/默认选择/审计同事务新建 |
+| PUT `/api/admin/models/{model_id}` | PA + CSRF | 乐观版本编辑、发布、启停 |
+| PUT `/api/admin/prompt-templates/{tid}` | PA + CSRF | 提示词版本/审计原子写入，旧写路径返回 410 |
+
+旧入口切换与全部创作路径接线仍在 P4 实施中，不据此表宣称整阶段已完成。
 
 ## 健康与身份（7）
 
@@ -121,6 +138,7 @@
 
 | 方法与路径 | P3 强制 | 目标/副作用 | 阶段 |
 |---|---|---|---|
+| POST `/api/projects/{pid}/audio-jobs` | Session | Production editor；全部音频模型/参数/素材验证后同事务入队 | P3/P4 |
 | POST `/api/projects/{pid}/jobs` | Session | 对象 assignee/PM/WO + model/quota；可能付费 | P3/P4/P6 |
 | POST `/api/projects/{pid}/run` | Session | 逐对象授权、版本校验、原子批次；可能多次付费 | P3/P5/P6 |
 | GET `/api/projects/{pid}/jobs` | Session | Production 成员，只得有权任务 | P3 |

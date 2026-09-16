@@ -4,30 +4,42 @@ export function voiceProfilesOf(document: FilmBibleDocument) {
   return document.filmBible?.voices?.profiles || {};
 }
 
-export function defaultVoiceProfile(cardId: string, providerId = ""): VoiceProfile {
+export function defaultVoiceProfile(cardId: string, model_id = "", defaults:Record<string,any> = {}): VoiceProfile {
   return {
     cardId,
-    providerId,
-    voiceType: "zh_female_vv_uranus_bigtts",
+    model_id,
+    voiceType: defaults.voice_type || "",
     version: 1,
     status: "draft",
     previewText: "你好，我是这个故事中的角色。",
-    parameters: { speechRate: 0, emotion: "" },
+    parameters: { speechRate: defaults.speech_rate ?? 0, emotion: defaults.emotion || "" },
   };
+}
+
+export function voiceParameters(models:Record<string,any>[],profile:VoiceProfile,performance?:{emotion:string;contextTexts:string[]}){
+ const model=models.find(item=>item.id===profile.model_id&&item.kind==='audio');
+ if(!model)throw new Error('所选平台语音模型已停用或未发布，请重新选择');
+ const rules=model.rules||{},parameters={...model.defaults};
+ if(!rules.voice_type?.enum?.includes(profile.voiceType))throw new Error('当前音色不在平台允许列表中');
+ parameters.voice_type=profile.voiceType;
+ if(rules.speech_rate)parameters.speech_rate=profile.parameters.speechRate;
+ if(rules.emotion)parameters.emotion=performance?.emotion??profile.parameters.emotion;
+ if(rules.context_texts&&performance)parameters.context_texts=performance.contextTexts;
+ return parameters;
 }
 
 export function saveVoiceProfile<T extends FilmBibleDocument>(document: T, cardId: string, input: VoiceProfile): T {
   const current = voiceProfilesOf(document)[cardId];
   const voiceType = input.voiceType.trim();
   const previewText = input.previewText.trim();
-  if (!input.providerId) throw new Error("请选择豆包语音服务");
+  if (!input.model_id) throw new Error("请选择豆包语音服务");
   if (!voiceType) throw new Error("音色 ID 不能为空");
   if (!previewText) throw new Error("试听台词不能为空");
-  const identityChanged = !!current && (current.providerId !== input.providerId || current.voiceType !== voiceType);
+  const identityChanged = !!current && (current.model_id !== input.model_id || current.voiceType !== voiceType);
   const next: VoiceProfile = {
     ...input,
     cardId,
-    providerId: input.providerId,
+    model_id: input.model_id,
     voiceType,
     previewText,
     version: identityChanged ? current.version + 1 : Math.max(1, input.version || 1),

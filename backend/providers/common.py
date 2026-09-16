@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import httpx
 
 from .. import store as s
+from .. import provider_egress
+from ..provider_redaction import scrub
 from ..media import probe
 
 
@@ -23,11 +25,11 @@ def checked(response, recoverable=False):
             if isinstance(error,dict): error=error.get('message') or str(error)
         except Exception: error=response.text[:400]
         guidance={401:'鉴权失败，请检查该服务的 API Key。',403:'服务拒绝访问，请检查账号权限和模型授权。',402:'服务额度不足，请核对供应商余额或配额后再提交。',429:'服务限流或配额受限，请查看供应商限制，稍后手动重试。',404:'接口或模型不存在，请检查服务地址和模型 ID。',413:'输入素材过大，请缩小文件后重试。',422:'输入参数不受支持，请检查模型能力、分辨率和参考素材。'}.get(response.status_code,'服务暂时异常，请核对供应商状态后重试。' if response.status_code>=500 else '请核对任务参数。')
-        message=f'模型服务返回 {response.status_code}：{guidance} 详情：{str(error)[:500]}'
+        message=f'模型服务返回 {response.status_code}：{guidance} 详情：{scrub(str(error))[:500]}'
         if recoverable and (response.status_code==429 or response.status_code>=500):
             raise RecoverableProviderError(message)
         raise ValueError(message)
-    return response.json()
+    return scrub(response.json())
 
 
 def assets_for(job):
@@ -68,7 +70,7 @@ def download_file(url, ext, recoverable=False):
     path = s.DATA / (s.uid('download-') + ext)
     try:
         # Provider credentials are intentionally never forwarded to result hosts.
-        with httpx.stream('GET', url, follow_redirects=True, timeout=120) as response:
+        with provider_egress.client(follow_redirects=True, timeout=120) as client, client.stream('GET',url) as response:
             if not response.is_success:
                 response.read()
                 checked(response, recoverable=recoverable)

@@ -1,3 +1,4 @@
+from tests.egress_helpers import mock_egress
 import time
 import httpx,pytest
 from PIL import Image
@@ -24,14 +25,14 @@ def test_tail_frame_upload_and_provider_flags(monkeypatch):
             captured.append(json_load:=json.loads(request.content));return httpx.Response(200,json={'job_id':'remote'})
         if request.url.path=='/api/v1/status/remote':return httpx.Response(200,json={'status':'failed','error':'test-stop'})
         raise AssertionError(request.url)
-    original=httpx.Client;monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    original=httpx.Client;mock_egress(monkeypatch,handle)
     worker=Worker()
     class NoWait:
         def wait(self,seconds):return False
         def is_set(self):return False
     worker.halt=NoWait()
     job={'id':jid,'submission_id':jid,'project_id':pid,'node_id':'n','kind':'video','input':{'model':'h3','prompt':'转头','frames':124,'asset_ids':[ids[0]],'end_asset_id':ids[1]}}
-    with pytest.raises(ValueError,match='test-stop'):worker.maestro(job,{'url':'http://engine','local':True})
+    with pytest.raises(ValueError,match='test-stop'):worker.maestro(job,{'url':'http://engine','model':job['input']['model'],'local':True})
     assert len(uploads)==2
     assert captured[0]['image_start']=='upload-1'
     assert captured[0]['image_end']=='upload-2'
@@ -61,14 +62,14 @@ def test_flux_image_reference_is_uploaded_and_sent_in_native_reference_mode(monk
             captured.append(json.loads(request.content));return httpx.Response(200,json={'job_id':'remote'})
         if request.url.path=='/api/v1/status/remote':return httpx.Response(200,json={'status':'failed','error':'test-stop'})
         raise AssertionError(request.url)
-    original=httpx.Client;monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    original=httpx.Client;mock_egress(monkeypatch,handle)
     worker=Worker()
     class NoWait:
         def wait(self,seconds):return False
         def is_set(self):return False
     worker.halt=NoWait()
     job={'id':jid,'submission_id':jid,'project_id':pid,'node_id':'image','kind':'image','input':{'model':'flux','prompt':'角色参考图中的人物站在雨巷','asset_ids':[aid]}}
-    with pytest.raises(ValueError,match='test-stop'):worker.maestro(job,{'url':'http://engine','local':True})
+    with pytest.raises(ValueError,match='test-stop'):worker.maestro(job,{'url':'http://engine','model':job['input']['model'],'local':True})
     assert captured[0]['image_mode']==1
     assert captured[0]['image_refs']==['uploaded-character']
     assert captured[0]['video_prompt_type']=='KI'

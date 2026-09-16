@@ -4,14 +4,13 @@ from backend.visual_references import validate_visual_reference_job
 
 
 PROVIDERS = [{
-    'id': 'ark', 'type': 'volcengine_ark', 'local': False,
-    'models': {'image': 'seedream'},
+    'id': 'seedream', 'kind': 'image', 'capabilities': {'image_reference': True},
 }]
 
 
 def document():
     return {
-        'generationPolicy': {'text': None, 'image': {'providerId': 'ark', 'modelId': 'seedream'}, 'video': None},
+        'generationPolicy': {'text': None, 'image': {'model_id': 'seedream'}, 'video': None},
         'filmBible': {'visual': {'cards': {
             'hero': {'id': 'hero', 'kind': 'character', 'status': 'active'},
             'wet': {'id': 'wet', 'kind': 'character_state', 'status': 'active'},
@@ -31,7 +30,7 @@ def document():
 
 def state_input():
     return {
-        'provider': 'ark', 'model': 'seedream', 'prompt': '雨中状态',
+        'model_id': 'seedream', 'prompt': '雨中状态',
         'asset_ids': ['asset-parent'], 'asset_category': 'character',
         'visual_reference': {
             'versionId': 'wet-v1', 'targetSource': 'project',
@@ -48,7 +47,7 @@ def test_state_reference_job_must_use_policy_and_frozen_locked_parent():
     wrong = state_input(); wrong['asset_ids'] = []
     with pytest.raises(ValueError, match='必须且只能发送'):
         validate_visual_reference_job(doc, 'visual-version:wet-v1', 'image', wrong, PROVIDERS, supports_reference)
-    wrong = state_input(); wrong['model'] = 'another-model'
+    wrong = state_input(); wrong['model_id'] = 'another-model'
     with pytest.raises(ValueError, match='生成策略不一致'):
         validate_visual_reference_job(doc, 'visual-version:wet-v1', 'image', wrong, PROVIDERS, supports_reference)
     doc['filmBible']['visual']['versions']['hero-v1']['status'] = 'pending_reference'
@@ -77,7 +76,7 @@ def test_state_reference_job_rejects_model_missing_from_server_catalog():
 def test_base_reference_job_rejects_hidden_image_conditioning():
     doc = document()
     value = {
-        'provider': 'ark', 'model': 'seedream', 'prompt': '角色定妆',
+        'model_id': 'seedream', 'prompt': '角色定妆',
         'asset_ids': [], 'asset_category': 'character',
         'visual_reference': {'versionId': 'hero-v1', 'targetSource': 'project'},
     }

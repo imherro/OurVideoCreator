@@ -3,10 +3,11 @@ import httpx,base64
 from pathlib import Path
 from PIL import Image
 from . import store as s
+from . import provider_egress
 
 def payload(inp,provider):
     params={**provider.get('parameters',{}),**inp.get('parameters',{})}
-    model=inp.get('model') or provider.get('model') or 'MiniMax-Hailuo-2.3'
+    model=provider.get('model') or 'MiniMax-Hailuo-2.3'
     if model!='MiniMax-Hailuo-2.3':raise ValueError('当前 MiniMax 原生适配器已配置的模型为 MiniMax-Hailuo-2.3')
     duration=params.get('duration',6);resolution=params.get('resolution','768P')
     if duration not in (6,10) or resolution not in ('768P','1080P') or (resolution=='1080P' and duration!=6):raise ValueError('MiniMax 2.3 支持 768P 的 6/10 秒或 1080P 的 6 秒')
@@ -34,7 +35,7 @@ def execute(worker,job,provider):
         if base.get('status_code',0)!=0:raise ValueError('MiniMax 服务错误 '+str(base.get('status_code'))+'：'+str(base.get('status_msg','未知错误')))
         return data
     url=provider['url'].rstrip('/');remote=job.get('provider_job_id')
-    with httpx.Client(timeout=120,headers={'Authorization':'Bearer '+provider.get('api_key','')},trust_env=not provider.get('local',False)) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120,headers={'Authorization':'Bearer '+provider.get('api_key','')},trust_env=not provider.get('local',False)) as client:
         if not remote:
             body=payload(job['input'],provider)
             from .worker import assets_for

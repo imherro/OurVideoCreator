@@ -14,10 +14,10 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from . import store as s
-from . import identity
+from . import identity, platform_models, model_validation, provider_egress
 from .instance_identity import describe as describe_instance
 from .prompts import TEMPLATES
-from .generation_policy import default_ark_policy, validate_generation_policy
+from .generation_policy import default_platform_policy, validate_generation_policy
 from .project_schema import empty_film_bible, migrate_document, new_document
 from .production_context import (
     SHARED_DOCUMENT_KEYS,
@@ -38,6 +38,8 @@ app = FastAPI(
     title='安影 AI 视频工作室', lifespan=lifespan,
     docs_url=None, redoc_url=None, openapi_url=None,
 )
+from .model_routes import router as model_router
+app.include_router(model_router)
 PUBLIC = {
     '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
     '/api/auth/register', '/api/auth/password-reset',
@@ -497,7 +499,7 @@ def project(pid):
     value['production_revision']=state['production']['revision']
     from .generation_staleness import reconcile_generation_staleness
     value['document']=reconcile_generation_staleness(
-        state['episode_document'],s.get_setting('providers',[]),
+        state['episode_document'],platform_models.compiler_catalog(),
         production_context=state['production_context'],
     )
     from .adaptation import project_script_to_document
@@ -600,7 +602,7 @@ class ProductionUpdate(StrictBody):
 def create_production(body:ProductionCreate):
     production_id=s.uid('production-')
     now=time.time();name=normalized_project_name(body.name)
-    context=new_production_context(default_ark_policy(s.get_setting('providers',[])))
+    context=new_production_context(default_platform_policy(platform_models.compiler_catalog()))
     with s.db() as c:
         workspace_id=_owned_workspace_id(c,body.workspace_id)
         c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated,workspace_id) VALUES(%s,%s,1,%s,%s,%s,%s)',(production_id,name,s.dumps(context),now,now,workspace_id))
@@ -671,7 +673,7 @@ class EpisodeCreate(StrictBody):
 
 @app.post('/api/productions/{production_id}/episodes')
 def create_episode(production_id:str,body:EpisodeCreate):
-    document=new_document(default_ark_policy(s.get_setting('providers',[])))
+    document=new_document(default_platform_policy(platform_models.compiler_catalog()))
     now=time.time();pid=s.uid('project-')
     with s.db() as c:
         parent=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
@@ -712,8 +714,8 @@ def normalized_project_name(name:str)->str:
     return name.strip() or '未命名短片'
 
 def project_create_document(body:ProjectCreate):
-    providers=s.get_setting('providers',[])
-    document=new_document(default_ark_policy(providers))
+    providers=platform_models.compiler_catalog()
+    document=new_document(default_platform_policy(providers))
     if body.style is not None:
         style=body.style.strip()
         if not style:raise ValueError('视觉风格不能为空')
@@ -806,10 +808,11 @@ class ProjectSave(StrictBody):
 
 @app.put('/api/projects/{pid}')
 def save_project(pid:str,body:ProjectSave):
+    model_validation.reject_private_overrides(body.document)
     document=migrate_document(body.document)
     # Preserve deleted provider ids so ordinary project edits remain savable;
     # the resolver reports the invalid target before any generation starts.
-    document['generationPolicy']=validate_generation_policy(document['generationPolicy'],s.get_setting('providers',[]),allow_missing=True)
+    document['generationPolicy']=validate_generation_policy(document['generationPolicy'],platform_models.compiler_catalog(),allow_missing=True)
     projected_context=production_context_from_document(document)
     with s.db() as c:
         state=read_project_state(c,pid,for_update=True)
@@ -920,8 +923,7 @@ def asset_public(row):
     metadata=public.get('metadata') or {}
     job_input=metadata.get('input') if isinstance(metadata,dict) else {}
     if isinstance(job_input,dict):
-        public['provider_id']=job_input.get('provider')
-        public['model_id']=job_input.get('model')
+        public['model_id']=job_input.get('model_id')
         public['generation_fingerprint']=metadata.get('generationFingerprint')
         visual=job_input.get('visual_reference') or {}
         if isinstance(visual,dict):public['visual_version_id']=visual.get('versionId')
@@ -1104,153 +1106,44 @@ def system():
 
 @app.get('/api/settings')
 def settings():
-    value=s.get_setting('providers',[])
     principal=identity.current()
-    if not principal.is_admin:
-        return {
-            'providers':[
-                {k:v for k,v in p.items() if k in ('id','name','type','kind','models')}
-                for p in value
-            ],
-            'ffmpeg':None,
-            'read_only':True,
-        }
-    return {
-        'providers':[
-            {**{k:v for k,v in p.items() if k not in ('api_key','auto_start')},'api_key_set':bool(p.get('api_key'))}
-            for p in value
-        ],
-        'ffmpeg':s.get_setting('ffmpeg','ffmpeg'),
-    }
+    return {**platform_models.catalog(), 'read_only':not principal.is_admin,
+            'ffmpeg':s.get_setting('ffmpeg','ffmpeg') if principal.is_admin else None}
 
 @app.put('/api/settings')
 async def update_settings(request:Request):
+    if not identity.current().is_admin:
+        raise HTTPException(403,'需要平台管理员权限')
     body=await request.json()
-    if 'providers' in body:
-        old={p['id']:p for p in s.get_setting('providers',[])}
-        for p in body['providers']:
-            masked_key_set=bool(p.pop('api_key_set',False))
-            p.pop('auto_start',None)
-            if not p.get('id') or p.get('type') not in ('openai','comfy','maestro','video_api','minimax','replicate','volcengine_ark','volcengine_speech','hc_atom','runninghub'): raise ValueError('模型服务配置无效')
-            if p.get('type')=='volcengine_ark':
-                from .providers.volcengine_ark import DEFAULT_BASE_URL
-                p['url']=p.get('url') or DEFAULT_BASE_URL
-                # Ark is always a paid remote provider.  Do not trust a client
-                # supplied `local` flag to bypass the cloud confirmation gate.
-                p['local']=False
-                p.pop('kind',None)
-                if not isinstance(p.get('models'),dict):raise ValueError('火山方舟模型配置无效')
-            if p.get('type')=='volcengine_speech':
-                from .providers.volcengine_speech import DEFAULT_RESOURCE_ID, DEFAULT_URL
-                p['url']=p.get('url') or DEFAULT_URL
-                p['local']=False
-                p['kind']='audio'
-                p['resource_id']=str(p.get('resource_id') or DEFAULT_RESOURCE_ID).strip()
-            if p.get('type')=='hc_atom':
-                from .providers.hc_atom import DEFAULT_BASE_URL
-                p['url']=p.get('url') or DEFAULT_BASE_URL
-                p['local']=False
-                p.pop('kind',None)
-                if not isinstance(p.get('models'),dict):raise ValueError('幻场 AI 模型配置无效')
-                public_base_url=str(p.get('public_base_url') or '').strip().rstrip('/')
-                if public_base_url:
-                    parsed_public=urlparse(public_base_url)
-                    if parsed_public.scheme not in ('http','https') or not parsed_public.netloc or parsed_public.username:
-                        raise ValueError('幻场 AI 公网素材地址必须是有效的 HTTP(S) 地址')
-                    p['public_base_url']=public_base_url
-            if p.get('type')=='runninghub':
-                from .providers.runninghub import DEFAULT_BASE_URL
-                p['url']=p.get('url') or DEFAULT_BASE_URL
-                p['local']=False
-                p.pop('kind',None)
-                if not isinstance(p.get('models'),dict):raise ValueError('RunningHub 模型配置无效')
-            url=p.get('url','')
-            if urlparse(url).scheme not in ('http','https') or urlparse(url).username: raise ValueError('请输入 HTTP(S) 服务地址')
-            # A masked settings round-trip may omit the key or send an empty
-            # field with api_key_set=true.  Both mean "keep the saved key".
-            if 'api_key' not in p or (not p.get('api_key') and masked_key_set):
-                p['api_key']=old.get(p['id'],{}).get('api_key','')
-        s.set_setting('providers',body['providers'])
-    for key in ('ffmpeg',):
-        if key in body: s.set_setting(key,body[key])
-    with s.db() as c:
-        identity.audit(c,'platform_settings.update','settings','global',payload={'keys':sorted(body)})
+    if isinstance(body,dict) and 'providers' in body:
+        raise HTTPException(410,'旧供应商配置入口已退役，请使用平台模型管理')
+    if not isinstance(body,dict) or set(body)-{'ffmpeg'}:
+        raise ValueError('设置字段无效')
+    if 'ffmpeg' in body:
+        if not isinstance(body['ffmpeg'],str) or not body['ffmpeg'].strip() or len(body['ffmpeg'])>2048:
+            raise ValueError('FFmpeg 路径无效')
+        with s.db() as c:
+            c.execute("""INSERT INTO settings(key,value) VALUES('ffmpeg',%s)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value""",(s.dumps(body['ffmpeg']),))
+            identity.audit(c,'platform_settings.update','settings','global',payload={'keys':['ffmpeg']})
     return settings()
+
+def retired_provider_entry():
+    if not identity.current().is_admin:
+        raise HTTPException(403,'需要平台管理员权限')
+    raise HTTPException(410,'旧供应商入口已退役，请使用平台模型管理；未发起上游调用')
 
 @app.get('/api/providers/{provider_id}/models')
 def provider_models(provider_id:str,kind:str|None=None):
-    import httpx
-    provider=next((p for p in s.get_setting('providers',[]) if p['id']==provider_id),None)
-    if not provider: raise ValueError('模型服务不存在')
-    headers={'Authorization':'Bearer '+provider['api_key']} if provider.get('api_key') else {}
-    url=provider['url'].rstrip('/')
-    if provider['type']=='volcengine_ark':
-        from .providers.volcengine_ark import list_models
-        models=list_models(provider)
-        if kind in ('text','image','video'):
-            models=[model for model in models if model['kind']==kind]
-        return {'models':models,'status':'ready'}
-    if provider['type']=='hc_atom':
-        from .providers.hc_atom import list_models
-        models=list_models(provider)
-        if kind in ('text','image','video'):
-            models=[model for model in models if model['kind']==kind]
-        return {'models':models,'status':'ready'}
-    if provider['type']=='runninghub':
-        from .providers.runninghub import list_models
-        models=list_models(provider)
-        if kind in ('text','image','video'):
-            models=[model for model in models if model['kind']==kind]
-        return {'models':models,'status':'ready'}
-    try:
-        with httpx.Client(timeout=20,trust_env=not provider.get('local'),headers=headers) as client:
-            if provider['type']=='maestro':
-                response=client.get(url+'/api/v1/models'); response.raise_for_status()
-                value=response.json()
-                from .capabilities import maestro_model
-                models=[maestro_model(m) for m in value.get('models',[])]
-                return {'models':[m for m in models if provider.get('kind') in m['kinds'] or not provider.get('kind')]}
-            if provider['type']=='openai':
-                response=client.get(url+'/models'); response.raise_for_status()
-                return {'models':[{'id':m['id'],'name':m.get('name',m['id'])} for m in response.json().get('data',[])]}
-            if provider['type']=='comfy':
-                response=client.get(url+'/system_stats'); response.raise_for_status()
-                return {'models':[{'id':provider.get('model') or 'workflow','name':provider.get('name','ComfyUI 工作流')}],'status':'ready'}
-            return {'models':[{'id':provider.get('model',''),'name':provider.get('model','配置的视频模型')}]}
-    except httpx.HTTPError as exc:
-        raise HTTPException(502,'模型服务连接失败，请确认服务地址、启动状态和密钥') from exc
+    retired_provider_entry()
 
 @app.post('/api/providers/{provider_id}/verify')
 def verify_provider(provider_id:str):
-    provider=next((p for p in s.get_setting('providers',[]) if p['id']==provider_id),None)
-    if provider and provider.get('type')=='volcengine_speech':
-        from .providers.volcengine_speech import verify
-        return verify(provider)
-    if provider and provider.get('type')=='runninghub':
-        from .providers.runninghub import verify
-        return verify(provider)
-    if not provider or provider.get('type') not in ('volcengine_ark','hc_atom'):raise ValueError('统一模型服务配置不存在')
-    if provider.get('type')=='hc_atom':
-        from .providers.hc_atom import list_models
-        service='幻场 AI'
-    else:
-        from .providers.volcengine_ark import list_models
-        service='ARK'
-    models=list_models(provider)
-    counts={kind:sum(model['kind']==kind for model in models) for kind in ('text','image','video')}
-    return {'status':'ready','message':f'{service} API Key 鉴权通过，读取到 {len(models)} 个适用模型','models':models,'counts':counts}
+    retired_provider_entry()
 
 @app.post('/api/providers/{provider_id}/test')
 def test_provider(provider_id:str,kind:str='text'):
-    provider=next((p for p in s.get_setting('providers',[]) if p['id']==provider_id),None)
-    if not provider or provider.get('type') not in ('volcengine_ark','hc_atom','runninghub'):raise ValueError('统一模型服务配置不存在')
-    if provider.get('type')=='runninghub':
-        from .providers.runninghub import check_configured_model
-    elif provider.get('type')=='hc_atom':
-        from .providers.hc_atom import check_configured_model
-    else:
-        from .providers.volcengine_ark import check_configured_model
-    return check_configured_model(provider,kind)
+    retired_provider_entry()
 
 class JobCreate(StrictBody):
     node_id:str
@@ -1285,29 +1178,23 @@ def reference_asset(pid,aid):
 
 @app.get('/api/prompt-library')
 def prompt_library():
-    return s.get_setting('prompt_library',{'revision':0,'templates':[]})
+    from .prompt_library import read
+    return read()
 
 @app.put('/api/prompt-library/{tid}')
 def save_prompt_template(tid:str,body:PromptTemplateSave):
-    if len(tid)>100 or body.kind not in ('text','storyboard','image','video'):raise ValueError('模板类型或编号无效')
-    with s.db() as c:
-        c.execute("""INSERT INTO settings(key,value) VALUES('prompt_library',%s)
-            ON CONFLICT(key) DO NOTHING""",(s.dumps({'revision':0,'templates':[]}),))
-        row=c.execute("SELECT value FROM settings WHERE key='prompt_library' FOR UPDATE").fetchone()
-        library=json.loads(row['value'])
-        if library['revision']!=body.revision:raise HTTPException(409,'模板库已在另一页面更新，请刷新后保存；当前草稿仍保留')
-        old=next((t for t in library['templates'] if t['id']==tid),None)
-        history=old.get('history',[]) if old else []
-        if old:history=[{k:v for k,v in old.items() if k!='history'},*history][:20]
-        template={'id':tid,'name':body.name,'kind':body.kind,'content':body.content,'deleted':body.deleted,'version':old['version']+1 if old else 1,'updated':time.time(),'history':history}
-        library['templates']=[template,*[t for t in library['templates'] if t['id']!=tid]]
-        if len(library['templates'])>500:raise ValueError('模板库最多保存 500 个模板')
-        library['revision']+=1
-        c.execute("UPDATE settings SET value=%s WHERE key='prompt_library'",(s.dumps(library),))
-    return library
+    raise HTTPException(410, '提示词写入已移至平台管理接口')
+
+
+@app.put('/api/admin/prompt-templates/{tid}')
+def save_platform_prompt_template(tid:str,body:PromptTemplateSave):
+    from .prompt_library import save
+    return save(tid,body)
 
 def create_job_record(c,pid,body):
     from .job_contracts import freeze_prompt_contract
+    model_validation.reject_private_overrides(body.input)
+    submitted_input=body.input
     body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
     old=c.execute('SELECT * FROM jobs WHERE submission_id=%s',(body.submission_id,)).fetchone()
@@ -1334,34 +1221,21 @@ def create_job_record(c,pid,body):
         state=read_project_state(c,pid)
         validate_visual_reference_job(
             state['document'] if state else {},body.node_id,body.kind,
-            body.input,s.get_setting('providers',[]),
+            body.input,platform_models.compiler_catalog(),
         )
-    provider_id=str(body.input.get('provider') or '').strip()
-    if body.kind!='export' and (not provider_id or provider_id=='local'):
-        raise ValueError('未配置外部模型服务，请先选择已连接的 Provider；系统不会自动回退到本地或其他付费模型')
-    selected = None
+    binding = selected = None
     if body.kind!='export':
-        configured={p['id']:p for p in s.get_setting('providers',[])}
-        selected=configured.get(provider_id)
-        if not selected: raise ValueError('所选外部模型服务未配置；系统不会自动切换到其他服务')
-        if selected.get('type') in ('volcengine_ark','hc_atom','runninghub'):
-            # Defend jobs created from settings saved by an older build.
-            selected={**selected,'local':False}
-        if selected.get('kind') and selected['kind']!=('text' if body.kind=='storyboard' else body.kind):raise ValueError('模型服务用途与节点不匹配，请选择适用服务')
-        if body.kind=='audio' and selected.get('type')!='volcengine_speech':raise ValueError('角色对白请选择豆包语音服务')
-        if selected.get('type')=='volcengine_ark':
-            from .providers.volcengine_ark import model_for
-            if not model_for(selected,body.kind):raise ValueError('请先配置火山方舟对应类型的模型 ID')
-        if selected.get('type')=='hc_atom':
-            from .providers.hc_atom import model_for
-            if not model_for(selected,body.kind):raise ValueError('请先配置幻场 AI 对应类型的模型 ID')
-        if selected.get('type')=='runninghub':
-            from .providers.runninghub import model_for
-            if not model_for(selected,body.kind):raise ValueError('请先配置 RunningHub 对应类型的模型')
+        model_id=body.input.get('model_id')
+        if not isinstance(model_id,str) or not model_id.strip():
+            raise ValueError('请选择已发布的平台 model_id；不会自动回退其他模型')
+        state=read_project_state(c,pid)
+        binding=platform_models.resolve(c,model_id,body.kind,submitted_input,
+            document=state['document'] if state else {},node_id=body.node_id)
+        selected=platform_models.config_for_binding(c,binding)
     if selected and selected['type']=='minimax':
         from .minimax_video import payload
         if body.kind!='video':raise ValueError('MiniMax 原生服务仅支持视频节点')
-        payload(body.input,selected)
+        payload({**body.input,**binding.parameters,'parameters':binding.parameters},selected)
     references=list(body.input.get('asset_ids',[]))
     if body.input.get('end_asset_id'):references.append(body.input['end_asset_id'])
     if selected and selected.get('type')=='volcengine_ark':
@@ -1376,7 +1250,7 @@ def create_job_record(c,pid,body):
         if body.kind=='video' and body.input.get('end_asset_id') and ark_video_reference_count!=1:
             raise ValueError('使用火山方舟尾帧时必须同时指定一张首帧')
         if body.kind=='video' and body.input.get('end_asset_id'):
-            capabilities=model_capabilities(selected,'video',body.input.get('model'))
+            capabilities=selected['capabilities']
             if capabilities.get('end_frame') is not True:
                 raise ValueError('所选火山方舟视频模型不支持尾帧控制')
         if body.kind=='image' and len(references)>max_image_references(selected):
@@ -1390,7 +1264,7 @@ def create_job_record(c,pid,body):
             raise ValueError('幻场 AI 图片任务最多提交 10 张参考图')
     if selected and selected.get('type')=='runninghub':
         from .providers.runninghub import model_capabilities
-        capabilities=model_capabilities(selected,body.kind,body.input.get('model'))
+        capabilities=selected['capabilities']
         if body.kind=='video' and body.input.get('end_asset_id') and not body.input.get('asset_ids'):
             raise ValueError('RunningHub 尾帧模式必须同时指定首帧')
         maximum=capabilities.get('max_references')
@@ -1402,6 +1276,36 @@ def create_job_record(c,pid,body):
         if selected and selected['type']=='minimax':
             from .minimax_video import first_frame
             first_frame(asset)
+    audio_ids=[]
+    for field in ('audio_asset_ids','audio_reference_ids','dialogue_audio_asset_ids'):
+        items=body.input.get(field,[])
+        if not isinstance(items,list) or any(not isinstance(aid,str) for aid in items):
+            raise ValueError('音频参考必须是素材 ID 列表')
+        audio_ids.extend(items)
+    dialogues=body.input.get('dialogue_audio',[])
+    if not isinstance(dialogues,list) or any(not isinstance(item,dict) for item in dialogues):
+        raise ValueError('对白音频引用无效')
+    audio_ids.extend(item.get('assetId') for item in dialogues)
+    for aid in audio_ids:
+        if not isinstance(aid,str) or reference_asset(pid,aid)['kind']!='audio':
+            raise ValueError('对白/音频参考必须属于当前作品且为音频素材')
+    dependencies=body.input.get('upstream_job_ids',[])
+    if not isinstance(dependencies,list) or any(not isinstance(jid,str) for jid in dependencies):
+        raise ValueError('上游任务引用无效')
+    for dependency in dependencies:
+        if not c.execute('SELECT id FROM jobs WHERE id=%s AND project_id=%s',(dependency,pid)).fetchone():
+            raise ValueError('不能引用其他制作集或不存在的上游任务')
+    for source in body.input.get('image_reference_sources',[]):
+        if not isinstance(source,dict):
+            raise ValueError('图像参考来源无效')
+        if source.get('type')=='asset':
+            if reference_asset(pid,source.get('asset_id'))['kind']!='image':
+                raise ValueError('图像参考必须为图像素材')
+        elif source.get('type')=='upstream_job':
+            if source.get('job_id') not in dependencies:
+                raise ValueError('图像来源必须属于本任务的已验证上游')
+        else:
+            raise ValueError('图像参考来源无效')
     owner=c.execute('''SELECT e.production_id,p.workspace_id FROM projects e
         JOIN productions p ON p.id=e.production_id WHERE e.id=%s''',(pid,)).fetchone()
     if not owner:raise HTTPException(404,'制作集不存在')
@@ -1410,32 +1314,52 @@ def create_job_record(c,pid,body):
     actor=identity.current(False)
     c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id if actor else None))
-    if selected:
-        c.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(selected)))
+    if binding:
+        platform_models.bind_job(c,jid,binding)
     return s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone())
+
+class AudioBatchCreate(StrictBody):
+    jobs:list[JobCreate]=Field(min_length=1,max_length=100)
+
+@app.post('/api/projects/{pid}/audio-jobs')
+def submit_audio_batch(pid:str,body:AudioBatchCreate):
+    project(pid)
+    if any(job.kind!='audio' for job in body.jobs):
+        raise ValueError('对白批次仅接受音频任务')
+    if len({job.submission_id for job in body.jobs})!=len(body.jobs):
+        raise ValueError('批次提交标识不能重复')
+    with s.db() as c:
+        # All validation, frozen bindings and events share one transaction.
+        results=[create_job_record(c,pid,job) for job in body.jobs]
+        for result in results:
+            s.event(pid,{'type':'job','id':result['id']},connection=c)
+    return {'jobs':results,'count':len(results)}
 
 @app.post('/api/projects/{pid}/jobs')
 def submit(pid:str,body:JobCreate):
+    model_validation.reject_private_overrides(body.input)
     saved_project=project(pid)
     with s.db() as c:
         project_state=read_project_state(c,pid)
     from .reference_compiler import compile_shot_image_input
     prepared_input=compile_shot_image_input(
         project_state['episode_document'],body.node_id,body.kind,body.input,
-        s.get_setting('providers',[]),
+        platform_models.compiler_catalog(),
         production_context=project_state['production_context'],
     )
     from .video_dialogue import bind_fixed_dialogue_audio, compile_shot_video_input
+    selected_provider=next((item for item in platform_models.compiler_catalog() if item.get('id')==prepared_input.get('model_id')),None)
     prepared_input=compile_shot_video_input(
         project_state['episode_document'],body.node_id,body.kind,prepared_input,
         production_context=project_state['production_context'],
+        parameter_rules=(selected_provider or {}).get('rules',{}),
     )
-    selected_provider=next((item for item in s.get_setting('providers',[]) if item.get('id')==prepared_input.get('provider')),None)
     if body.kind=='video' and selected_provider and selected_provider.get('type') in ('volcengine_ark','runninghub'):
         prepared_input=bind_fixed_dialogue_audio(
             project_state['episode_document'],body.node_id,body.kind,prepared_input,
             production_assets(saved_project['production_id'],kind='audio'),
             production_context=project_state['production_context'],
+            parameter_rules=selected_provider.get('rules',{}),
         )
     if body.kind in ('text','storyboard') and prepared_input.get('target_duration') is None:
         prepared_input={**prepared_input,'target_duration':saved_project['document'].get('duration',15)}
@@ -1493,8 +1417,7 @@ class ChapterTrashCreate(StrictBody):
 class SourceExtractionCreate(StrictBody):
     project_id:str
     chapter_ids:list[str]=Field(min_length=1,max_length=500)
-    provider:str
-    model:str
+    model_id:str=Field(min_length=1,max_length=200)
     allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=80)
 
@@ -1709,7 +1632,7 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
             chapter=chapter_map[chapter_id]
             job_body=JobCreate(node_id='source-chapter:'+chapter_id,kind='text',
                 submission_id=body.submission_id+':'+chapter_id[:24],input={
-                    'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
+                    'model_id':body.model_id,'allow_cloud':body.allow_cloud,
                     'stage':'source_analysis','prompt':f'章节标题：{chapter["title"]}\n\n原文：\n{chapter["content"]}',
                     'source_event_extraction':{'productionId':production_id,'chapterId':chapter_id,'chapterRevision':chapter['revision']},
             })
@@ -1730,8 +1653,7 @@ class RevisionAction(StrictBody):
 
 class TextGenerationCreate(StrictBody):
     project_id:str
-    provider:str
-    model:str=''
+    model_id:str=Field(min_length=1,max_length=200)
     allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=100)
 
@@ -1751,8 +1673,7 @@ class ScriptSave(StrictBody):
 
 class ScriptGenerationCreate(StrictBody):
     episode_nos:list[int]=Field(min_length=1,max_length=500)
-    provider:str
-    model:str=''
+    model_id:str=Field(min_length=1,max_length=200)
     allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=100)
 
@@ -1856,8 +1777,8 @@ def generate_adaptation(production_id:str,body:TextGenerationCreate):
 商业字段必须服从总集数：freeEpisodes 范围为 0–{count}；firstPaywallEpisode 范围为 1–{after}，其中 {after} 表示全剧不设付费集；每个付费卡点 episodeNo 范围为 1–{count}。
 目标规格：'''.format(count=episode_count, after=episode_count + 1)+s.dumps(format_value)+'\n原著事件：\n'+s.dumps(sources)
         job_body=JobCreate(node_id='adaptation:'+production_id,kind='text',submission_id=body.submission_id,input={
-            'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
-            'stage':'adaptation_generation','prompt':prompt,'max_tokens':12000,
+            'model_id':body.model_id,'allow_cloud':body.allow_cloud,
+            'stage':'adaptation_generation','prompt':prompt,
             'adaptation_generation':{
                 'productionId':production_id,'adaptationFingerprint':adaptation_fingerprint(context),
                 'sourceFingerprint':source_fingerprint(sources),'sourceEventIds':[item['id'] for item in sources],
@@ -1991,8 +1912,8 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
                 '\n原著章节：'+s.dumps(chapters)+'\n本集现有剧本（为空则首次生成）：'+s.dumps(script_to_api(script))
             job_body=JobCreate(node_id='episode-script:'+project_row['id'],kind='text',
                 submission_id=body.submission_id+f':{episode_no:03d}',input={
-                    'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
-                    'stage':'script_generation','prompt':prompt,'max_tokens':12000,
+                    'model_id':body.model_id,'allow_cloud':body.allow_cloud,
+                    'stage':'script_generation','prompt':prompt,
                     'episode_script_generation':{
                         'productionId':production_id,'episodeNo':episode_no,
                         'scriptRevision':script['revision'],'adaptationFingerprint':fingerprint,
@@ -2006,7 +1927,9 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
 @app.post('/api/projects/{pid}/run')
 async def run_workflow(pid:str,request:Request):
     from .workflows import execution_plan
-    body=await request.json();p=project(pid)
+    body=await request.json()
+    model_validation.reject_private_overrides(body)
+    p=project(pid)
     with s.db() as c:
         project_state=read_project_state(c,pid)
     group=body.get('submission_id')
@@ -2015,15 +1938,14 @@ async def run_workflow(pid:str,request:Request):
     plan=execution_plan(
         p['document'],body.get('node_ids'),body.get('include_descendants') is True,exact,
     )
-    providers={x['id']:x for x in s.get_setting('providers',[])}
+    providers={x['id']:x for x in platform_models.compiler_catalog()}
     # Validate the entire batch before submitting its first runnable node.
     for node,_ in plan:
         data=node.get('data',{})
         if data.get('kind') not in ('text','storyboard','image','video'): continue
-        provider_id=str(data.get('provider') or '').strip()
-        provider=providers.get(provider_id)
-        if not provider_id or provider_id=='local' or not provider:
-            raise ValueError('部分节点未配置外部模型服务；系统不会自动回退或切换到其他服务')
+        model_validation.reject_private_overrides(data)
+        if not providers.get(data.get('model_id')):
+            raise ValueError('部分节点未选择可用的平台模型；不会自动回退或切换服务')
     for node,parents in plan:
         data=node.get('data',{})
         if data.get('kind') not in ('text','storyboard','image','video'): continue
@@ -2064,6 +1986,7 @@ async def run_workflow(pid:str,request:Request):
         data=compile_shot_video_input(
             project_state['episode_document'],node['id'],kind,data,
             production_context=project_state['production_context'],
+            parameter_rules=(providers.get(data.get('model_id')) or {}).get('rules',{}),
         )
         film_bible_compiled=bool(data.get('reference_compiler'))
         manual_assets=list(data.get('asset_ids',[]))
@@ -2112,15 +2035,16 @@ async def run_workflow(pid:str,request:Request):
             generated_image_parents=0
         for aid in data['asset_ids']:
             reference_asset(pid,aid)
-        provider=providers.get(data.get('provider'))
+        provider=providers.get(data.get('model_id'))
         if provider and provider.get('type')=='volcengine_ark':
             if kind=='video':
                 data=bind_fixed_dialogue_audio(
                     project_state['episode_document'],node['id'],kind,data,
                     available_audio_assets,
                     production_context=project_state['production_context'],
+                    parameter_rules=provider.get('rules',{}),
                 )
-            if kind=='video':
+            if kind=='video' and 'resolution' in provider.get('rules',{}):
                 data['parameters']={
                     'resolution':p['document'].get('videoResolution','720p'),
                     **(data.get('parameters') or {}),
@@ -2151,11 +2075,13 @@ async def run_workflow(pid:str,request:Request):
                     project_state['episode_document'],node['id'],kind,data,
                     available_audio_assets,
                     production_context=project_state['production_context'],
+                    parameter_rules=provider.get('rules',{}),
                 )
-                data['parameters']={
-                    'resolution':p['document'].get('videoResolution','720p'),
-                    **(data.get('parameters') or {}),
-                }
+                if 'resolution' in provider.get('rules',{}):
+                    data['parameters']={
+                        'resolution':p['document'].get('videoResolution','720p'),
+                        **(data.get('parameters') or {}),
+                    }
         if provider and provider.get('type')=='minimax':
             # Hailuo accepts exactly one initial image.  Detect multiple
             # upstream image branches before any expensive parent job starts.
@@ -2165,7 +2091,8 @@ async def run_workflow(pid:str,request:Request):
             if not parents: raise ValueError(f'节点 {data.get("label",node["id"])} 缺少输入')
             data['prompt']={'text':'根据上游信息编写剧本','storyboard':'将上游剧本拆解为结构化分镜','image':'生成上游描述的电影画面','video':'根据上游画面与描述生成动态镜头'}[kind]
         data['project_style']=p['document'].get('style','')
-        data['ratio']=(p['document'].get('videoRatio') or p['document'].get('ratio','16:9')) if kind=='video' else p['document'].get('ratio','16:9')
+        if kind in ('image','video') and provider and 'ratio' in provider.get('rules',{}):
+            data['ratio']=(p['document'].get('videoRatio') or p['document'].get('ratio','16:9')) if kind=='video' else p['document'].get('ratio','16:9')
         if kind in ('text','storyboard'):
             data['target_duration']=data.get('target_duration') or p['document'].get('duration',15)
         if kind=='storyboard':
@@ -2221,28 +2148,33 @@ def cancel(jid:str):
         # Re-read after cancellation so a provider handle attached between the
         # initial read and this state change is visible to remote cancellation.
         job=read_job(jid)
-        with s.db() as c:
-            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(jid,)).fetchone()
-        if snapshot:
-            provider=json.loads(snapshot['provider'])
-            if provider.get('type')=='replicate':
+        provider=None
+        if job.get('provider_job_id') and job['kind']!='export':
+            try:
+                with s.db() as c:
+                    provider=platform_models.load_job_provider(c,jid,remote=True)
+            except ValueError:
+                s.cancelled_phase(jid,'本地已取消；原模型凭证/配置不可用，未换账号取消远端任务，请人工核对')
+        from .provider_redaction import protect
+        with protect(provider.get('api_key','') if provider else ''), provider_egress.before_call(lambda: platform_models.check_job_call(jid)):
+            if provider and provider.get('type')=='replicate':
                 from .replicate_api import cancel as cancel_replicate
                 cancel_replicate(job,provider)
-            elif provider.get('type')=='volcengine_ark':
+            elif provider and provider.get('type')=='volcengine_ark':
                 from .providers.volcengine_ark import cancel as cancel_ark
                 remote_cancelled=cancel_ark(job,provider)
                 if remote_cancelled is True:
                     s.cancelled_phase(jid,'已取消本地等待，并已请求供应商取消远端任务')
                 elif remote_cancelled is False:
                     s.cancelled_phase(jid,'本地已取消；供应商可能继续生成并产生费用')
-            elif provider.get('type')=='hc_atom':
+            elif provider and provider.get('type')=='hc_atom':
                 from .providers.hc_atom import cancel as cancel_hc
                 remote_cancelled=cancel_hc(job,provider)
                 if remote_cancelled is True:
                     s.cancelled_phase(jid,'已取消本地等待，并已请求幻场 AI 取消远端任务')
                 elif remote_cancelled is False:
                     s.cancelled_phase(jid,'本地已取消；幻场 AI 远端任务可能继续生成并产生费用')
-            elif provider.get('type')=='runninghub':
+            elif provider and provider.get('type')=='runninghub':
                 s.cancelled_phase(jid,'本地已取消；RunningHub 远端任务可能继续生成并产生费用')
         with s.db() as c:
             scope=c.execute('SELECT workspace_id,production_id FROM jobs WHERE id=%s',(jid,)).fetchone()
@@ -2258,8 +2190,7 @@ def resume(jid:str):
         if not job: raise HTTPException(404,'任务不存在')
         if job['status'] in ('queued','running','succeeded'): return s.unpack(job)
         if job['status']!='interrupted': raise HTTPException(409,'只有中断任务可以恢复查询')
-        snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(jid,)).fetchone()
-        provider=json.loads(snapshot['provider']) if snapshot else {}
+        provider=platform_models.load_job_provider(c,jid,remote=bool(job['provider_job_id'])) if job['kind']!='export' else {}
         if job['provider_job_id']:
             if provider.get('type') not in ('maestro','comfy','video_api','minimax','replicate','volcengine_ark','hc_atom','runninghub'):
                 raise HTTPException(409,'此任务的上游服务不支持恢复查询，请核对服务配置')

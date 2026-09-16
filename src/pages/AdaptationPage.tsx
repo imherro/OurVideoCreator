@@ -35,11 +35,10 @@ export function AdaptationPage({
     () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
   );
-  const configuredDefault = textProviders.find((provider) => provider.id === defaultTarget?.providerId);
+  const configuredDefault = textProviders.find((provider) => provider.id === defaultTarget?.model_id);
   const defaultProviderId = configuredDefault?.id || "";
-  const defaultModelId = defaultTarget?.modelId || configuredDefault?.models?.text || configuredDefault?.model || "";
+  const defaultModelId = configuredDefault?.id || "";
   const [providerId, setProviderId] = useState(defaultProviderId);
-  const [model, setModel] = useState(defaultModelId);
 
   async function load() {
     const [value, sourceChapters] = await Promise.all([
@@ -54,8 +53,7 @@ export function AdaptationPage({
   useEffect(() => { setDraft(null); setActive(1); void load().catch(report); }, [productionId, refreshKey]);
   useEffect(() => {
     setProviderId(defaultProviderId);
-    setModel(defaultModelId);
-  }, [productionId, defaultTarget?.providerId, defaultTarget?.modelId]);
+  }, [productionId, defaultTarget?.model_id, defaultTarget?.model_id]);
   function run(action: () => Promise<void>) {
     setBusy(true);
     void action().catch(report).finally(() => setBusy(false));
@@ -86,9 +84,9 @@ export function AdaptationPage({
   async function generate() {
     if (!draft) return;
     const provider = textProviders.find((item) => item.id === providerId);
-    if (!provider) throw new Error("请先为作品配置外部文本 Provider；系统不会自动选择其他付费模型");
-    const modelId = model || provider?.models?.text || provider?.model || "";
-    if (!modelId) throw new Error("请填写文本模型 ID");
+    if (!provider) throw new Error("请先为作品配置平台文本模型；系统不会自动选择其他付费模型");
+    const modelId = provider?.id || "";
+    if (!modelId) throw new Error("请选择已发布的平台文本模型");
     if (!window.confirm(`将依据 ${draft.sourceEventCount} 条原著事件重新生成完整改编策划。\n服务：${provider.name}\n模型：${modelId}\n生成结果会进入待审核状态。确认创建文本任务？`)) return;
     const episodePlans = createEpisodePlans(draft.adaptationPlan.format.episodeCount, draft.adaptationPlan.format.targetDuration, draft.episodePlans);
     const saved = await request(`/productions/${productionId}/adaptation`, {
@@ -99,7 +97,7 @@ export function AdaptationPage({
     onRevision(saved.revision);
     await request(`/productions/${productionId}/adaptation/generate`, {
       method: "POST",
-      body: JSON.stringify({ project_id: projectId, provider: providerId, model: modelId, submission_id: `adaptation-${Date.now()}` }),
+      body: JSON.stringify({ project_id: projectId, model_id: modelId, submission_id: `adaptation-${Date.now()}` }),
     });
     notify("已创建改编策划任务；完成后本页会自动刷新");
   }
@@ -138,7 +136,7 @@ export function AdaptationPage({
       </article>
       <MonetizationEditor draft={draft} setDraft={setDraft} />
     </main><aside className="episode-plan-list"><h3>分集导航</h3>{draft.episodePlans.map((item: EpisodePlan) => <button key={item.episodeNo} className={active === item.episodeNo ? "active" : ""} onClick={() => setActive(item.episodeNo)}><span>EP{String(item.episodeNo).padStart(2, "0")}</span><small className={item.status}>{STATUS_LABELS[item.status] || item.status}</small></button>)}</aside></div>
-    <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => { setProviderId(e.target.value); const p = textProviders.find((x) => x.id === e.target.value); setModel(p?.models?.text || p?.model || ""); }}><option value="" disabled>请选择外部 Provider</option>{textProviders.map((item) => <option key={item.id} value={item.id}>外部 API · {item.name}</option>)}</select></label><label>模型<input value={model} placeholder="外部模型 ID" onChange={(e) => setModel(e.target.value)} /></label>{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
+    <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => setProviderId(e.target.value)}><option value="" disabled>请选择平台模型</option>{textProviders.map((item) => <option key={item.id} value={item.id}>外部 API · {item.name}</option>)}</select></label>{!textProviders.length&&<p className="error">暂无可用平台文本模型，请联系管理员。</p>}{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
   </section>;
 }
 

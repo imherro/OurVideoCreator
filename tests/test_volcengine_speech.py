@@ -1,3 +1,4 @@
+from tests.egress_helpers import mock_egress
 import base64
 import json
 import time
@@ -62,18 +63,14 @@ def test_speech_v3_sse_uses_fixed_voice_and_registers_dialogue(monkeypatch):
         return httpx.Response(200, text=stream)
 
     original = httpx.Client
-    monkeypatch.setattr(
-        httpx,
-        'Client',
-        lambda **kwargs: original(**kwargs, transport=httpx.MockTransport(respond)),
-    )
+    mock_egress(monkeypatch,respond)
     monkeypatch.setattr(common, 'probe', lambda _path: {'duration': 1.25, 'has_audio': True})
     worker = WorkerStub()
     job = {'id': job_id, 'project_id': project_id, 'node_id': 'dialogue:1', 'input': job_input}
     result = volcengine_speech.synthesize(
         worker,
         job,
-        {'api_key': 'speech-key', 'resource_id': 'seed-tts-2.0'},
+        {'url':'https://openspeech.bytedance.com','api_key': 'speech-key', 'resource_id': 'seed-tts-2.0'},
     )
 
     assert captured['headers']['x-api-key'] == 'speech-key'

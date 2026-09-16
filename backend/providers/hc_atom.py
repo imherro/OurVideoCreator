@@ -10,6 +10,7 @@ from urllib.parse import quote
 import httpx
 
 from .. import store as s
+from .. import provider_egress
 from . import common
 
 
@@ -22,10 +23,8 @@ _asset_library_lock = threading.RLock()
 
 def _root(provider):
     value = str(provider.get('url') or DEFAULT_BASE_URL).rstrip('/').removesuffix('/v1')
-    # The former ai-aigc host accepts requests but misroutes V3 video bodies and
-    # reports that their top-level model field is missing. Keep saved projects
-    # working while directing them to the gateway documented for V3.
-    return DEFAULT_BASE_URL if value == LEGACY_BASE_URL else value
+    # The administrator owns the exact frozen origin; no legacy host rewrites.
+    return value
 
 
 def text_base_url(provider):
@@ -94,7 +93,7 @@ def _catalog_kind(model_id, provider, item=None):
 def list_models(provider):
     """Read the authenticated catalogue. This endpoint does not run a model."""
     try:
-        with httpx.Client(timeout=30, headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=30, headers=_headers(provider), trust_env=True) as client:
             value = _checked(client.get(_root(provider) + '/v1/models'))
     except httpx.HTTPError as exc:
         raise ValueError('幻场 AI 连接失败，请检查网络、服务地址和代理设置') from exc
@@ -410,7 +409,7 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
         raise ValueError('幻场 Seedance 当前尚未开放尾帧绑定，请清除尾帧')
     path = _root(provider) + '/v3/video/tasks'
     remote = job.get('provider_job_id')
-    with httpx.Client(timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
         if not remote:
             requested = float(params.get('duration') or job['input'].get('duration') or 5)
             submitted = _seedance_duration(model, requested)
@@ -452,13 +451,13 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
 
 
 def generate_image(worker, job, provider):
-    model = str(job['input'].get('model') or model_for(provider, 'image')).strip()
+    model = str(model_for(provider, 'image')).strip()
     if not model:
         raise ValueError('请填写幻场 AI 图片模型 ID')
     refs = common.assets_for(job)
     params = {**(provider.get('parameters') or {}).get('image', {}), **job['input'].get('parameters', {})}
     use_task = bool(refs) or params.get('mode') == 'task'
-    with httpx.Client(timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
         if use_task:
             path = _root(provider) + str(params.get('task_path') or '/image/generation/tasks')
             remote = job.get('provider_job_id')
@@ -502,7 +501,7 @@ def generate_image(worker, job, provider):
 
 
 def generate_video(worker, job, provider):
-    model = str(job['input'].get('model') or model_for(provider, 'video')).strip()
+    model = str(model_for(provider, 'video')).strip()
     if not model:
         raise ValueError('请填写幻场 AI 视频模型 ID')
     refs = common.assets_for(job)
@@ -514,7 +513,7 @@ def generate_video(worker, job, provider):
     if len(refs) > 1:
         raise ValueError('幻场 AI 通用视频接口最多提交一张参考图')
     path = _root(provider) + str(params.pop('task_path', None) or '/video/generation/tasks')
-    with httpx.Client(timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider, job.get('submission_id')), trust_env=True) as client:
         remote = job.get('provider_job_id')
         if not remote:
             body = {**params, 'model': model, 'prompt': job['input']['prompt']}
@@ -542,12 +541,12 @@ def cancel(job, provider):
         return False
     kind = job.get('kind')
     section = ((provider.get('parameters') or {}).get(kind) or {})
-    model = str((job.get('input') or {}).get('model') or model_for(provider, 'video')).strip()
+    model = str(model_for(provider, 'video')).strip()
     default = ('/image/generation/tasks' if kind == 'image' else
                '/v3/video/tasks' if _is_seedance(model) else '/video/generation/tasks')
     path = _root(provider) + str(section.get('task_path') or default) + '/' + quote(str(remote), safe='')
     try:
-        with httpx.Client(timeout=20, headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=20, headers=_headers(provider), trust_env=True) as client:
             return client.delete(path).is_success
     except httpx.HTTPError:
         return False

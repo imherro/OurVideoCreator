@@ -9,7 +9,7 @@ TIMING_MARKER = '[固定对白音轨时序]'
 DURATION_MARKER = '[镜头时长]'
 
 
-def _apply_duration(result, duration, planned_duration=None):
+def _apply_duration(result, duration, planned_duration=None, parameter_rules=None):
     duration = max(1, int(math.ceil(float(duration))))
     base = str(result.get('prompt') or '').split(DURATION_MARKER, 1)[0].rstrip()
     result['prompt'] = (
@@ -18,7 +18,8 @@ def _apply_duration(result, duration, planned_duration=None):
     )
     result['planned_shot_duration'] = float(planned_duration if planned_duration is not None else duration)
     result['shot_duration'] = duration
-    result['parameters'] = {**(result.get('parameters') or {}), 'duration': duration}
+    if parameter_rules is None or 'duration' in parameter_rules:
+        result['parameters'] = {**(result.get('parameters') or {}), 'duration': duration}
     return result
 
 
@@ -57,7 +58,7 @@ def compile_video_prompt(base_prompt, shot):
     return '\n'.join(lines).strip()
 
 
-def compile_shot_video_input(document, node_id, kind, input_value, production_context=None):
+def compile_shot_video_input(document, node_id, kind, input_value, production_context=None, parameter_rules=None):
     """Freeze canonical shot timing and dialogue into every video submission."""
     result = dict(input_value)
     if kind != 'video':
@@ -87,7 +88,7 @@ def compile_shot_video_input(document, node_id, kind, input_value, production_co
     result['prompt'] = compile_video_prompt(
         base_prompt, shot,
     )
-    result = _apply_duration(result, provider_duration, shot_duration)
+    result = _apply_duration(result, provider_duration, shot_duration, parameter_rules)
     dialogues = [item for item in (shot.get('dialogues') or []) if isinstance(item, dict) and str(item.get('text') or '').strip()]
     if dialogues:
         result['dialogue_projection'] = {
@@ -109,7 +110,7 @@ def compile_shot_video_input(document, node_id, kind, input_value, production_co
     return result
 
 
-def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, production_context=None):
+def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, production_context=None, parameter_rules=None):
     """Freeze current locked-voice dialogue takes into a video job."""
     result = dict(input_value)
     if kind != 'video':
@@ -154,6 +155,7 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
     shot_duration = max(
         float(shot.get('duration') or 0),
         float((result.get('parameters') or {}).get('duration') or 0),
+        float(result.get('shot_duration') or 0),
     )
     gaps = max(0, len(selected) - 1) * .12
     spoken_duration = sum(item[3] for item in selected) + gaps
@@ -165,7 +167,7 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
             'to': effective_duration,
             'spoken_duration': round(spoken_duration, 3),
         }
-    result = _apply_duration(result, effective_duration, shot_duration)
+    result = _apply_duration(result, effective_duration, shot_duration, parameter_rules)
     cursor = min(.3, max(0, (effective_duration - spoken_duration) / 2)) if effective_duration else .3
     frozen = []
     timing_lines = []
@@ -192,5 +194,7 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
     # Keep the source asset ids in the durable job input; the provider builds a
     # short timing-aware reference track immediately before submission.
     result['dialogue_audio_mode'] = 'seedance_reference'
+    if parameter_rules is not None and 'generate_audio' not in parameter_rules:
+        raise ValueError('所选平台模型未发布固定对白所需的 generate_audio 参数')
     result['parameters'] = {**(result.get('parameters') or {}), 'generate_audio': True}
     return result

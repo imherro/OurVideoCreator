@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 from . import database
+from .provider_redaction import scrub
 from .storage import LocalStorageBackend
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +33,7 @@ def stored_asset_path(stored_name):
     return STORAGE.resolve(stored_name)
 
 def dumps(value):
-    return json.dumps(value, ensure_ascii=False)
+    return json.dumps(scrub(value), ensure_ascii=False)
 
 def db():
     return database.transaction()
@@ -93,6 +94,7 @@ def unpack(row):
     return data
 
 def job_update(job_id, **fields):
+    fields = scrub(fields)
     allowed = {'status','result','provider_job_id','error','phase','progress','telemetry'}
     assert fields.keys() <= allowed
     if 'result' in fields:
@@ -112,6 +114,8 @@ def job_update(job_id, **fields):
 
 def attach_provider_job_id(job_id, provider_job_id):
     """Persist a paid upstream handle even if cancellation raced its response."""
+    if scrub(provider_job_id) != provider_job_id:
+        raise ValueError("供应商返回了不安全的任务编号，已阻止持久化，请人工核对远端状态")
     with db() as c:
         current=c.execute('SELECT project_id,status,provider_job_id FROM jobs WHERE id=%s FOR UPDATE',(job_id,)).fetchone()
         if not current:raise ValueError('任务不存在，无法保存供应商任务编号')
@@ -123,6 +127,7 @@ def attach_provider_job_id(job_id, provider_job_id):
     return current['status']
 
 def cancelled_phase(job_id, phase):
+    phase = scrub(phase)
     with db() as c:
         current=c.execute("SELECT project_id FROM jobs WHERE id=%s AND status='cancelled'",(job_id,)).fetchone()
         if not current:return False

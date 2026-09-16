@@ -43,9 +43,9 @@ def test_each_generation_dependency_changes_fingerprint_and_marks_stale():
     changed_style = copy.deepcopy(document); changed_style['filmBible']['styleVersion'] = 8
     variants.append(build_generation_fingerprint(changed_style, shot, 'ark', 'seedream', 1))
     variants.append(build_generation_fingerprint(document, shot, 'ark', 'seedream', 2))
-    variants.append(build_generation_fingerprint(document, shot, 'other-provider', 'seedream', 1))
+    assert build_generation_fingerprint(document, shot, 'ignored-legacy-provider', 'seedream', 1) == original
     variants.append(build_generation_fingerprint(document, shot, 'ark', 'other-model', 1))
-    assert len({item['hash'] for item in variants}) == 6
+    assert len({item['hash'] for item in variants}) == 5
     assert all(item['hash'] != original['hash'] for item in variants)
     assert fingerprint_status(original, original) == 'current'
     assert all(fingerprint_status(original, item) == 'stale' for item in variants)

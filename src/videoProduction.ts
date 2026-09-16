@@ -64,7 +64,7 @@ export function deriveVideoProductionRows(
     const endFrame = videoNode?.data?.end_asset_id ? assetMap.get(videoNode.data.end_asset_id) : undefined;
     const videoAsset = videoNode?.data?.assetId ? assetMap.get(videoNode.data.assetId) : undefined;
     const job = latestJob(jobs, videoNode?.id);
-    const provider = providerMap.get(videoNode?.data?.provider);
+    const provider = providerMap.get(videoNode?.data?.model_id);
     const profiles = document.filmBible?.voices?.profiles || {};
     const dialogues = Array.isArray(shot.dialogues) ? shot.dialogues.filter((item: Value) => String(item.text || "").trim()) : [];
     const dialogueAudioAssets: Value[] = [];
@@ -96,7 +96,7 @@ export function deriveVideoProductionRows(
       }
     }
     const catalogCapabilities = modelCapabilities[
-      [String(videoNode?.data?.provider || ""), String(videoNode?.data?.model || "")].join("\u0000")
+      String(videoNode?.data?.model_id || "")
     ];
     const endFrameSupported = Boolean(
       catalogCapabilities?.end_frame ??
@@ -111,8 +111,8 @@ export function deriveVideoProductionRows(
     else if (requiresInitialStateReview(imageNode?.data?.prompt) && !imageNode?.data?.state_reviewed)
       readinessReason = "首帧包含关键初始状态，尚未人工核验";
     else if (!String(videoNode.data?.prompt || "").trim()) readinessReason = "Video Prompt 为空";
-    else if (!provider || videoNode.data?.provider === "local") readinessReason = "尚未选择可用的视频 Provider";
-    else if (!String(videoNode.data?.model || "").trim()) readinessReason = "尚未选择视频模型";
+    else if (!provider || videoNode.data?.model_id === "local") readinessReason = "尚未选择可用的视频 Provider";
+    else if (!String(videoNode.data?.model_id || "").trim()) readinessReason = "尚未选择视频模型";
     else if (videoNode.data?.end_asset_id && !endFrameSupported) readinessReason = "当前模型不支持尾帧";
     else if (dialogueReadinessReason) readinessReason = dialogueReadinessReason;
 
@@ -160,8 +160,8 @@ export function videoSubmissionSummary(rows: VideoProductionRow[], uids: string[
   const targets = rows.filter((row) => selected.has(row.uid));
   const groups = new Map<string, { providerId: string; providerName: string; modelId: string; count: number; cloud: boolean }>();
   for (const row of targets) {
-    const providerId = String(row.videoNode?.data?.provider || "");
-    const modelId = String(row.videoNode?.data?.model || "");
+    const providerId = String(row.videoNode?.data?.model_id || "");
+    const modelId = String(row.videoNode?.data?.model_id || "");
     const key = `${providerId}\u0000${modelId}`;
     const current = groups.get(key);
     if (current) current.count += 1;

@@ -70,8 +70,7 @@ def generation_fingerprint_payload(
         'boundVisualVersions': _bound_versions(document, shot),
         'styleVersion': _style_version(document),
         'promptCompilerVersion': prompt_compiler_version,
-        'providerId': str(provider_id or ''),
-        'modelId': str(model_id or ''),
+        'model_id': str(model_id or ''),
     }
 
 

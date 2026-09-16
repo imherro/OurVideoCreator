@@ -50,7 +50,7 @@ def normalize_visual_bible(value,provider_id='',model_id=''):
         versions[version_id]={'id':version_id,'cardId':card_id,'version':1,'parentVersionId':None,'status':'draft',
           'spec':{'description':_text(item.get('description'),f'视觉卡 {key} 描述'),'attributes':[{'name':_text(x.get('name'),'属性名'),'value':_text(x.get('value'),'属性值')} for x in item.get('attributes',[]) if isinstance(x,dict)]},
           'invariants':[_text(x,'锁定项') for x in item.get('invariants',[])], 'references':[], 'createdAt':time.time(),
-          'provenance':{'source':'script_extraction','providerId':provider_id,'modelId':model_id}}
+          'provenance':{'source':'script_extraction','model_id':model_id}}
     for key,item in raw.items():
         parent=str(item.get('parent_key') or '').strip();card_id,version_id=keys[key]
         if parent:

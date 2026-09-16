@@ -8,6 +8,8 @@ import httpx
 import pytest
 from PIL import Image
 
+from tests.platform_model_helpers import bind_adapter_job
+from tests.egress_helpers import mock_egress
 from backend import store as s
 from backend import worker as worker_module
 from backend.providers import common, volcengine_ark as ark
@@ -25,7 +27,7 @@ def stored_job(kind, provider, provider_job_id=None):
         db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Ark test','{}',now,now))
         db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                    (jid,'ark-submit-'+uuid.uuid4().hex,pid,'node',kind,'running',s.dumps(inp),provider_job_id,now,now))
-        db.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(provider)))
+        bind_adapter_job(db,jid,kind,provider,inp)
     return {'id':jid,'project_id':pid,'node_id':'node','kind':kind,'status':'running','input':inp,'provider_job_id':provider_job_id}
 
 
@@ -77,7 +79,7 @@ def test_ark_text_reuses_openai_compatible_worker(monkeypatch):
         body=json.loads(request.read())
         assert body['model']=='doubao-text' and body['stream'] is True
         return httpx.Response(200,content=b'data: {"choices":[{"delta":{"content":"OK"}}]}\n\ndata: [DONE]\n\n')
-    monkeypatch.setattr(worker_module.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     assert Worker().execute(item)=={'text':'OK'}
 
 
@@ -90,7 +92,7 @@ def test_seedream_downloads_into_existing_asset_library(monkeypatch):
         assert body['model']=='seedream-image' and body['response_format']=='url'
         assert 'image' not in body
         return httpx.Response(200,json={'data':[{'url':'https://result.example/frame.png'}]})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common,'download_result',lambda job,url,ext:{'id':'asset-image','kind':'image','url':'/api/assets/asset-image/file'})
     assert Worker().execute(item)['assets'][0]['id']=='asset-image'
 
@@ -111,7 +113,7 @@ def test_seedream_resolves_ordered_local_references_as_data_uris(monkeypatch,cou
         assert [base64.b64decode(value.split(',',1)[1]) for value in references]==expected
         assert all(value.startswith('data:image/png;base64,') for value in references)
         return httpx.Response(200,json={'data':[{'url':'https://result.example/frame.png'}]})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common,'download_result',lambda job,url,ext:{'id':'asset-image','kind':'image'})
     assert Worker().execute(item)['assets'][0]['id']=='asset-image'
 
@@ -120,13 +122,12 @@ def test_seedream_reference_limit_is_provider_configurable(monkeypatch):
     p=provider();p['parameters']['image']={'max_references':1}
     item=stored_job('image',p)
     item['input']['asset_ids']=[add_image_asset(item,'一',(1,2,3))[0],add_image_asset(item,'二',(3,2,1))[0]]
-    with pytest.raises(ValueError,match='最多支持 1 张参考图'):
+    with pytest.raises(ValueError,match='参考图或数量超限'):
         Worker().execute(item)
 
 
 def test_seedance_persists_task_and_resume_only_queries(monkeypatch):
-    p=provider();item=stored_job('video',p)
-    item['input']['parameters']={'duration':2}
+    p=provider();p['parameters']['video']['duration']=2;item=stored_job('video',p)
     calls=[];downloads=[];original=httpx.Client
     def handle(request):
         calls.append((request.method,request.url.path))
@@ -137,7 +138,7 @@ def test_seedance_persists_task_and_resume_only_queries(monkeypatch):
             assert body['duration']==2
             return httpx.Response(200,json={'id':'ark-task-1','status':'queued'})
         return httpx.Response(200,json={'id':'ark-task-1','status':'succeeded','content':{'video_url':'https://result.example/movie.mp4'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     def download(job,url,ext,recoverable=False):
         downloads.append((url,ext,recoverable))
         return {'id':'asset-video','kind':'video'}
@@ -174,20 +175,20 @@ def test_seedance_25_short_shot_uses_provider_minimum_without_changing_plan():
 
 
 def test_seedance_25_sends_locked_dialogue_as_audio_reference(monkeypatch):
-    item=stored_job('video',provider())
+    configured=provider();configured['models']['video']='doubao-seedance-2-5-260628'
+    item=stored_job('video',configured)
     frame_id,_=add_image_asset(item,'对白镜头首帧',(24,48,96))
     item['input']['asset_ids']=[frame_id]
     item['input']['dialogue_audio']=[{'assetId':'voice-1','start':.3,'duration':1.2}]
     item['input']['dialogue_audio_asset_ids']=['voice-1']
     item['input']['dialogue_audio_mode']='seedance_reference'
-    item['input']['model']='doubao-seedance-2-5-260628'
     original=httpx.Client;submitted=[]
     def handle(request):
         if request.method=='POST':
             body=json.loads(request.read());submitted.append(body)
             return httpx.Response(200,json={'id':'dialogue-video'})
         return httpx.Response(200,json={'status':'succeeded','content':{'video_url':'https://result.example/dialogue.mp4'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(ark,'_dialogue_reference_audio',lambda job,duration:'data:audio/mpeg;base64,ZmFrZQ==')
     monkeypatch.setattr(common,'download_result',lambda job,url,ext,recoverable=False:{'id':'referenced-video','kind':'video'})
     worker=Worker();worker.halt=NoWait()
@@ -225,7 +226,7 @@ def test_seedance_legacy_dialogue_job_still_uses_exact_audio_mux(monkeypatch,tmp
             submitted.append(json.loads(request.read()))
             return httpx.Response(200,json={'id':'legacy-dialogue-video'})
         return httpx.Response(200,json={'status':'succeeded','content':{'video_url':'https://result.example/dialogue.mp4'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     downloaded=tmp_path/'silent.mp4';downloaded.write_bytes(b'video')
     monkeypatch.setattr(common,'download_file',lambda *args,**kwargs:downloaded)
     monkeypatch.setattr(ark,'_mux_fixed_dialogue',lambda worker,job,path:{'id':'fixed-voice-video','kind':'video'})
@@ -252,7 +253,7 @@ def test_seedance_sends_one_local_image_as_first_frame(monkeypatch):
             assert base64.b64decode(frame['image_url']['url'].split(',',1)[1])==expected
             return httpx.Response(200,json={'id':'i2v-task'})
         return httpx.Response(200,json={'id':'i2v-task','status':'succeeded','content':{'video_url':'https://result.example/i2v.mp4'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common,'download_result',lambda job,url,ext,recoverable=False:{'id':'i2v-result','kind':'video'})
     worker=Worker();worker.halt=NoWait()
     assert worker.execute(item)['assets'][0]['id']=='i2v-result'
@@ -262,7 +263,7 @@ def test_seedance_sends_one_local_image_as_first_frame(monkeypatch):
 def test_seedance_rejects_more_than_one_first_frame():
     item=stored_job('video',provider())
     item['input']['asset_ids']=[add_image_asset(item,'一',(1,2,3))[0],add_image_asset(item,'二',(3,2,1))[0]]
-    with pytest.raises(ValueError,match='最多接受一张首帧'):
+    with pytest.raises(ValueError,match='参考图或数量超限'):
         Worker().execute(item)
 
 
@@ -281,7 +282,7 @@ def test_seedance_sends_first_and_last_frames_in_role_order(monkeypatch):
             assert images==[first_bytes,last_bytes]
             return httpx.Response(200,json={'id':'fl2v-task'})
         return httpx.Response(200,json={'status':'succeeded','content':{'video_url':'https://result.example/fl2v.mp4'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common,'download_result',lambda job,url,ext,recoverable=False:{'id':'fl2v-result','kind':'video'})
     worker=Worker();worker.halt=NoWait()
     assert worker.execute(item)['assets'][0]['id']=='fl2v-result'
@@ -302,7 +303,7 @@ def test_seedance_cancel_requests_remote_delete(monkeypatch):
     def handle(request):
         calls.append((request.method,request.url.path))
         return httpx.Response(204)
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     assert ark.cancel({'provider_job_id':'task-to-cancel'},provider()) is True
     assert calls==[('DELETE','/api/v3/contents/generations/tasks/task-to-cancel')]
 
@@ -314,7 +315,7 @@ def test_seedance_poll_failure_keeps_existing_task_recoverable(monkeypatch,statu
     def handle(request):
         assert request.method=='GET'
         return httpx.Response(status,json={'error':{'message':'temporary'}})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     worker=Worker();worker.halt=NoWait()
     with pytest.raises(common.RecoverableProviderError):
         worker.execute(item)
@@ -351,7 +352,7 @@ def test_seedance_cancel_race_persists_remote_task_id(monkeypatch):
             s.job_update(item['id'],status='cancelled',phase='已请求取消')
             return httpx.Response(200,json={'id':'paid-task-after-cancel'})
         return httpx.Response(204)
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     worker=Worker();worker.halt=NoWait()
     with pytest.raises(InterruptedError):
         worker.execute(item)
@@ -365,9 +366,9 @@ def test_seedance_cancel_race_persists_remote_task_id(monkeypatch):
 def test_seedance_expired_status_is_explicit(monkeypatch):
     item=stored_job('video',provider(),'expired-task')
     original=httpx.Client
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(
+    mock_egress(monkeypatch,
         lambda request:httpx.Response(200,json={'id':'expired-task','status':'expired'})
-    )))
+    )
     worker=Worker();worker.halt=NoWait()
     with pytest.raises(ValueError,match='任务已过期'):
         worker.execute(item)
@@ -392,7 +393,7 @@ def test_model_catalog_is_grouped_and_custom_endpoints_keep_configured_kind(monk
             {'id':'ep-custom-video','name':'私有接入点'},
             {'id':'doubao-embedding-large','name':'Embedding'},
         ]})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     models=ark.list_models(p)
     assert {m['id']:m['kind'] for m in models}=={
         'doubao-seed-2-0-pro':'text',
@@ -407,9 +408,9 @@ def test_model_catalog_is_grouped_and_custom_endpoints_keep_configured_kind(monk
 def test_unlisted_custom_model_is_reported_without_generation(monkeypatch):
     p=provider();p['models']['image']='ep-not-returned'
     original=httpx.Client
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(
+    mock_egress(monkeypatch,
         lambda request:httpx.Response(200,json={'data':[]})
-    )))
+    )
     result=ark.check_configured_model(p,'image')
     assert result['status']=='unlisted'
     assert result['model']=='ep-not-returned'

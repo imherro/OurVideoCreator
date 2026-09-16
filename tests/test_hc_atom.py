@@ -4,6 +4,8 @@ import uuid
 
 import httpx
 
+from tests.platform_model_helpers import bind_adapter_job
+from tests.egress_helpers import mock_egress
 from backend import store as s
 from backend import worker as worker_module
 from backend.providers import common, hc_atom
@@ -29,10 +31,10 @@ def provider():
     }
 
 
-def test_legacy_gateway_is_redirected_to_documented_v3_host():
+def test_explicit_gateway_is_never_silently_redirected():
     configured = provider()
     configured['url'] = hc_atom.LEGACY_BASE_URL
-    assert hc_atom._root(configured) == hc_atom.DEFAULT_BASE_URL
+    assert hc_atom._root(configured) == hc_atom.LEGACY_BASE_URL
 
 
 def test_http_200_business_error_is_not_treated_as_created_task(monkeypatch):
@@ -45,7 +47,7 @@ def test_http_200_business_error_is_not_treated_as_created_task(monkeypatch):
     def handle(request):
         return httpx.Response(200, json={'code': 500, 'msg': '当前用户未分配该模型可用的厂商', 'data': None})
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     worker = Worker()
     worker.halt = NoWait()
     try:
@@ -69,7 +71,7 @@ def stored_job(kind, provider_value, provider_job_id=None):
             'INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (jid, 'hc-submit-' + uuid.uuid4().hex, pid, 'node', kind, 'running', s.dumps(inp), provider_job_id, now, now),
         )
-        db.execute('INSERT INTO job_private VALUES(%s,%s)', (jid, s.dumps(provider_value)))
+        bind_adapter_job(db,jid,kind,provider_value,inp)
     return {'id': jid, 'submission_id': 'hc-submit-test', 'project_id': pid, 'node_id': 'node', 'kind': kind, 'status': 'running', 'input': inp, 'provider_job_id': provider_job_id}
 
 
@@ -86,7 +88,7 @@ def test_catalog_is_read_only_and_classifies_unified_models(monkeypatch):
             {'id': 'wan2.5-i2i-preview'}, {'id': 'tencent-mps-superres'},
         ]})
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     models = hc_atom.list_models(provider())
     classified = {row['id']: row['kind'] for row in models}
     assert classified == {
@@ -106,7 +108,7 @@ def test_text_reuses_openai_compatible_streaming_endpoint(monkeypatch):
         assert body['model'] == 'qwen-text'
         return httpx.Response(200, content=b'data: {"choices":[{"delta":{"content":"OK"}}]}\n\ndata: [DONE]\n\n')
 
-    monkeypatch.setattr(worker_module.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     assert Worker().execute(item) == {'text': 'OK'}
 
 
@@ -124,7 +126,7 @@ def test_video_submit_poll_and_download(monkeypatch):
             return httpx.Response(200, json={'code': 200, 'data': {'taskId': 'vg-1', 'status': 'PENDING'}})
         return httpx.Response(200, json={'code': 200, 'data': {'taskId': 'vg-1', 'status': 'SUCCESS', 'progress': 100, 'resultUrl': 'https://result.example/video.mp4'}})
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common, 'download_result', lambda job, url, ext, recoverable=False: {'id': 'video-asset', 'kind': 'video'})
     worker = Worker()
     worker.halt = NoWait()
@@ -187,7 +189,7 @@ def test_seedance_uses_v3_signed_first_frame_and_minimum_duration(monkeypatch):
             'content': {'video_url': 'https://result.example/video.mp4'},
         })
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common, 'download_result', lambda job, url, ext, recoverable=False: {'id': 'v3-video', 'kind': 'video'})
     worker = Worker()
     worker.halt = NoWait()
@@ -242,7 +244,7 @@ def test_seedance_stops_before_video_submit_when_provider_asset_review_fails(mon
             }})
         raise AssertionError('video task must not be submitted before the provider asset is active')
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     worker = Worker()
     worker.halt = NoWait()
     try:
@@ -272,7 +274,7 @@ def test_seedance_retries_transport_reset_with_same_idempotency_key(monkeypatch)
             'content': {'video_url': 'https://result.example/video.mp4'},
         })
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common, 'download_result', lambda *args, **kwargs: {'id': 'retry-video'})
     worker = Worker()
     worker.halt = NoWait()
@@ -300,7 +302,7 @@ def test_reference_image_uses_async_task_protocol(monkeypatch):
             return httpx.Response(200, json={'code': 200, 'data': {'taskId': 'ig-1'}})
         return httpx.Response(200, json={'code': 200, 'data': {'status': 'SUCCESS', 'resultUrls': ['https://result.example/image.png']}})
 
-    monkeypatch.setattr(hc_atom.httpx, 'Client', lambda **kw: original(**kw, transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common, 'download_result', lambda job, url, ext, recoverable=False: {'id': 'image-asset', 'kind': 'image'})
     worker = Worker()
     worker.halt = NoWait()

@@ -119,8 +119,8 @@ export function ArtDepartmentPage({
             let model = "尚未配置";
             try {
               const target = resolveVisualGenerationTarget(card, panelProps.generationPolicy, panelProps.providers, panelProps.localModels);
-              const provider = panelProps.providers.find((item) => item.id === target.providerId);
-              model = `${provider?.name || target.providerId} · ${target.modelId || "服务默认"}`;
+              const provider = panelProps.providers.find((item) => item.id === target.model_id);
+              model = `${provider?.name || target.model_id} · ${target.model_id || "服务默认"}`;
             } catch {}
             return (
               <article className={`art-card ${activeVersionId === displayed?.id ? "active" : ""}`} key={card.id}>

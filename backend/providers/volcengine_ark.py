@@ -7,6 +7,7 @@ import httpx
 from PIL import Image
 
 from .. import store as s
+from .. import provider_egress
 from ..media import ffmpeg_executable, probe
 from . import common
 
@@ -100,7 +101,7 @@ def _catalog_kind(model_id, provider, item=None):
 def list_models(provider):
     """Return the authenticated Ark model catalog without running a model."""
     try:
-        with httpx.Client(timeout=30, headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=30, headers=_headers(provider), trust_env=True) as client:
             value = common.checked(client.get(_root(provider) + '/models'))
     except httpx.HTTPError as exc:
         raise ValueError('火山方舟连接失败，请检查网络、服务地址和代理设置') from exc
@@ -266,7 +267,7 @@ def generate_image(worker, job, provider):
         raise ValueError('请填写火山方舟图片模型 ID')
     params = {**provider.get('parameters', {}).get('image', {}), **job['input'].get('parameters', {})}
     body = {
-        'model': job['input'].get('model') or model,
+        'model': model,
         'prompt': job['input']['prompt'],
         'size': job['input'].get('size') or params.get('size') or '2K',
         'response_format': 'url',
@@ -276,7 +277,7 @@ def generate_image(worker, job, provider):
         references = [resolve_image_reference(asset) for asset in assets]
         body['image'] = references[0] if len(references) == 1 else references
     worker.progress(job, '火山方舟生成图像')
-    with httpx.Client(timeout=600, headers=_headers(provider), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=600, headers=_headers(provider), trust_env=True) as client:
         return _image_result(worker, job, common.checked(client.post(_root(provider) + '/images/generations', json=body)))
 
 
@@ -411,7 +412,7 @@ def generate_video(worker, job, provider):
     model = model_for(provider, 'video')
     if not model:
         raise ValueError('请填写火山方舟视频模型 ID')
-    selected_model = str(job['input'].get('model') or model).strip()
+    selected_model = str(model).strip()
     if selected_model.lower().startswith(DISABLED_VIDEO_PREFIXES):
         raise ValueError('安影已停用 Seedance 2.0，请在项目设置中选择 Doubao-Seedance-2.5')
     root = _root(provider)
@@ -423,7 +424,7 @@ def generate_video(worker, job, provider):
     )
     if dialogue_reference and not selected_model.lower().startswith(SEEDANCE_25_PREFIX):
         raise ValueError('固定对白音频参考需要 Doubao-Seedance-2.5，请在项目设置中选择该模型')
-    with httpx.Client(timeout=120, headers=_headers(provider), trust_env=True) as client:
+    with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider), trust_env=True) as client:
         if not remote:
             assets=common.assets_for(job)
             content=[{'type': 'text', 'text': job['input']['prompt']}]
@@ -545,7 +546,7 @@ def cancel(job, provider):
     if not remote:
         return None
     try:
-        with httpx.Client(timeout=20, headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=20, headers=_headers(provider), trust_env=True) as client:
             response=client.delete(_root(provider) + '/contents/generations/tasks/' + quote(str(remote), safe=''))
             return response.is_success
     except (httpx.HTTPError, ValueError):

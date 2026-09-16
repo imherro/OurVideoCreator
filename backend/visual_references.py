@@ -18,33 +18,10 @@ def _primary_reference(version):
 
 
 def resolve_image_model_capabilities(provider, model_id):
-    """Read server-owned capabilities for one concrete image model."""
-    provider_type = provider.get('type')
-    if provider_type == 'volcengine_ark':
-        from .providers.volcengine_ark import list_models
-        models = list_models(provider)
-    elif provider_type == 'hc_atom':
-        from .providers.hc_atom import list_models
-        models = list_models(provider)
-    elif provider_type == 'runninghub':
-        from .providers.runninghub import list_models
-        models = list_models(provider)
-    elif provider_type == 'maestro':
-        from .capabilities import maestro_model
-        headers = {'Authorization': 'Bearer ' + provider['api_key']} if provider.get('api_key') else {}
-        try:
-            with httpx.Client(timeout=20, trust_env=not provider.get('local'), headers=headers) as client:
-                response = client.get(provider['url'].rstrip('/') + '/api/v1/models')
-                response.raise_for_status()
-                models = [maestro_model(item) for item in response.json().get('models', [])]
-        except (httpx.HTTPError, ValueError, TypeError) as exc:
-            raise ValueError('无法在入队前核对所选图片模型的参考图能力') from exc
-    else:
-        models = []
-    model = next((item for item in models if item.get('id') == model_id), None)
-    if not model:
-        raise ValueError('图片模型目录中找不到所选模型，无法确认参考图能力')
-    return model.get('capabilities')
+    """Capabilities come from the published platform model, never upstream I/O."""
+    if provider.get('id') != model_id or provider.get('kind') != 'image':
+        raise ValueError('图片模型目录中找不到所选平台模型')
+    return provider.get('capabilities')
 
 
 def validate_visual_reference_job(
@@ -70,7 +47,7 @@ def validate_visual_reference_job(
         raise ValueError('已锁定或已弃用的视觉版本不能生成参考图')
     override = ((card.get('generation') or {}).get('image'))
     target = resolve_generation_target('image', override, document.get('generationPolicy'), providers)
-    if input_value.get('provider') != target['providerId'] or input_value.get('model') != target['modelId']:
+    if input_value.get('model_id') != target['model_id']:
         raise ValueError('视觉参考任务模型与资产卡/项目生成策略不一致，请刷新后重试')
     if marker.get('targetSource') != target['source']:
         raise ValueError('视觉参考任务的策略来源记录不一致')
@@ -102,10 +79,10 @@ def validate_visual_reference_job(
         raise ValueError('状态资产的父参考图记录不一致')
     if references != [asset_id]:
         raise ValueError('状态资产必须且只能发送创建时冻结的父版本主参考图')
-    provider = next((item for item in providers if item.get('id') == target['providerId']), None)
+    provider = next((item for item in providers if item.get('id') == target['model_id']), None)
     if not provider:
         raise ValueError('视觉参考任务所用模型服务已不存在')
-    capabilities = (capability_resolver or resolve_image_model_capabilities)(provider, target['modelId'])
+    capabilities = (capability_resolver or resolve_image_model_capabilities)(provider, target['model_id'])
     if not isinstance(capabilities, dict) or capabilities.get('image_reference') is not True:
         raise ValueError('所选图片模型未明确支持参考图，状态资产不能入队')
 
@@ -132,8 +109,7 @@ def record_visual_reference_submission(c, pid, body, job):
         'submissionId': body.submission_id,
         'jobId': job['id'],
         'createdAt': int(time.time() * 1000),
-        'providerId': body.input.get('provider'),
-        'modelId': body.input.get('model'),
+        'model_id': body.input.get('model_id'),
         'targetSource': marker.get('targetSource'),
         'prompt': body.input.get('prompt'),
     }

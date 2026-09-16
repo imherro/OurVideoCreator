@@ -1,3 +1,4 @@
+from tests.egress_helpers import mock_egress
 import json,time
 import httpx,pytest
 from backend import store as s
@@ -26,7 +27,7 @@ def test_repair_is_limited_to_one_additional_request(monkeypatch,fixed):
         content=json.dumps(board(10 if fixed and len(requests)==2 else 5),ensure_ascii=False)
         return httpx.Response(200,text='data: '+json.dumps({'choices':[{'delta':{'content':content}}]})+'\n\ndata: [DONE]\n\n')
     original=httpx.Client
-    monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(respond)))
+    mock_egress(monkeypatch,respond)
     if fixed:
         result=Worker().text(job,{'url':'http://test/v1','local':True})
         assert result['repair_count']==1
@@ -56,7 +57,7 @@ def test_film_bible_storyboard_is_two_text_passes_with_deterministic_bindings(mo
         content=json.dumps(payloads[len(requests)-1],ensure_ascii=False)
         return httpx.Response(200,text='data: '+json.dumps({'choices':[{'delta':{'content':content}}]})+'\n\ndata: [DONE]\n\n')
     original=httpx.Client
-    monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(respond)))
+    mock_egress(monkeypatch,respond)
     job={'id':jid,'project_id':pid,'node_id':'n','kind':'storyboard','input':{
       'provider':'ark','model':'doubao','prompt':'雨夜里的青年','target_duration':5,'film_bible':True,
     }}
@@ -82,7 +83,7 @@ def test_non_structured_visual_output_gets_one_bounded_repair(monkeypatch):
     def respond(request):
         requests.append(json.loads(request.content));content=json.dumps(payloads[len(requests)-1],ensure_ascii=False)
         return httpx.Response(200,text='data: '+json.dumps({'choices':[{'delta':{'content':content}}]})+'\n\ndata: [DONE]\n\n')
-    original=httpx.Client;monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(respond)))
+    original=httpx.Client;mock_egress(monkeypatch,respond)
     job={'id':jid,'project_id':pid,'node_id':'n','kind':'storyboard','input':{'provider':'ark','model':'doubao','prompt':'短片','target_duration':5,'film_bible':True}}
     result=Worker().text(job,{'url':'http://test/v1','api_key':'test'})
     assert len(requests)==3 and result['visual_repair_count']==1 and result['storyboard_repair_count']==0

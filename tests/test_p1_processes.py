@@ -71,6 +71,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
     data.mkdir()
     env = {**os.environ, 'MVC_DATA_DIR':str(data), 'PYTHONUTF8':'1', 'NO_PROXY':'127.0.0.1,localhost'}
     fake_port, web_one_port, web_two_port = free_port(), free_port(), free_port()
+    env['OVC_PROVIDER_EGRESS_EXCEPTIONS']=json.dumps([{'scheme':'http','host':'127.0.0.1','ip':'127.0.0.1','port':fake_port}])
     count_file = tmp_path / 'fake-count.txt'
     received_file = tmp_path / 'fake-received.json'
     release_file = tmp_path / 'fake-release'
@@ -172,12 +173,18 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
             'phone':ADMIN_PHONE,'password':ADMIN_PASSWORD,
         })['ok']
         csrf_token=next(cookie.value for cookie in cookie_jar if cookie.name=='ovc_csrf')
-        provider = {'id':'p1-fake','name':'P1 Fake','type':'openai','kind':'text','url':f'http://127.0.0.1:{fake_port}/v1','local':True,'model':'p1-fake-model'}
-        request_json(opener, base_one+'/api/settings', 'PUT', {'providers':[provider]})
+        provider = request_json(opener, base_one+'/api/admin/model-providers', 'POST', {
+            'revision':0,'name':'P1 Fake','enabled':True,'api_key':'',
+            'config':{'type':'openai','url':f'http://127.0.0.1:{fake_port}/v1','auth_mode':'none'},
+        })
+        model = request_json(opener, base_one+'/api/admin/models', 'POST', {
+            'revision':0,'provider_id':provider['id'],'kind':'text','published':True,'enabled':True,
+            'definition':{'name':'P1 text','upstream_model':'p1-fake-model','capabilities':{},'defaults':{},'rules':{}},
+        })
         project = request_json(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
         job = request_json(opener, base_one+f'/api/projects/{project["id"]}/jobs', 'POST', {
             'node_id':'p1-text','kind':'text','submission_id':'p1-process-job-001',
-            'input':{'provider':'p1-fake','model':'p1-fake-model','prompt':'process isolation'},
+            'input':{'model_id':model['id'],'prompt':'process isolation'},
         })
         job_id = job['id']
         assert job['status'] == 'queued'

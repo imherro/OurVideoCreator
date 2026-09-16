@@ -19,8 +19,7 @@ export type ResolvedVisualGenerationTarget = GenerationTarget & {
 export type VisualReferencePlan = {
   versionId: string;
   prompt: string;
-  providerId: string;
-  modelId: string;
+  model_id: string;
   targetSource: "override" | "project" | "system";
   assetIds: string[];
   assetCategory: "character" | "scene" | "prop";
@@ -95,8 +94,7 @@ export function setVisualCardImageOverride<T extends FilmBibleDocument>(
   const currentVersion = visual.versions[card.currentVersionId];
   if (currentVersion && !['draft', 'pending_reference'].includes(currentVersion.status))
     throw new Error("已锁定或已弃用视觉版本的生成策略不可修改");
-  if (override.mode === "override" && !override.providerId)
-    throw new Error("请选择图片模型服务");
+  // An explicit empty override is a draft, never a silent fallback choice.
   const generation = {
     ...(card.generation || {}),
     image: override,
@@ -150,7 +148,7 @@ export function planVisualReferenceGeneration(
   const { version, card } = requireVisual(visual, versionId);
   if (!['draft', 'pending_reference'].includes(version.status))
     throw new Error("已锁定或已弃用的视觉版本不能重新生成参考图");
-  if (!target.providerId || !target.modelId)
+  if (!target.model_id)
     throw new Error("图片生成服务或模型尚未配置");
   let parent: { version: VisualVersion; card: VisualCard } | undefined;
   let parentReferenceAssetId: string | undefined;
@@ -177,8 +175,7 @@ export function planVisualReferenceGeneration(
   return {
     versionId,
     prompt: promptFor(visual, version, card, parent),
-    providerId: target.providerId,
-    modelId: target.modelId,
+    model_id: target.model_id,
     targetSource: target.source,
     assetIds: parentReferenceAssetId ? [parentReferenceAssetId] : [],
     assetCategory: visualAssetCategory(card),
@@ -259,8 +256,7 @@ export function acceptVisualReferenceResult<T extends FilmBibleDocument>(
     provenance: {
       jobId: job.id,
       submissionId: job.submission_id || generation.submissionId,
-      providerId: generation.providerId,
-      modelId: generation.modelId,
+      model_id: generation.model_id,
       targetSource: generation.targetSource,
       prompt: generation.prompt,
       parentVersionId: generation.parentVersionId,

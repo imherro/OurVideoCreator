@@ -11,6 +11,9 @@ from backend.providers import common, volcengine_ark as ark
 from backend.worker import Worker
 from test_api import project
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
+from tests.egress_helpers import mock_egress
+from backend import platform_models
 
 
 @pytest.fixture
@@ -27,18 +30,15 @@ def _image(client,pid,name):
 
 
 def _minimax_settings(client):
-    client.put('/api/settings',json={'providers':[{
-        'id':'hailuo','name':'Hailuo','type':'minimax','kind':'video',
-        'url':'https://api.minimax.io/v1','model':'MiniMax-Hailuo-2.3','local':False
-    }]})
+    publish_test_model(client,'hailuo',kind='video',provider_type='minimax',upstream_model='MiniMax-Hailuo-2.3',
+        capabilities={'image_reference':True,'max_references':1})
 
 
 def _ark_settings(client):
-    client.put('/api/settings',json={'providers':[{
-        'id':'ark','name':'火山方舟','type':'volcengine_ark','local':False,
-        'url':'https://ark.example/api/v3','api_key':'secret',
-        'models':{'text':'doubao','image':'seedream','video':'seedance'},
-    }]})
+    for kind in ('text','image','video'):
+        caps={} if kind=='text' else {'image_reference':True,'max_references':10 if kind=='image' else 1}
+        if kind=='video':caps['end_frame']=True
+        publish_test_model(client,'ark-'+kind,kind=kind,provider_type='volcengine_ark',capabilities=caps)
 
 
 def test_batch_carries_static_reference_asset_to_minimax(batch_authenticated):
@@ -46,7 +46,7 @@ def test_batch_carries_static_reference_asset_to_minimax(batch_authenticated):
     doc=item['document']
     doc['nodes']=[
         {'id':'reference','data':{'kind':'reference','assetId':asset['id']}},
-        {'id':'video','data':{'kind':'video','provider':'hailuo','prompt':'镜头向前推进'}},
+        {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头向前推进'}},
     ]
     doc['edges']=[{'id':'frame','source':'reference','target':'video'}]
     assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
@@ -57,15 +57,17 @@ def test_batch_carries_static_reference_asset_to_minimax(batch_authenticated):
     assert jobs[0]['input']['asset_ids']==[asset['id']]
     with s.db() as db:
         frozen=db.execute('SELECT provider FROM job_private WHERE job_id=%s',(jobs[0]['id'],)).fetchone()['provider']
-    assert 'MiniMax-Hailuo-2.3' in frozen
+    assert json.loads(frozen)=={}
+    with s.db() as db:
+        assert platform_models.load_job_provider(db,jobs[0]['id'])['model']=='MiniMax-Hailuo-2.3'
 
 
 def test_exact_video_batch_reuses_completed_image_without_rerunning_it(batch_authenticated):
     client=batch_authenticated;item=project(client);asset=_image(client,item['id'],'ready-frame.png');_minimax_settings(client)
     doc=item['document']
     doc['nodes']=[
-        {'id':'image','data':{'kind':'image','provider':'missing-old-provider','prompt':'已经完成的首帧','assetId':asset['id']}},
-        {'id':'video','data':{'kind':'video','provider':'hailuo','prompt':'镜头缓慢推进'}},
+        {'id':'image','data':{'kind':'image','model_id':'missing-old-model','prompt':'已经完成的首帧','assetId':asset['id']}},
+        {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头缓慢推进'}},
     ]
     doc['edges']=[{'id':'frame','source':'image','target':'video'}]
     assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
@@ -86,7 +88,7 @@ def test_batch_rejects_multiple_minimax_frames_before_queueing(batch_authenticat
     doc['nodes']=[
         {'id':'one','data':{'kind':'reference','assetId':one['id']}},
         {'id':'two','data':{'kind':'reference','assetId':two['id']}},
-        {'id':'video','data':{'kind':'video','provider':'hailuo','prompt':'镜头向前推进'}},
+        {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头向前推进'}},
     ]
     doc['edges']=[{'id':'one-edge','source':'one','target':'video'},{'id':'two-edge','source':'two','target':'video'}]
     assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
@@ -103,9 +105,9 @@ def test_batch_seedream_keeps_canvas_reference_order_after_parent_finishes(batch
     manual=_image(client,item['id'],'manual.png')
     doc=item['document']
     doc['nodes']=[
-        {'id':'generated-node','data':{'kind':'image','provider':'ark','prompt':'生成角色定妆图'}},
+        {'id':'generated-node','data':{'kind':'image','model_id':'ark-image','prompt':'生成角色定妆图'}},
         {'id':'static-node','data':{'kind':'reference','assetId':static['id']}},
-        {'id':'target','data':{'kind':'image','provider':'ark','prompt':'融合三张参考图','asset_ids':[manual['id']]}},
+        {'id':'target','data':{'kind':'image','model_id':'ark-image','prompt':'融合三张参考图','asset_ids':[manual['id']]}},
     ]
     doc['edges']=[
         {'id':'generated-first','source':'generated-node','target':'target'},
@@ -136,7 +138,7 @@ def test_batch_seedream_keeps_canvas_reference_order_after_parent_finishes(batch
         body=json.loads(request.read())
         assert [base64.b64decode(value.split(',',1)[1]) for value in body['image']]==expected
         return httpx.Response(200,json={'data':[{'url':'https://result.example/frame.png'}]})
-    monkeypatch.setattr(ark.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(common,'download_result',lambda job,url,ext:{'id':'result','kind':'image'})
     assert Worker().execute(target)['assets'][0]['id']=='result'
 
@@ -149,8 +151,8 @@ def test_batch_seedance_allows_dynamic_first_frame_with_explicit_last_frame(batc
     tail=_image(client,item['id'],'tail.png')
     doc=item['document']
     doc['nodes']=[
-        {'id':'first','data':{'kind':'image','provider':'ark','prompt':'生成视频首帧'}},
-        {'id':'video','data':{'kind':'video','provider':'ark','prompt':'生成连续转场','end_asset_id':tail['id']}},
+        {'id':'first','data':{'kind':'image','model_id':'ark-image','prompt':'生成视频首帧'}},
+        {'id':'video','data':{'kind':'video','model_id':'ark-video','prompt':'生成连续转场','end_asset_id':tail['id']}},
     ]
     doc['edges']=[{'id':'first-frame','source':'first','target':'video'}]
     saved=client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc})
@@ -168,6 +170,7 @@ def test_batch_seedance_rejects_end_frame_when_selected_model_lacks_capability(b
     client=batch_authenticated;item=project(client);_ark_settings(client)
     first=_image(client,item['id'],'first.png')
     tail=_image(client,item['id'],'tail.png')
+    publish_test_model(client,'seedance-no-tail',kind='video',provider_type='volcengine_ark',capabilities={'image_reference':True,'max_references':1,'end_frame':False})
     catalog_calls=[]
     monkeypatch.setattr(ark,'list_models',lambda provider:catalog_calls.append(provider['id']) or [{
         'id':'seedance-no-tail','kind':'video',
@@ -175,9 +178,9 @@ def test_batch_seedance_rejects_end_frame_when_selected_model_lacks_capability(b
     }])
     doc=item['document']
     doc['nodes']=[
-        {'id':'first','data':{'kind':'image','provider':'ark','prompt':'现有首帧','assetId':first['id']}},
+        {'id':'first','data':{'kind':'image','model_id':'ark-image','prompt':'现有首帧','assetId':first['id']}},
         {'id':'video','data':{
-            'kind':'video','provider':'ark','model':'seedance-no-tail',
+            'kind':'video','model_id':'seedance-no-tail',
             'prompt':'镜头向前推进','end_asset_id':tail['id'],
         }},
     ]
@@ -189,5 +192,5 @@ def test_batch_seedance_rejects_end_frame_when_selected_model_lacks_capability(b
     })
     assert result.status_code==400
     assert '不支持尾帧' in result.text
-    assert catalog_calls==['ark']
+    assert catalog_calls==[]
     assert client.get('/api/projects/'+item['id']+'/jobs').json()==[]

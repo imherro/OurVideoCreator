@@ -2,35 +2,40 @@ import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
 type Value=Record<string,any>;
 export function ModelSelector({data,providers,request,onChange}:{data:Value;providers:Value[];localModels?:Value[];request:(path:string)=>Promise<any>;onChange:(patch:Value)=>void}){
- const [models,setModels]=useState<Value[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
- const kind=data.kind==='storyboard'?'text':data.kind,providerId=data.provider||'';
- const provider=providers.find(p=>p.id===providerId),nativeMinimax=provider?.type==='minimax';
- const suitable=providers.filter(p=>p.kind===kind||!p.kind);
+ const [models,setModels]=useState<Value[]>(providers),[loading,setLoading]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
+ const kind=data.kind==='storyboard'?'text':data.kind;
  useEffect(()=>{
-  let active=true,timer:ReturnType<typeof setTimeout>|undefined;const deadline=Date.now()+180000;
-  setModels([]);setError('');if(!providerId){setLoading(false);return}
-  async function refreshModels(){setLoading(true);try{const v=await request('/providers/'+encodeURIComponent(providerId)+'/models?kind='+encodeURIComponent(kind));if(!active)return;
-   if(v.status==='starting'){if(Date.now()>deadline)throw new Error('外部服务启动较慢，请检查网关状态后刷新');timer=setTimeout(refreshModels,3000);return}setModels(v.models);setLoading(false);
-  }catch(e:any){if(active){setError(e.message);setLoading(false)}}}
-  void refreshModels();return()=>{active=false;clearTimeout(timer)};
- },[providerId,kind,refresh]);
- const defaultModel=provider?.models?.[kind]||provider?.model||'';
- const selected=models.find(m=>m.id===data.model),caps=selected?.capabilities;
- return <><label>模型服务<select value={providerId} onChange={e=>{const p=providers.find(p=>p.id===e.target.value);onChange({provider:e.target.value,model:p?.models?.[kind]||p?.model||'',model_capabilities:undefined})}}>
- <option value="" disabled>请选择已连接的外部服务</option>
- {suitable.map(p=><option key={p.id} value={p.id}>外部 API · {p.name}</option>)}
- {providerId&&!suitable.some(p=>p.id===providerId)&&<option value={providerId} disabled>原服务不适用，请重新选择</option>}
- </select></label>
- {!providerId&&<p className="error">尚未配置外部模型服务；系统不会自动选择其他付费模型。</p>}
- {providerId&&<>
- <div className="field-heading"><label>服务模型</label><button className="quiet" onClick={()=>{if(defaultModel)onChange({model:defaultModel,frames:defaultModel==='minimax_h3'?124:data.frames,resolution:defaultModel==='minimax_h3'?'864x480':data.resolution,model_capabilities:models.find(m=>m.id===defaultModel)?.capabilities})}}>使用默认</button><button className="quiet" disabled={loading} onClick={()=>setRefresh(v=>v+1)}><RefreshCw size={13}/>刷新</button></div>
- <select aria-label="服务模型" value={data.model||''} onChange={e=>{const m=models.find(m=>m.id===e.target.value);onChange({model:e.target.value,model_capabilities:m?.capabilities})}}><option value="">{loading?'正在读取模型目录':'请选择模型'}</option>{data.model&&!models.some(m=>m.id===data.model)&&<option value={data.model}>{data.model}</option>}{models.map(m=><option key={m.id} value={m.id} disabled={m.installed===false}>{m.name}{m.installed===true?' · 已安装':m.installed===false?' · 未安装':''}</option>)}</select>
- {loading&&<p className="muted">正在读取外部服务模型目录。</p>}
+  let active=true;setLoading(true);setError('');
+  request('/models').then(value=>{if(active)setModels(value.models||[])}).catch(e=>{if(active){setModels([]);setError(e.message)}}).finally(()=>{if(active)setLoading(false)});
+  return()=>{active=false};
+ },[kind,refresh,request]);
+ const available=models.filter(item=>item.kind===kind),selected=available.find(item=>item.id===data.model_id),caps=selected?.capabilities;
+ function choose(id:string){
+  const model=available.find(item=>item.id===id);
+  onChange({model_id:id,parameters:{...model?.defaults},provider:undefined,model:undefined,
+            resolution:undefined,frames:undefined,seed:undefined,
+            model_capabilities:{...model?.capabilities},model_rules:{...model?.rules}});
+ }
+ return <>
+ <div className="field-heading"><label>平台模型</label><button className="quiet" disabled={loading} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={13}/>刷新目录</button></div>
+ <select aria-label="平台模型" value={data.model_id||''} onChange={e=>choose(e.target.value)}>
+ <option value="">{loading?'正在读取平台目录':'请选择平台模型'}</option>
+ {data.model_id&&!selected&&<option value={data.model_id} disabled>原模型不可用，请重新选择</option>}
+ {available.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+ </select>
+ {!loading&&!available.length&&<p className="error">暂无已发布且可用的平台模型，请联系管理员。系统不会自动回退其他服务。</p>}
  {error&&<p className="error">{error}</p>}
- <details><summary>手动填写模型 ID</summary><input aria-label="手动模型 ID" value={data.model||''} onChange={e=>onChange({model:e.target.value,model_capabilities:undefined})}/></details>
- {caps&&<p className="muted">{caps.image_reference?'支持参考图':'不支持参考图'}{caps.max_references?` · 最多 ${caps.max_references} 张`:''}{caps.audio_output?' · 生成原声':''}{caps.end_frame?' · 支持尾帧':''}</p>}
- </>}
- {nativeMinimax&&<><label>生成时长<select value={data.parameters?.duration??provider?.parameters?.duration??6} onChange={e=>onChange({parameters:{...data.parameters,duration:Number(e.target.value)}})}><option value={6}>6 秒</option><option value={10}>10 秒（768P）</option></select></label><label>云端分辨率<select value={data.parameters?.resolution??provider?.parameters?.resolution??'768P'} onChange={e=>onChange({parameters:{...data.parameters,resolution:e.target.value}})}><option>768P</option><option>1080P</option></select></label><p className="muted">支持文生视频或单首帧图生视频。1080P 仅支持 6 秒，生成参数以上述云端设置为准。</p></>}
- {kind==='video'&&!nativeMinimax&&<p className="muted">视频时长与规格继承项目设置；实际提交时长按分镜和固定音色对白自动计算。</p>}
+ {caps&&<p className="muted">{caps.image_reference?'支持参考图':'不支持参考图'}{caps.max_references?` · 最多 ${caps.max_references} 张`:''}{caps.end_frame?' · 支持尾帧':''}{caps.audio_reference?' · 支持参考音频':''}</p>}
+ {selected&&Object.entries(selected.rules||{}).filter(([,rule])=>(rule as Value).type!=='strings').map(([name,value])=>{
+   const rule=value as Value,current=data.parameters?.[name]??selected.defaults?.[name]??'';
+   const change=(v:any)=>onChange({parameters:{...data.parameters,[name]:v}});
+   return <label key={name}>{name}
+    {rule.enum?<select value={String(current)} onChange={e=>change(rule.enum.find((v:any)=>String(v)===e.target.value))}>
+     <option value="" disabled>请选择允许值</option>{rule.enum.map((v:any)=><option key={String(v)} value={String(v)}>{String(v)}</option>)}
+    </select>:rule.type==='boolean'?<input type="checkbox" checked={!!current} onChange={e=>change(e.target.checked)}/>:
+    <input type={['number','integer'].includes(rule.type)?'number':'text'} value={current} min={rule.min} max={rule.max} maxLength={rule.max_length}
+     step={rule.type==='integer'?1:'any'} onChange={e=>change(['number','integer'].includes(rule.type)?Number(e.target.value):e.target.value)}/>}
+   </label>;
+ })}
  </>;
 }

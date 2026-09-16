@@ -9,17 +9,14 @@ from backend.app import app
 from backend.worker import Worker
 from backend.adaptation import validate_adaptation_bundle
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
 
 
 @pytest.fixture(scope="module")
 def adaptation_client():
     with TestClient(app) as client:
         login_admin(client)
-        response = client.put("/api/settings", json={"providers": [{
-            "id": "p1-test-openai", "name": "P1 test gateway", "type": "openai",
-            "kind": "text", "url": "http://127.0.0.1:1/v1", "local": False,
-        }]})
-        assert response.status_code == 200, response.text
+        publish_test_model(client, "p1-test-openai")
         yield client
 
 
@@ -168,13 +165,13 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
     ).json()
     blocked = client.post(
         f'/api/productions/{production["id"]}/script-generations',
-        json={"episode_nos": [5], "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False, "submission_id": "phase3-before-approval"},
+        json={"episode_nos": [5], "model_id": "p1-test-openai", "allow_cloud": False, "submission_id": "phase3-before-approval"},
     )
     assert blocked.status_code == 400
     reviewed = client.post(f'/api/productions/{production["id"]}/adaptation/review',json={"revision": saved["revision"]}).json()
     approved = client.post(f'/api/productions/{production["id"]}/adaptation/approve',json={"revision": reviewed["revision"]}).json()
 
-    body = {"episode_nos": [5, 8, 12], "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False, "submission_id": "phase3-selected-batch"}
+    body = {"episode_nos": [5, 8, 12], "model_id": "p1-test-openai", "allow_cloud": False, "submission_id": "phase3-selected-batch"}
     first = client.post(f'/api/productions/{production["id"]}/script-generations',json=body)
     second = client.post(f'/api/productions/{production["id"]}/script-generations',json=body)
     assert first.status_code == second.status_code == 200, first.text
@@ -214,7 +211,7 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
     with s.db() as connection:
         row = connection.execute("SELECT shared_context FROM productions WHERE id=%s", (production["id"],)).fetchone()
         context = json.loads(row["shared_context"])
-        context["generationPolicy"]["text"] = {"providerId": "ark-for-script", "modelId": "doubao-seed"}
+        context["generationPolicy"]["text"] = {"model_id": "p1-test-openai"}
         connection.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), production["id"]))
     approved = save_and_approve(client, production, adaptation)
     virtual = client.get(f'/api/productions/{production["id"]}/episode-scripts/2').json()
@@ -232,8 +229,8 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
     projected = client.get(f'/api/projects/{project_id}').json()
     node = next(item for item in projected["document"]["nodes"] if item["data"].get("canonicalScriptProjection"))
     assert node["data"]["text"] == payload["body"]
-    assert node["data"]["provider"] == "ark-for-script"
-    assert node["data"]["model"] == "doubao-seed"
+    assert "provider" not in node["data"]
+    assert node["data"]["model_id"] == "p1-test-openai"
     assert node["data"]["generationPolicyInherited"] is True
     node["data"]["text"] = "从画布篡改"
     put = client.put(f'/api/projects/{project_id}',json={

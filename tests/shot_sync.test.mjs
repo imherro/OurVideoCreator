@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {updateShot,framesForDuration,updateLinkedNodePrompt,migrateLinkedNodePrompts} from '../src/shotSync.ts';
 test('shot prompt edits update linked inputs and invalidate descendants',()=>{
- const doc={shots:[{id:'s',imageNode:'i',videoNode:'v'}],nodes:['i','v'].map(id=>({id,position:{x:0,y:0},data:{prompt:'old',resultJob:'old-job',model:'minimax_h3'}})),edges:[{id:'e',source:'i',target:'v'}]};
+ const doc={shots:[{id:'s',imageNode:'i',videoNode:'v'}],nodes:['i','v'].map(id=>({id,position:{x:0,y:0},data:{prompt:'old',resultJob:'old-job',model_id:'v',model_rules:{frames:{type:'integer'}},model_capabilities:{fps:24,min_frames:124,frame_step:17,max_frames:345}}})),edges:[{id:'e',source:'i',target:'v'}]};
  const updated=updateShot(doc,'s',{image_prompt:'new'});
  assert.equal(updated.nodes[0].data.prompt,'new');assert.equal(updated.nodes[1].data.prompt,'old');
  assert.ok(updated.nodes.every(n=>n.data.stale));assert.equal(doc.nodes[0].data.prompt,'old');
- const duration=updateShot(doc,'s',{duration:8});assert.equal(duration.nodes[1].data.frames,192);
+ const duration=updateShot(doc,'s',{duration:8});assert.equal(duration.nodes[1].data.parameters.frames,192);
 });
 test('frame conversion respects different model lattices',()=>{
  assert.equal(framesForDuration('minimax_h3',1),124);

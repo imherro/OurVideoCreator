@@ -9,6 +9,7 @@ import time
 from urllib.parse import quote, urlparse
 
 from . import store as s
+from .provider_egress import validate_url
 
 
 DEFAULT_TTL = 3600
@@ -47,12 +48,12 @@ def public_asset_url(provider: dict, asset_id: str, ttl: int = DEFAULT_TTL) -> s
     base = str(
         section.get('public_base_url')
         or provider.get('public_base_url')
-        or s.get_setting('public_base_url', '')
         or ''
     ).strip().rstrip('/')
     parsed = urlparse(base)
     if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.username:
         raise ValueError('请在幻场 AI 设置中填写安影的公网访问地址，例如 https://vc.goroc.com')
+    validate_url(base,resolve=True)
     expires = int(time.time()) + max(60, min(int(ttl), DEFAULT_TTL))
     purpose = 'provider-input'
     token = signature(asset_id, expires, 'GET', purpose)

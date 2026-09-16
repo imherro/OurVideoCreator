@@ -85,9 +85,9 @@ export function RunWorkflow({
       {planned.map((node) => (
         <p key={node.id}>
           {node.data.label || node.data.kind} ·{" "}
-          {node.data.provider === "local" || !node.data.provider
+          {node.data.model_id === "local" || !node.data.model_id
             ? "未配置外部 Provider"
-            : providers.find((provider) => provider.id === node.data.provider)
+            : providers.find((provider) => provider.id === node.data.model_id)
                 ?.name || "服务未配置"}
         </p>
       ))}

@@ -33,6 +33,8 @@ from backend.app import (
 )
 from backend.worker import Worker
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
+from backend import platform_models
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +44,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def client():
     with TestClient(app) as value:
         login_admin(value)
+        publish_test_model(value, 'p2-resume-model')
         yield value
 
 
@@ -60,6 +63,8 @@ def _interrupted_job(project_id, suffix):
             VALUES(%s,%s,%s,%s,'text','interrupted',%s,'interrupted',%s,%s)""",
             (job_id, f'p2-r1-{suffix}-{job_id}', project_id, 'node-p2-r1', s.dumps({'prompt':'frozen'}), now, now),
         )
+        platform_models.bind_job(connection, job_id, platform_models.resolve(
+            connection, 'p2-resume-model', 'text', {'model_id':'p2-resume-model','prompt':'frozen'}))
     return job_id
 
 
@@ -138,7 +143,9 @@ def test_p2_r1_worker_lock_session_loss_stops_cli_before_claim_and_explicit_rest
 
 def test_p2_r1_first_prompt_write_and_parent_sequences_are_serialized(client):
     with s.db() as connection:
-        connection.execute("DELETE FROM settings WHERE key='prompt_library'")
+        connection.execute("DELETE FROM prompt_template_revisions")
+        connection.execute("DELETE FROM prompt_templates")
+        connection.execute("DELETE FROM prompt_library_state")
     barrier = threading.Barrier(3)
     outcomes = []
     outcome_lock = threading.Lock()
@@ -146,11 +153,10 @@ def test_p2_r1_first_prompt_write_and_parent_sequences_are_serialized(client):
     def prompt_contender(index):
         barrier.wait()
         try:
-            value = save_prompt_template(
-                f'first-{index}',
-                PromptTemplateSave(revision=0,name=f'first-{index}',kind='text',content='prompt'),
-            )
-            outcome = ('success', value['revision'])
+            response = client.put('/api/admin/prompt-templates/' + f'first-{index}', json={
+                'revision':0,'name':f'first-{index}','kind':'text','content':'prompt',
+            })
+            outcome = ('success', response.json()['revision']) if response.status_code == 200 else ('conflict', response.status_code)
         except HTTPException as exc:
             outcome = ('conflict', exc.status_code)
         with outcome_lock:

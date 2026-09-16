@@ -31,13 +31,11 @@ export type ProjectSetupDraft = {
 };
 
 export function defaultGenerationPolicy(providers: Value[]): GenerationPolicy {
-  const ark = providers.find((provider) => provider.type === "volcengine_ark");
-  if (!ark) return { text: null, image: null, video: null };
   return Object.fromEntries(
-    (["text", "image", "video"] as const).map((kind) => [
-      kind,
-      { providerId: ark.id, modelId: ark.models?.[kind] || "" },
-    ]),
+    (["text", "image", "video"] as const).map((kind) => {
+      const model = providers.find(item => item.kind === kind && item.is_default);
+      return [kind, model ? {model_id:model.id} : null];
+    }),
   ) as GenerationPolicy;
 }
 

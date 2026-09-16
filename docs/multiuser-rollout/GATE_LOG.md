@@ -7,8 +7,8 @@
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
-| P3 | P3-R2 返修中 | 不通过 | `5e0c5e36d37415d4867d380f4e86dd47c87eebce` | `evidence/P3-R1/REPORT.md` | `OVC-P3-R1-01…03` | P3-R2 |
-| P4 | 未提交 | 未验收 | | | | 否 |
+| P3 | P3-R2 已复验 | 通过 | `de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6` | `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md` | 无；原六项及 R1-01/02/03 全部关闭 | P4 |
+| P4 | P4-MODEL-01 实施中 | 未验收 | | `design/P4_MODEL_CONFIG.md` | 尚未提交验收 | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
 | P7 | 未提交 | 未验收 | | | | 否 |
@@ -227,3 +227,13 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 报告及原始证据：`evidence/P3-R2/REPORT.md`、00–13 日志/JSON/浏览器记录。正式定向 27、Python 全量 303、前端 126，build/route/compile exit 0；基线真实 PG 死锁、首次预算失守和双有效重置 token 红测已保存。页面流程在独立 host-only Cookie 上下文完成，两次 native confirm 由用户协助，失败尝试和取证限制如实保留。
 
 三个残留项是否关闭、P3 是否通过均待外部验收人复核；不自行签发通过，P4 未开始。
+
+## P3-R2 外部复验通过
+
+结论：**通过，P3 已通过，允许进入 P4**（2026-09-16，用户指定的主 ChatGPT 会话，完整绑定及运行边界见 `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md`）。
+
+通过 evidence HEAD：`de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6`；被测业务 SHA：`cd61996bf6908f66cfd3429d27fa42acb03c144d`。
+
+本次关闭 `OVC-P3-R1-01`、`OVC-P3-R1-02`、`OVC-P3-R1-03`，原 `OVC-P3-01…06` 整体关闭，无新增阻塞，不需要 P3-R3。浏览器证据按人工协助验证认可，不冒称全自动。P0/P1/P2 历史通过不变，既有 warning 和历史未归因超时继续保留。
+
+下一单一授权任务：**P4-MODEL-01，平台统一 Provider/Key/模型后台与受控调用闭环**。只授权 P4；P5/P6 等后续阶段、公网部署、真实付费 API 仍未授权。完整外部任务归档于 `prompts/P4_CODEX_PROMPT.md`，P4 完成后必须再次外部验收。

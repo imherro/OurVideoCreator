@@ -841,9 +841,10 @@ def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(
 
     ordinary_settings = editor.get("/api/settings").json()
     assert ordinary_settings["read_only"] is True
-    assert all("api_key" not in item for item in ordinary_settings["providers"])
+    assert all("api_key" not in item for item in ordinary_settings["models"])
     assert editor.put("/api/settings", json={"providers": []}).status_code == 403
-    assert editor.get("/api/providers/not-configured/models").status_code == 400
+    assert editor.get("/api/providers/not-configured/models").status_code == 403
+    assert editor.get("/api/models").status_code == 200
     assert editor.post("/api/providers/not-configured/verify").status_code == 403
     assert editor.get("/api/admin/users").status_code == 403
     assert admin.get("/api/admin/audit-events").status_code == 200
@@ -978,7 +979,15 @@ def test_acl09_route_guard_fails_for_a_new_unclassified_api_route():
     assert guard_exit_code(export_routes(app), route_map) == 0
 
 
-def test_media04_signed_capability_binds_asset_method_purpose_expiry_and_revocation(admin, clients):
+def test_media04_signed_capability_binds_asset_method_purpose_expiry_and_revocation(admin, clients, monkeypatch):
+    # A precise deployment exception for the in-process TestClient hostname;
+    # retain real URL policy and every signed-media authorization assertion.
+    original_resolver=socket.getaddrinfo
+    monkeypatch.setattr(socket,"getaddrinfo",lambda host,*args,**kwargs:
+        [(socket.AF_INET,socket.SOCK_STREAM,6,"",("127.0.0.1",80))]
+        if host=="testserver" else original_resolver(host,*args,**kwargs))
+    monkeypatch.setenv("OVC_PROVIDER_EGRESS_EXCEPTIONS",json.dumps([
+        {"scheme":"http","host":"testserver","ip":"127.0.0.1","port":80}]))
     owner, owner_user, _ = register(admin, clients, nickname="Capability owner")
     workspace = add_workspace(admin, owner_user["id"], "Capability team")
     project = create_project(owner, workspace, "Capability production")

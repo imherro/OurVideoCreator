@@ -12,13 +12,13 @@ import {
 import {updateDraftVisualVersion} from '../src/filmBible/commands.ts';
 
 const providers=[
-  {id:'ark',name:'Ark',type:'volcengine_ark',local:false,models:{image:'seedream'}},
-  {id:'maestro-image',name:'Maestro',type:'maestro',kind:'image',local:true,model:'flux'},
+  {id:'seedream-project',name:'Ark image',kind:'image'},
+  {id:'flux-special',name:'Maestro image',kind:'image'},
 ];
 
 function fixture(){
   return {
-    generationPolicy:{text:null,image:{providerId:'ark',modelId:'seedream-project'},video:null},
+    generationPolicy:{text:null,image:{model_id:'seedream-project'},video:null},
     filmBible:{visual:{cards:{
       hero:{id:'hero',kind:'character',name:'林岚',parentCardId:null,currentVersionId:'hero-v1',status:'active',source:{type:'script_extraction'}},
       wet:{id:'wet',kind:'character_state',name:'雨中的林岚',parentCardId:'hero',currentVersionId:'wet-v1',status:'active',source:{type:'script_extraction'}},
@@ -33,12 +33,12 @@ test('visual card override wins over the project image policy and inherit restor
   let doc=fixture();
   let card=doc.filmBible.visual.cards.hero;
   assert.deepEqual(resolveVisualGenerationTarget(card,doc.generationPolicy,providers),{
-    providerId:'ark',modelId:'seedream-project',source:'project',
+    model_id:'seedream-project',source:'project',
   });
-  doc=setVisualCardImageOverride(doc,'hero',{mode:'override',providerId:'maestro-image',modelId:'flux-special'});
+  doc=setVisualCardImageOverride(doc,'hero',{mode:'override',model_id:'flux-special'});
   card=doc.filmBible.visual.cards.hero;
   assert.deepEqual(resolveVisualGenerationTarget(card,doc.generationPolicy,providers),{
-    providerId:'maestro-image',modelId:'flux-special',source:'override',
+    model_id:'flux-special',source:'override',
   });
   doc=setVisualCardImageOverride(doc,'hero',{mode:'inherit'});
   assert.equal(resolveVisualGenerationTarget(doc.filmBible.visual.cards.hero,doc.generationPolicy,providers).source,'project');
@@ -47,7 +47,7 @@ test('visual card override wins over the project image policy and inherit restor
 test('uploaded primary reference requires human locking and locked versions are immutable',()=>{
   let doc=fixture();
   assert.throws(()=>lockVisualVersion(doc,'hero-v1'),/只有待确认参考图/);
-  doc=setVisualCardImageOverride(doc,'hero',{mode:'override',providerId:'ark',modelId:'seedream-manual'});
+  doc=setVisualCardImageOverride(doc,'hero',{mode:'override',model_id:'seedream-manual'});
   doc=attachUploadedPrimaryReference(doc,'hero-v1',{id:'asset-uploaded',name:'hero.png'},10);
   assert.equal(doc.filmBible.visual.versions['hero-v1'].status,'pending_reference');
   assert.deepEqual(primaryReference(doc.filmBible.visual.versions['hero-v1']),{
@@ -59,14 +59,14 @@ test('uploaded primary reference requires human locking and locked versions are 
   assert.throws(()=>attachUploadedPrimaryReference(doc,'hero-v1',{id:'replacement'}),/不能替换/);
   assert.throws(()=>updateDraftVisualVersion(doc,'hero-v1',{spec:{description:'改写',attributes:[]},invariants:[]}),/不可修改/);
   assert.throws(
-    ()=>setVisualCardImageOverride(doc,'hero',{mode:'override',providerId:'ark',modelId:'another-model'}),
+    ()=>setVisualCardImageOverride(doc,'hero',{mode:'override',model_id:'another-model'}),
     /生成策略不可修改/,
   );
   assert.throws(()=>setVisualCardImageOverride(doc,'hero',{mode:'inherit'}),/生成策略不可修改/);
 });
 
 test('state generation requires and sends the locked parent reference',()=>{
-  const target={providerId:'ark',modelId:'seedream',source:'project'};
+  const target={model_id:'seedream',source:'project'};
   let doc=fixture();
   assert.throws(()=>planVisualReferenceGeneration(doc,'wet-v1',target,{image_reference:true}),/先确认并锁定父版本/);
   doc=lockVisualVersion(attachUploadedPrimaryReference(doc,'hero-v1',{id:'asset-parent'}),'hero-v1');
@@ -82,11 +82,11 @@ test('state generation requires and sends the locked parent reference',()=>{
 test('generated primary reference preserves immutable job and parent provenance',()=>{
   let doc=fixture();
   doc=lockVisualVersion(attachUploadedPrimaryReference(doc,'hero-v1',{id:'asset-parent'}),'hero-v1');
-  const plan=planVisualReferenceGeneration(doc,'wet-v1',{providerId:'ark',modelId:'seedream',source:'override'},{image_reference:true});
+  const plan=planVisualReferenceGeneration(doc,'wet-v1',{model_id:'seedream',source:'override'},{image_reference:true});
   doc.filmBible.visual.versions['wet-v1'].status='pending_reference';
   doc.filmBible.visual.versions['wet-v1'].provenance.referenceGeneration={
     submissionId:'submission-reference-1',jobId:'job-reference-1',createdAt:20,
-    providerId:plan.providerId,modelId:plan.modelId,targetSource:plan.targetSource,
+    model_id:plan.model_id,targetSource:plan.targetSource,
     prompt:plan.prompt,parentVersionId:plan.parentVersionId,
     parentReferenceAssetId:plan.parentReferenceAssetId,
   };
@@ -99,8 +99,8 @@ test('generated primary reference preserves immutable job and parent provenance'
   assert.equal(reference.source,'generated');
   assert.equal(reference.provenance.jobId,'job-reference-1');
   assert.equal(reference.provenance.submissionId,'submission-reference-1');
-  assert.equal(reference.provenance.providerId,'ark');
-  assert.equal(reference.provenance.modelId,'seedream');
+  assert.equal(reference.provenance.providerId,undefined);
+  assert.equal(reference.provenance.model_id,'seedream');
   assert.equal(reference.provenance.targetSource,'override');
   assert.equal(reference.provenance.parentVersionId,'hero-v1');
   assert.equal(reference.provenance.parentReferenceAssetId,'asset-parent');
@@ -111,7 +111,7 @@ test('persisted submission ownership recovers after reload and applies idempoten
   let doc=fixture();
   doc.filmBible.visual.versions['hero-v1'].status='pending_reference';
   doc.filmBible.visual.versions['hero-v1'].provenance.referenceGeneration={
-    submissionId:'submission-reload-1',createdAt:20,providerId:'ark',modelId:'seedream',
+    submissionId:'submission-reload-1',createdAt:20,model_id:'seedream',
     targetSource:'project',prompt:'角色定妆',
   };
   doc=structuredClone(doc);
@@ -128,7 +128,7 @@ test('late result from an older submission cannot replace the current generation
   let doc=fixture();
   doc.filmBible.visual.versions['hero-v1'].status='pending_reference';
   doc.filmBible.visual.versions['hero-v1'].provenance.referenceGeneration={
-    submissionId:'submission-B',jobId:'job-B',createdAt:20,providerId:'ark',modelId:'seedream',
+    submissionId:'submission-B',jobId:'job-B',createdAt:20,model_id:'seedream',
     targetSource:'project',prompt:'第二次生成',
   };
   const lateA={id:'job-A',submission_id:'submission-A',node_id:'visual-version:hero-v1',result:{assets:[{id:'asset-A'}]}};

@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 
 from .. import store as s
+from .. import provider_egress
 from . import common
 
 DEFAULT_URL = 'https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse'
@@ -38,7 +39,7 @@ def synthesize(worker, job, provider):
         raise ValueError('请输入试听或对白文本')
     if len(text.encode('utf-8')) > 1024:
         raise ValueError('单条对白不能超过 1024 字节，请拆成多句生成')
-    voice_type = str(inp.get('voice_type') or inp.get('model') or provider.get('model') or DEFAULT_VOICE_TYPE).strip()
+    voice_type = str(inp.get('voice_type') or provider.get('model') or DEFAULT_VOICE_TYPE).strip()
     if not voice_type:
         raise ValueError('请为角色选择豆包语音音色 ID')
     params = {**(provider.get('parameters') or {}), **(inp.get('parameters') or {})}
@@ -86,7 +87,7 @@ def synthesize(worker, job, provider):
     worker.progress(job, '豆包语音正在合成固定角色音色')
     try:
         chunks = []
-        with httpx.Client(timeout=httpx.Timeout(120, connect=15), headers=_headers(provider), trust_env=True) as client:
+        with provider_egress.client(origin=provider['url'],timeout=httpx.Timeout(120, connect=15), headers=_headers(provider), trust_env=True) as client:
             with client.stream('POST', str(provider.get('url') or DEFAULT_URL), json=body) as response:
                 if not response.is_success:
                     response.read()

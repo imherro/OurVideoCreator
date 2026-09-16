@@ -15,7 +15,7 @@ export type VisualAttribute = { name: string; value: string };
 
 export type VisualGenerationOverride =
   | { mode: "inherit" }
-  | { mode: "override"; providerId: string; modelId: string };
+  | { mode: "override"; model_id: string };
 
 export type VisualReference = {
   role: "primary";
@@ -25,8 +25,7 @@ export type VisualReference = {
   provenance: {
     jobId?: string;
     submissionId?: string;
-    providerId?: string;
-    modelId?: string;
+    model_id?: string;
     targetSource?: "override" | "project" | "system";
     prompt?: string;
     parentVersionId?: string;
@@ -70,7 +69,7 @@ export type VisualBible = {
 
 export type VoiceProfile = {
   cardId: string;
-  providerId: string;
+  model_id: string;
   voiceType: string;
   version: number;
   status: "draft" | "locked";

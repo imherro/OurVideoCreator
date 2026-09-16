@@ -4,7 +4,7 @@ from backend.reference_compiler import compile_shot_image_input
 
 
 PROVIDERS = [{
-    'id': 'image-provider', 'name': 'Image Provider', 'type': 'openai',
+    'id': 'image-model', 'name': 'Image Provider', 'type': 'openai',
     'kind': 'image', 'local': True, 'model': 'image-model',
 }]
 
@@ -62,7 +62,7 @@ def document():
 
 def input_value():
     return {
-        'provider': 'image-provider', 'model': 'image-model',
+        'model_id': 'image-model',
         'prompt': '把林岚改成金发并换成红衣服',
         'asset_ids': ['asset-manual'],
     }
@@ -131,8 +131,8 @@ def test_compiler_uses_only_asset_bindings_in_character_scene_prop_order():
     assert '拼贴画' in result['prompt']
     assert 'composite' not in result['reference_compiler']
     assert result['generation_fingerprint']['algorithm'] == 'sha256'
-    assert result['generation_fingerprint']['inputs']['providerId'] == 'image-provider'
-    assert result['generation_fingerprint']['inputs']['modelId'] == 'image-model'
+    assert 'providerId' not in result['generation_fingerprint']['inputs']
+    assert result['generation_fingerprint']['inputs']['model_id'] == 'image-model'
     assert [item['versionId'] for item in result['generation_fingerprint']['inputs']['boundVisualVersions']] == [
         'hero-v1', 'friend-v1', 'alley-v1', 'umbrella-v1',
     ]

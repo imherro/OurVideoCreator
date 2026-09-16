@@ -28,6 +28,7 @@ from backend.app import (
 from backend.database import WorkerAdvisoryLock, check_ready
 from tests.postgres_test_db import _assert_safe_target
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -201,12 +202,7 @@ def test_db04_injected_save_failure_rolls_back_content_history_and_event(monkeyp
 
 def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(monkeypatch):
     client = authenticated_client()
-    previous = s.get_setting('providers', [])
-    provider = {
-        'id': 'p2-batch-provider', 'name': 'P2 batch', 'type': 'openai',
-        'url': 'http://127.0.0.1:9/v1', 'local': True, 'kind': 'text', 'model': 'test',
-    }
-    s.set_setting('providers', [*previous, provider])
+    model = publish_test_model(client, 'p2-batch-model')
     try:
         production = client.post('/api/productions', json={'name': 'P2 batch rollback'}).json()
         episode = client.post(f'/api/productions/{production["id"]}/episodes', json={'title': 'Episode'}).json()
@@ -234,7 +230,7 @@ def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(mo
         monkeypatch.setattr(app_module, 'create_job_record', injected)
         body = SourceExtractionCreate(
             project_id=episode['id'], chapter_ids=[item['id'] for item in chapters],
-            provider=provider['id'], model='test', allow_cloud=False,
+            model_id=model['id'], allow_cloud=False,
             submission_id='p2-last-item-rollback',
         )
         with pytest.raises(RuntimeError, match='last batch item'):
@@ -254,7 +250,6 @@ def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(mo
             ).fetchone()['count']
         assert jobs == private == events == 0
     finally:
-        s.set_setting('providers', previous)
         client.__exit__(None, None, None)
 
 

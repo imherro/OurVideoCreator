@@ -9,6 +9,8 @@ from backend.app import app
 from backend import store as s
 from backend.worker import Worker
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model, bind_adapter_job, CANARY
+from tests.egress_helpers import mock_egress, public_test_dns
 
 @pytest.fixture(scope='module')
 def client():
@@ -140,19 +142,17 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     assert listed[first['id']]['production_id']==production['id']
 
     other=c.post('/api/projects',json={'name':'另一个 Production'}).json()
-    prior_providers=s.get_setting('providers',[])
-    reference_provider={'id':'reference-test-api','name':'Reference test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
-    s.set_setting('providers',[*prior_providers,reference_provider])
+    reference_provider=publish_test_model(c,'reference-test-api',kind='image',provider_type='volcengine_ark',
+        capabilities={'image_reference':True,'max_references':10})
     accepted_job=c.post(f'/api/projects/{second["id"]}/jobs',json={
-        'node_id':'same-production-reference','kind':'text','submission_id':'same-production-reference-1',
-        'input':{'prompt':'只验证引用边界','provider':reference_provider['id'],'asset_ids':[reference['id']]},
+        'node_id':'same-production-reference','kind':'image','submission_id':'same-production-reference-1',
+        'input':{'prompt':'只验证引用边界','model_id':reference_provider['id'],'asset_ids':[reference['id']]},
     })
     assert accepted_job.status_code==200,accepted_job.text
     rejected_job=c.post(f'/api/projects/{other["id"]}/jobs',json={
-        'node_id':'cross-production-reference','kind':'text','submission_id':'cross-production-reference-1',
-        'input':{'prompt':'只验证引用边界','provider':reference_provider['id'],'asset_ids':[reference['id']]},
+        'node_id':'cross-production-reference','kind':'image','submission_id':'cross-production-reference-1',
+        'input':{'prompt':'只验证引用边界','model_id':reference_provider['id'],'asset_ids':[reference['id']]},
     })
-    s.set_setting('providers',prior_providers)
     assert rejected_job.status_code==400
     assert '其他 Production' in rejected_job.json()['detail']
     rejected=c.patch(
@@ -188,27 +188,20 @@ def test_legacy_project_create_api_still_creates_one_episode_wrapper(authenticat
 
 def test_project_schema_revision_and_generation_policy_roundtrip(authenticated):
     c=authenticated
-    old_providers=s.get_setting('providers',[])
-    ark={'id':'phase0-ark','name':'Phase 0 Ark','type':'volcengine_ark','local':False,
-         'url':'https://ark.cn-beijing.volces.com/api/v3','api_key':'test-only',
-         'models':{'text':'doubao','image':'seedream','video':'seedance'}}
-    s.set_setting('providers',[*old_providers,ark])
-    try:
-        created=project(c)
-        from backend.project_schema import CURRENT_SCHEMA_VERSION
-        assert created['document']['schemaVersion']==CURRENT_SCHEMA_VERSION
-        assert created['document']['generationPolicy']['image']=={'providerId':'phase0-ark','modelId':'seedream'}
-        document=created['document'];document['generationPolicy']['video']={'providerId':'phase0-ark','modelId':'seedance-custom'}
-        saved=c.put('/api/projects/'+created['id'],json={'name':created['name'],'revision':created['revision'],'document':document})
-        assert saved.status_code==200,saved.text
-        assert c.get('/api/projects/'+created['id']).json()['document']['generationPolicy']['video']['modelId']=='seedance-custom'
+    for kind in ('text','image','video'):
+        publish_test_model(c,'phase0-'+kind,kind=kind,provider_type='volcengine_ark',default=True)
+    publish_test_model(c,'seedance-custom',kind='video',provider_type='volcengine_ark')
+    created=project(c)
+    from backend.project_schema import CURRENT_SCHEMA_VERSION
+    assert created['document']['schemaVersion']==CURRENT_SCHEMA_VERSION
+    assert created['document']['generationPolicy']['image']=={'model_id':'phase0-image'}
+    document=created['document'];document['generationPolicy']['video']={'model_id':'seedance-custom'}
+    saved=c.put('/api/projects/'+created['id'],json={'name':created['name'],'revision':created['revision'],'document':document})
+    assert saved.status_code==200,saved.text
+    reopened=c.get('/api/projects/'+created['id']).json()['document']
+    assert reopened['generationPolicy']['video']['model_id']=='seedance-custom'
+    assert reopened['schemaVersion']==CURRENT_SCHEMA_VERSION
 
-        # P2 starts from an empty PostgreSQL baseline. Legacy SQLite row
-        # rewriting is intentionally retired; current documents still round-trip.
-        reopened=c.get('/api/projects/'+created['id']).json()['document']
-        assert reopened['schemaVersion']==CURRENT_SCHEMA_VERSION
-    finally:
-        s.set_setting('providers',old_providers)
 
 def test_film_bible_and_shot_bindings_round_trip_through_project_document(authenticated):
     c=authenticated;p=project(c);doc=p['document']
@@ -219,11 +212,11 @@ def test_film_bible_and_shot_bindings_round_trip_through_project_document(authen
     }]})
     doc['filmBible']['visual']=visual;version_id=key_ids['hero'][1]
     card_id=key_ids['hero'][0]
-    visual['cards'][card_id]['generation']={'image':{'mode':'override','providerId':'ark','modelId':'seedream-custom'}}
+    visual['cards'][card_id]['generation']={'image':{'mode':'override','model_id':'seedream-custom'}}
     visual['versions'][version_id]['status']='locked'
     visual['versions'][version_id]['references']=[{
       'role':'primary','assetId':'asset-reference','source':'generated','createdAt':123,
-      'provenance':{'jobId':'job-reference','providerId':'ark','modelId':'seedream-custom','targetSource':'override'},
+      'provenance':{'jobId':'job-reference','model_id':'seedream-custom','targetSource':'override'},
     }]
     visual['versions'][version_id]['provenance']={'lockedAt':124}
     doc['shots']=[{'id':'shot-001','uid':'shot-stable-1','order':1,'assetBindings':{
@@ -263,7 +256,7 @@ def test_phase5_roundtrip_preserves_versions_binding_fingerprint_stale_and_media
     for shot in doc['shots']:
         fingerprint=build_generation_fingerprint(doc,shot,'phase5-provider','phase5-model',1)
         doc['nodes'].append({'id':shot['imageNode'],'data':{
-            'kind':'image','provider':'phase5-provider','model':'phase5-model',
+            'kind':'image','model_id':'phase5-model',
             'assetId':media['id'],'resultJob':'historical-job-'+shot['id'],
             'generationFingerprint':fingerprint,
         }})
@@ -334,12 +327,8 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
     from backend.film_bible import normalize_visual_bible
 
     c=authenticated
-    old_providers=s.get_setting('providers',[])
-    provider={
-        'id':'phase3-image','name':'Phase 3 Image','type':'openai','kind':'image',
-        'url':'http://127.0.0.1:1/v1','local':True,'model':'image-model',
-    }
-    s.set_setting('providers',[*old_providers,provider])
+    provider=publish_test_model(c,'phase3-image',kind='image',provider_type='volcengine_ark',
+        capabilities={'image_reference':True,'max_references':10})
     try:
         p=project(c)
         adaptation={
@@ -384,7 +373,7 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
         visual['versions'][hero_version]['status']='locked'
         visual['versions'][hero_version]['references']=[{'role':'primary','assetId':parent['id']}]
         doc['filmBible']['visual']=visual
-        doc['generationPolicy']['image']={'providerId':'phase3-image','modelId':'image-model'}
+        doc['generationPolicy']['image']={'model_id':'phase3-image'}
         saved=c.put(f'/api/projects/{p["id"]}',json={
             'name':p['name'],'revision':p['revision'],
             'production_revision':p['production_revision'],'document':doc,
@@ -393,7 +382,7 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
         payload={
             'node_id':f'visual-version:{state_version}','kind':'image','submission_id':'phase3-state-reference',
             'input':{
-                'provider':'phase3-image','model':'image-model','prompt':'雨中状态','allow_cloud':False,
+                'model_id':'phase3-image','prompt':'雨中状态','allow_cloud':False,
                 'model_capabilities':{'image_reference':True},
                 'asset_ids':[parent['id']],'asset_category':'character',
                 'visual_reference':{
@@ -445,7 +434,7 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
         assert c.get('/api/jobs/'+job['id']).json()['input']['asset_ids']==[parent['id']]
         c.post('/api/jobs/'+job['id']+'/cancel')
     finally:
-        s.set_setting('providers',old_providers)
+        pass
 
 def test_shot_reference_compiler_is_identical_for_single_and_batch_submission(authenticated,monkeypatch):
     import io
@@ -455,12 +444,8 @@ def test_shot_reference_compiler_is_identical_for_single_and_batch_submission(au
     from backend.film_bible import normalize_visual_bible
 
     c=authenticated
-    old_providers=s.get_setting('providers',[])
-    provider={
-        'id':'phase4-image','name':'Phase 4 Image','type':'openai','kind':'image',
-        'url':'http://127.0.0.1:1/v1','local':True,'model':'image-model',
-    }
-    s.set_setting('providers',[*old_providers,provider])
+    provider=publish_test_model(c,'phase4-image',kind='image',provider_type='volcengine_ark',
+        capabilities={'image_reference':True,'max_references':10})
     try:
         p=project(c);doc=p['document']
         visual,keys=normalize_visual_bible({'cards':[
@@ -481,7 +466,7 @@ def test_shot_reference_compiler_is_identical_for_single_and_batch_submission(au
         image_node={
             'id':'phase4-image-node','type':'media','position':{'x':0,'y':0},
             'data':{
-                'kind':'image','label':'分镜图','provider':'phase4-image','model':'image-model',
+                'kind':'image','label':'分镜图','model_id':'phase4-image',
                 'prompt':'中景，人物穿过雨巷','asset_ids':[assets['manual']['id']],
             },
         }
@@ -543,7 +528,7 @@ def test_shot_reference_compiler_is_identical_for_single_and_batch_submission(au
         for job_id in [accepted.json()['id'],*batch.json()['job_ids']]:
             c.post('/api/jobs/'+job_id+'/cancel')
     finally:
-        s.set_setting('providers',old_providers)
+        pass
 
 def test_asset_library_semantic_categories(authenticated):
     import io
@@ -571,53 +556,34 @@ def test_asset_library_semantic_categories(authenticated):
 def test_cross_origin_and_secret_masking(authenticated):
     c=authenticated
     assert c.post('/api/projects',json={'name':'bad'},headers={'Origin':'https://other.example'}).status_code==403
-    settings={'providers':[{'id':'cloud','name':'测试服务','type':'openai','url':'https://example.com/v1','api_key':'do-not-expose','local':False,'kind':'text'}]}
-    assert c.put('/api/settings',json=settings).status_code==200
-    assert 'do-not-expose' not in c.get('/api/settings').text
-    assert c.get('/api/settings').json()['providers'][0]['api_key_set'] is True
+    publish_test_model(c,'cloud',api_key='do-not-expose')
+    public=c.get('/api/settings')
+    assert 'do-not-expose' not in public.text and 'providers' not in public.json()
+    private=c.get('/api/admin/model-providers').json()['providers']
+    assert next(item for item in private if item['id']=='test-provider-cloud')['api_key_set'] is True
+    assert c.put('/api/settings',json={'providers':[]}).status_code==410
 
 def test_volcengine_ark_unified_settings_and_connection(authenticated,monkeypatch):
     import httpx
     c=authenticated
-    provider={
-        'id':'ark','name':'火山方舟','type':'volcengine_ark','local':False,
-        'url':'https://ark.cn-beijing.volces.com/api/v3','api_key':'ark-secret',
-        'models':{'text':'doubao-text','image':'seedream-image','video':'seedance-video'},
-    }
-    assert c.put('/api/settings',json={'providers':[ *s.get_setting('providers',[]), provider]}).status_code==200
-    public=c.get('/api/settings')
-    assert 'ark-secret' not in public.text
-    public_body=public.json()
-    public_ark=next(item for item in public_body['providers'] if item['id']=='ark')
-    assert public_ark['api_key_set'] is True
-    # A second save of the masked public object must preserve the server key.
-    public_ark['local']=True
-    public_ark['kind']='image'
-    public_ark['api_key']=''
-    assert c.put('/api/settings',json={'providers':public_body['providers']}).status_code==200
-    saved_ark=next(item for item in s.get_setting('providers',[]) if item['id']=='ark')
-    assert saved_ark['api_key']=='ark-secret'
-    assert saved_ark['local'] is False and 'kind' not in saved_ark
+    public_test_dns(monkeypatch)
     calls=[]
-    original=httpx.Client
-    def handle(request):
-        calls.append((request.method,str(request.url),request.headers.get('authorization')))
-        assert request.method=='GET' and request.url.path=='/api/v3/models'
-        return httpx.Response(200,json={'data':[
-            {'id':'doubao-text','name':'Doubao Text'},
-            {'id':'seedream-image','name':'Seedream'},
-            {'id':'seedance-video','name':'Seedance'},
-            {'id':'doubao-embedding','name':'Embedding'},
-        ]})
-    monkeypatch.setattr(httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
-    ark_image_model=c.get('/api/providers/ark/models?kind=image').json()['models'][0]
-    assert ark_image_model['id']=='seedream-image'
-    assert ark_image_model['capabilities']['image_reference'] is True
-    assert ark_image_model['capabilities']['max_references']==10
-    ark_video_model=c.get('/api/providers/ark/models?kind=video').json()['models'][0]
-    assert ark_video_model['capabilities']['image_reference'] is True
-    assert ark_video_model['capabilities']['max_references']==1
-    assert ark_video_model['capabilities']['end_frame'] is True
+    mock_egress(monkeypatch,lambda request: calls.append(request.method) or (_ for _ in ()).throw(AssertionError('must not call upstream')))
+    for kind in ('text','image','video'):
+        caps={} if kind=='text' else {'image_reference':True,'max_references':10 if kind=='image' else 1}
+        if kind=='video':caps['end_frame']=True
+        publish_test_model(c,'ark-'+kind,kind=kind,provider_type='volcengine_ark',capabilities=caps,api_key='ark-secret')
+    public=c.get('/api/settings')
+    assert 'ark-secret' not in public.text and 'models.example.test' not in public.text
+    rows={item['id']:item for item in public.json()['models']}
+    assert rows['ark-image']['capabilities']['image_reference'] is True
+    assert rows['ark-image']['capabilities']['max_references']==10
+    assert rows['ark-video']['capabilities']=={'image_reference':True,'max_references':1,'end_frame':True}
+    private=next(item for item in c.get('/api/admin/model-providers').json()['providers'] if item['id']=='test-provider-ark-video')
+    kept=c.put('/api/admin/model-providers/'+private['id'],json={
+        'revision':private['revision'],'name':private['name'],'enabled':True,'config':private['config']})
+    assert kept.status_code==200,kept.text
+    assert kept.json()['credential_version_id']==private['credential_version_id']
     p=project(c)
     import io
     from PIL import Image
@@ -625,42 +591,42 @@ def test_volcengine_ark_unified_settings_and_connection(authenticated,monkeypatc
     reference=c.post('/api/projects/'+p['id']+'/assets',files={'file':('ark-reference.png',stream.getvalue(),'image/png')}).json()
     accepted=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-image-reference','kind':'image','submission_id':'ark-image-reference-job',
-        'input':{'provider':'ark','prompt':'参考图一的人物生成新场景','asset_ids':[reference['id']],'allow_cloud':True},
+        'input':{'model_id':'ark-image','prompt':'参考图一的人物生成新场景','asset_ids':[reference['id']],'allow_cloud':True},
     })
     assert accepted.status_code==200,accepted.text
     accepted_video=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-video-reference','kind':'video','submission_id':'ark-video-reference-job',
-        'input':{'provider':'ark','prompt':'让人物走动','asset_ids':[reference['id']],'allow_cloud':True},
+        'input':{'model_id':'ark-video','prompt':'让人物走动','asset_ids':[reference['id']],'allow_cloud':True},
     })
     assert accepted_video.status_code==200,accepted_video.text
     accepted_transition=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-video-transition','kind':'video','submission_id':'ark-video-transition-job',
-        'input':{'provider':'ark','prompt':'从首帧连续运动到尾帧','asset_ids':[reference['id']],
+        'input':{'model_id':'ark-video','prompt':'从首帧连续运动到尾帧','asset_ids':[reference['id']],
                  'end_asset_id':reference['id'],'allow_cloud':True},
     })
     assert accepted_transition.status_code==200,accepted_transition.text
     rejected_tail_only=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-video-tail-only','kind':'video','submission_id':'ark-video-tail-only-job',
-        'input':{'provider':'ark','prompt':'移动到尾帧','end_asset_id':reference['id'],'allow_cloud':True},
+        'input':{'model_id':'ark-video','prompt':'移动到尾帧','end_asset_id':reference['id'],'allow_cloud':True},
     })
-    assert rejected_tail_only.status_code==400 and '必须同时指定一张首帧' in rejected_tail_only.text
+    assert rejected_tail_only.status_code==400 and '缺少首帧' in rejected_tail_only.text
     rejected_video=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-video-many-references','kind':'video','submission_id':'ark-video-many-references-job',
-        'input':{'provider':'ark','prompt':'让人物走动','asset_ids':[reference['id'],reference['id']],'allow_cloud':True},
+        'input':{'model_id':'ark-video','prompt':'让人物走动','asset_ids':[reference['id'],reference['id']],'allow_cloud':True},
     })
-    assert rejected_video.status_code==400 and '最多接受一张首帧' in rejected_video.text
+    assert rejected_video.status_code==400 and '数量超限' in rejected_video.text
     c.post('/api/jobs/'+accepted.json()['id']+'/cancel')
     c.post('/api/jobs/'+accepted_video.json()['id']+'/cancel')
     c.post('/api/jobs/'+accepted_transition.json()['id']+'/cancel')
     cloud_without_extra_authorization=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-image','kind':'image','submission_id':'ark-cloud-gate',
-        'input':{'provider':'ark','prompt':'一只猫'},
+        'input':{'model_id':'ark-image','prompt':'一只猫'},
     })
     assert cloud_without_extra_authorization.status_code==200,cloud_without_extra_authorization.text
     c.post('/api/jobs/'+cloud_without_extra_authorization.json()['id']+'/cancel')
     queued=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-video','kind':'video','submission_id':'ark-cancel-cost-warning',
-        'input':{'provider':'ark','prompt':'一只猫走过窗前','allow_cloud':True},
+        'input':{'model_id':'ark-video','prompt':'一只猫走过窗前','allow_cloud':True},
     }).json()
     with s.db() as db:
         db.execute('UPDATE jobs SET provider_job_id=%s WHERE id=%s',('remote-ark-task',queued['id']))
@@ -668,59 +634,39 @@ def test_volcengine_ark_unified_settings_and_connection(authenticated,monkeypatc
     cancelled=c.post('/api/jobs/'+queued['id']+'/cancel').json()
     assert cancelled['status']=='cancelled'
     assert cancelled['phase']=='本地已取消；供应商可能继续生成并产生费用'
-    verified=c.post('/api/providers/ark/verify')
-    assert verified.status_code==200,verified.text
-    assert verified.json()['counts']=={'text':1,'image':1,'video':1}
-    for kind,model in provider['models'].items():
-        tested=c.post('/api/providers/ark/test?kind='+kind)
-        assert tested.status_code==200,tested.text
-        assert tested.json()['status']=='listed' and tested.json()['model']==model
-    assert all(call==('GET','https://ark.cn-beijing.volces.com/api/v3/models','Bearer ark-secret') for call in calls)
+    checked=c.post('/api/admin/model-providers/test-provider-ark-video/check')
+    assert checked.status_code==200,checked.text
+    assert checked.json()['status']=='unverified'
+    for suffix in ('verify','test'):
+        assert c.post('/api/providers/ark/'+suffix).status_code==410
+    assert c.get('/api/providers/ark/models').status_code==410
+    assert calls==[]
 
 
 def test_hc_atom_unified_settings_and_connection(authenticated,monkeypatch):
-    import httpx
-    from backend.providers import hc_atom
     c=authenticated
-    previous=s.get_setting('providers',[])
-    provider={
-        'id':'hc','name':'幻场 AI','type':'hc_atom','local':True,
-        'url':'https://ai-aigc.fzyinghe.com','api_key':'yh-secret',
-        'models':{'text':'qwen-text','image':'flux-image','video':'kling-video'},
-    }
-    try:
-        saved=c.put('/api/settings',json={'providers':[provider]})
-        assert saved.status_code==200,saved.text
-        public=saved.json()['providers'][0]
-        assert public['type']=='hc_atom' and public['local'] is False
-        assert public['api_key_set'] is True and 'api_key' not in public
-        original=httpx.Client
-        def handle(request):
-            assert request.method=='GET' and request.url.path=='/v1/models'
-            assert request.headers['authorization']=='Bearer yh-secret'
-            return httpx.Response(200,json={'data':[
-                {'id':'qwen-text'},{'id':'flux-image'},{'id':'kling-video'},
-            ]})
-        monkeypatch.setattr(hc_atom.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
-        verified=c.post('/api/providers/hc/verify')
-        assert verified.status_code==200,verified.text
-        assert verified.json()['counts']=={'text':1,'image':1,'video':1}
-        assert c.get('/api/providers/hc/models?kind=video').json()['models'][0]['id']=='kling-video'
-    finally:
-        s.set_setting('providers',previous)
+    public_test_dns(monkeypatch)
+    for kind in ('text','image','video'):
+        publish_test_model(c,'hc-'+kind,kind=kind,provider_type='hc_atom')
+    public=c.get('/api/models')
+    assert CANARY not in public.text and 'models.example.test' not in public.text
+    assert {row['kind'] for row in public.json()['models'] if row['id'].startswith('hc-')}=={'text','image','video'}
+    private=next(row for row in c.get('/api/admin/model-providers').json()['providers'] if row['id']=='test-provider-hc-video')
+    assert private['api_key_set'] is True and 'api_key' not in private
+    checked=c.post('/api/admin/model-providers/'+private['id']+'/check')
+    assert checked.status_code==200 and checked.json()['generation_verified'] is False
+    assert c.post('/api/providers/hc/verify').status_code==410
+    assert c.get('/api/providers/hc/models?kind=video').status_code==410
 
 
 def test_ark_cancel_rereads_handle_attached_after_initial_snapshot(authenticated,monkeypatch):
     c=authenticated;p=project(c)
     now=time.time();jid='ark-cancel-reverse-race'
-    provider=next(
-        (item for item in s.get_setting('providers',[]) if item['id']=='ark'),
-        {'id':'ark','name':'Test Ark','type':'volcengine_ark','url':'https://example.invalid','api_key':'test-only'},
-    )
+    provider={'id':'ark','type':'volcengine_ark','url':'https://ark.example.test','model':'test'}
     with s.db() as db:
         db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                    (jid,jid,p['id'],'video-node','video','running',s.dumps({'provider':'ark','allow_cloud':True,'prompt':'test'}),now,now))
-        db.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(provider)))
+        bind_adapter_job(db,jid,'video',provider,{'prompt':'test'})
     original_job_update=s.job_update
     seen=[]
     def racing_job_update(job_id,**fields):
@@ -799,7 +745,7 @@ def test_projects_and_assets_move_to_trash_and_restore(authenticated):
 
 def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(authenticated):
     c=authenticated;p=project(c)
-    payload={'node_id':'n1','kind':'text','submission_id':'stable-submission-001','input':{'provider':'cloud','prompt':'编写短片'}}
+    payload={'node_id':'n1','kind':'text','submission_id':'stable-submission-001','input':{'model_id':'cloud','prompt':'编写短片'}}
     first=c.post('/api/projects/'+p['id']+'/jobs',json=payload).json()
     second=c.post('/api/projects/'+p['id']+'/jobs',json=payload).json()
     assert first['id']==second['id']
@@ -807,7 +753,10 @@ def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(auth
     assert 'do-not-expose' not in str(first)
     with s.db() as db:
         frozen=db.execute('SELECT provider FROM job_private WHERE job_id=%s',(first['id'],)).fetchone()['provider']
-    assert 'do-not-expose' in frozen
+    assert json.loads(frozen)=={}
+    with s.db() as db:
+        from backend import platform_models
+        assert platform_models.load_job_provider(db,first['id'])['api_key']=='do-not-expose'
 
 def test_missing_or_removed_local_provider_fails_before_any_upstream_request(authenticated,monkeypatch):
     import httpx
@@ -832,9 +781,8 @@ def test_missing_or_removed_local_provider_fails_before_any_upstream_request(aut
 def test_cancel_wins_late_completion(authenticated):
     c=authenticated;p=project(c)
     old=s.get_setting('providers',[])
-    provider={'id':'cancel-test-api','name':'Cancel test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
-    s.set_setting('providers',[*old,provider])
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'cancel-submission-001','input':{'provider':provider['id'],'prompt':'你好'}}).json()
+    provider=publish_test_model(c,'cancel-test-api')
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'cancel-submission-001','input':{'model_id':provider['id'],'prompt':'你好'}}).json()
     s.set_setting('providers',old)
     s.job_update(job['id'],status='running')
     assert c.post('/api/jobs/'+job['id']+'/cancel').json()['status']=='cancelled'
@@ -855,7 +803,8 @@ def test_media_upload_range_and_project_boundary(authenticated):
     assert c.post('/api/projects/'+other['id']+'/jobs',json=request).status_code==400
     assert c.post('/api/projects/'+p['id']+'/assets',files={'file':('bad.html',b'<script>x</script>','text/html')}).status_code==400
 
-def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticated):
+def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticated,monkeypatch):
+    public_test_dns(monkeypatch)
     from backend.provider_assets import public_asset_url
     import io
     from PIL import Image
@@ -870,9 +819,8 @@ def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticate
 
 def test_restart_marks_ambiguous_running_job(authenticated):
     c=authenticated;p=project(c)
-    provider={'id':'restart-test-api','name':'Restart test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
-    s.set_setting('providers',[provider])
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'provider':provider['id'],'prompt':'test'}}).json()
+    provider=publish_test_model(c,'restart-test-api')
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'model_id':provider['id'],'prompt':'test'}}).json()
     with s.db() as db:
         db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND id!=%s",(job['id'],))
     s.job_update(job['id'],status='running',provider_job_id='upstream-paid-id')
@@ -892,8 +840,8 @@ def test_graph_cycle_rejected_without_submitting(authenticated):
 
 def test_graph_storyboard_defaults_to_two_pass_film_bible(authenticated):
     c=authenticated;p=project(c);doc=p['document']
-    c.put('/api/settings',json={'providers':[{'id':'local-test','name':'test','type':'openai','url':'http://127.0.0.1:1/v1','local':True}]})
-    doc['nodes']=[{'id':'plan','data':{'kind':'storyboard','provider':'local-test','prompt':'雨夜故事'}}]
+    publish_test_model(c,'local-test')
+    doc['nodes']=[{'id':'plan','data':{'kind':'storyboard','model_id':'local-test','prompt':'雨夜故事'}}]
     assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'film-bible-graph-001'})
     assert result.status_code==200,result.text
@@ -909,8 +857,8 @@ def test_graph_storyboard_defaults_to_two_pass_film_bible(authenticated):
 
 def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     c=authenticated;p=project(c);doc=p['document']
-    c.put('/api/settings',json={'providers':[{'id':'local-test','name':'test','type':'openai','url':'http://127.0.0.1:1/v1','local':True}]})
-    doc['nodes']=[{'id':n,'data':{'kind':'text','provider':'local-test','prompt':prompt}} for n,prompt in [('a','故事'),('b','分镜')]]
+    publish_test_model(c,'local-test')
+    doc['nodes']=[{'id':n,'data':{'kind':'text','model_id':'local-test','prompt':prompt}} for n,prompt in [('a','故事'),('b','分镜')]]
     doc['edges']=[{'source':'a','target':'b'}]
     assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'graph-run-test-001'}).json()
@@ -942,12 +890,12 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
     from backend import worker as module
     c=authenticated;p=project(c)
     provider={'id':'recover-'+provider_type,'type':provider_type,'url':'http://engine.test','local':True,'model':'test','workflow':{}}
-    c.put('/api/settings',json={'providers':[provider]})
     kind='video' if provider_type=='video_api' else 'image'
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':kind,'submission_id':'resume-'+provider_type,'input':{'provider':provider['id'],'prompt':'test'}}).json()
+    publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url=provider['url'],options={'workflow':{}})
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':kind,'submission_id':'resume-'+provider_type,'input':{'model_id':provider['id'],'prompt':'test'}}).json()
     s.job_update(job['id'],status='interrupted',provider_job_id='original-handle')
     # Editing the service after interruption must not change the polling target.
-    c.put('/api/settings',json={'providers':[{**provider,'url':'http://changed.invalid'}]})
+    publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url='http://changed.invalid',options={'workflow':{}})
     assert c.post('/api/jobs/'+job['id']+'/resume').json()['status']=='queued'
     assert c.post('/api/jobs/'+job['id']+'/resume').json()['id']==job['id']
     job=c.get('/api/jobs/'+job['id']).json()
@@ -963,7 +911,7 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
         if path in ('/api/v1/uploads/recovered.png','/view'):return httpx.Response(200,content=picture.getvalue())
         raise AssertionError(path)
     original=httpx.Client
-    monkeypatch.setattr(module.httpx,'Client',lambda **kw:original(**kw,transport=httpx.MockTransport(handle)))
+    mock_egress(monkeypatch,handle)
     monkeypatch.setattr(module,'download_result',lambda *args:{'id':'returned-video','kind':'video'})
     worker=Worker()
     class NoWait:
@@ -975,9 +923,8 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
 
 def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(authenticated):
     c=authenticated;p=project(c)
-    provider={'id':'resume-test-api','name':'Resume test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
-    s.set_setting('providers',[provider])
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'provider':provider['id'],'prompt':'test'}}).json()
+    provider=publish_test_model(c,'resume-test-api')
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'model_id':provider['id'],'prompt':'test'}}).json()
     s.job_update(job['id'],status='interrupted',error='restart',phase='old phase',progress=42,telemetry={'old':True})
     resumed=c.post('/api/jobs/'+job['id']+'/resume').json()
     assert resumed['status']=='queued'
@@ -992,10 +939,10 @@ def test_replicate_resume_uses_frozen_service_and_cancel_requests_remote_stop(au
     from backend import replicate_api
     c=authenticated;p=project(c)
     provider={'id':'replicate-video','name':'Replicate','type':'replicate','kind':'video','url':'https://api.replicate.com/v1','model':'bytedance/seedance-1-pro','api_key':'test-key','local':False}
-    assert c.put('/api/settings',json={'providers':[provider]}).status_code==200
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'video','submission_id':'replicate-resume-001','input':{'provider':'replicate-video','allow_cloud':True,'prompt':'镜头推进'}}).json()
+    publish_test_model(c,provider['id'],kind='video',provider_type='replicate',url=provider['url'],upstream_model=provider['model'])
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'video','submission_id':'replicate-resume-001','input':{'model_id':'replicate-video','allow_cloud':True,'prompt':'镜头推进'}}).json()
     s.job_update(job['id'],status='interrupted',provider_job_id='prediction-original')
-    assert c.put('/api/settings',json={'providers':[{**provider,'url':'https://changed.invalid'}]}).status_code==200
+    publish_test_model(c,provider['id'],kind='video',provider_type='replicate',url='https://changed.invalid',upstream_model=provider['model'])
     assert c.post('/api/jobs/'+job['id']+'/resume').json()['status']=='queued'
     calls=[]
     monkeypatch.setattr(replicate_api,'cancel',lambda remote_job,frozen:calls.append((remote_job['provider_job_id'],frozen['url'])))
@@ -1009,19 +956,19 @@ def test_personal_prompt_library_versions_and_conflicts(authenticated):
     c=authenticated
     value=c.get('/api/prompt-library').json()
     body={'revision':value['revision'],'name':'我的电影分镜','kind':'storyboard','content':'只使用中文，保留角色。'}
-    first=c.put('/api/prompt-library/test-template',json=body)
+    first=c.put('/api/admin/prompt-templates/test-template',json=body)
     assert first.status_code==200
     assert first.json()['templates'][0]['version']==1
-    assert c.put('/api/prompt-library/test-template',json=body).status_code==409
+    assert c.put('/api/admin/prompt-templates/test-template',json=body).status_code==409
     body.update(revision=first.json()['revision'],content='每镜一个动作。')
-    second=c.put('/api/prompt-library/test-template',json=body).json()
+    second=c.put('/api/admin/prompt-templates/test-template',json=body).json()
     assert second['templates'][0]['history'][0]['content']=='只使用中文，保留角色。'
     assert c.get('/api/prompt-library').json()==second
 
 def test_batch_late_validation_failure_rolls_back_all_jobs(authenticated):
     c=authenticated;p=project(c);doc=p['document']
-    c.put('/api/settings',json={'providers':[{'id':'text-only','name':'text','type':'openai','kind':'text','url':'http://127.0.0.1:1','local':True}]})
-    doc['nodes']=[{'id':'a','data':{'kind':'text','prompt':'story','provider':'text-only'}},{'id':'b','data':{'kind':'image','prompt':'frame','provider':'text-only'}}]
+    publish_test_model(c,'text-only')
+    doc['nodes']=[{'id':'a','data':{'kind':'text','prompt':'story','model_id':'text-only'}},{'id':'b','data':{'kind':'image','prompt':'frame','model_id':'text-only'}}]
     doc['edges']=[{'id':'ab','source':'a','target':'b'}]
     c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc})
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'atomic-batch-validation'})

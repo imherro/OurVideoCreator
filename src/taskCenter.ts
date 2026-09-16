@@ -50,7 +50,7 @@ export function deriveTaskCenterRows(
         shotNodeIds(item).includes(job.node_id) ||
         [item.uid, item.id, item.shot_id].filter(Boolean).includes(job.input?.shot_uid || job.input?.shot_id),
       );
-      const providerId = String(job.input?.provider || node?.data?.provider || "");
+      const providerId = String(job.input?.model_id || node?.data?.model_id || "");
       const provider = providerMap.get(providerId);
       return {
         job,
@@ -61,7 +61,7 @@ export function deriveTaskCenterRows(
         node,
         shot,
         providerName: provider?.name || providerId || (job.kind === "export" ? "本机导出" : "未记录"),
-        modelName: String(job.input?.model || node?.data?.model || (job.kind === "export" ? "FFmpeg" : "未记录")),
+        modelName: String(job.input?.model_id || node?.data?.model_id || (job.kind === "export" ? "FFmpeg" : "未记录")),
       };
     });
 }

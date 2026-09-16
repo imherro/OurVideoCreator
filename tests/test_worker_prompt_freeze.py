@@ -1,6 +1,7 @@
 import time
 
 from backend import store as s
+from tests.platform_model_helpers import bind_adapter_job
 from backend.worker import Worker
 
 
@@ -12,10 +13,10 @@ def _job(compiled):
     now=time.time()
     provider={
         'id':'prompt-maestro','name':'Prompt Maestro','type':'maestro',
-        'kind':'image','url':'http://127.0.0.1:7870','local':True,
+        'kind':'image','url':'https://maestro.example.test','local':True,'model':'image-model',
     }
     input_value={
-        'provider':'prompt-maestro','model':'image-model','prompt':'冻结后的最终提示词',
+        'prompt':'冻结后的最终提示词',
         'upstream_job_ids':[upstream_id],'asset_ids':[],
     }
     if compiled:
@@ -33,7 +34,7 @@ def _job(compiled):
             'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
             (job_id,s.uid(),pid,'image','image','running',s.dumps(input_value),now,now),
         )
-        db.execute('INSERT INTO job_private VALUES(%s,%s)',(job_id,s.dumps(provider)))
+        bind_adapter_job(db,job_id,'image',provider,input_value)
         return s.unpack(db.execute('SELECT * FROM jobs WHERE id=%s',(job_id,)).fetchone())
 
 

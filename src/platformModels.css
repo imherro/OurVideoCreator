@@ -1,0 +1,15 @@
+.platform-model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.platform-model-grid > div { min-width: 0; }
+.platform-model-grid form { display: grid; gap: 12px; margin-top: 18px; }
+.platform-model-grid label { display: grid; gap: 5px; color: #cbd2d3; }
+.platform-model-grid input, .platform-model-grid select, .platform-model-grid textarea { width: 100%; margin: 0; }
+.platform-model-grid textarea { resize: vertical; font: 12px/1.5 Consolas, monospace; }
+.platform-model-grid .checkbox { display: flex; align-items: center; gap: 8px; }
+.platform-model-grid .checkbox input { width: auto; }
+.platform-model-grid details { padding: 10px 0; }
+.platform-model-grid summary { cursor: pointer; color: #dfc38e; }
+.platform-model-grid p { font-size: 12px; line-height: 1.6; }
+.credential-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.credential-row code { overflow-wrap: anywhere; font-size: 11px; }
+.credential-row [role=alert] { flex-basis: 100%; border: 1px solid #705a37; padding: 10px; border-radius: 6px; }
+@media(max-width: 950px) { .platform-model-grid { grid-template-columns: 1fr; } }

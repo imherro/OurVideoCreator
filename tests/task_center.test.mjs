@@ -12,11 +12,11 @@ const episodes = [
 ];
 const documents = {
   "ep-1": {
-    nodes: [{ id: "video-1", data: { provider: "ark", model: "video-model" } }],
+    nodes: [{ id: "video-1", data: { model_id: "video-model" } }],
     shots: [{ uid: "shot-1", shot_id: "001", pipeline: { videoNodeId: "video-1" } }],
   },
   "ep-2": {
-    nodes: [{ id: "image-2", data: { provider: "local", model: "image-model" } }],
+    nodes: [{ id: "image-2", data: { model_id: "image-model" } }],
     shots: [{ uid: "shot-2", shot_id: "002", imageNode: "image-2" }],
   },
 };
@@ -28,13 +28,13 @@ test("task center projects durable jobs across episodes with ownership and model
     { id: "export", project_id: "ep-1", node_id: "export", kind: "export", status: "interrupted", created: 1.5, input: {} },
   ];
   const rows = deriveTaskCenterRows(jobs, episodes, documents, [
-    { id: "ark", name: "火山方舟" },
-    { id: "local", name: "本地图片" },
+    { id: "video-model", name: "火山方舟" },
+    { id: "image-model", name: "平台图片" },
   ]);
 
   assert.deepEqual(rows.map((row) => row.job.id), ["new", "export", "old"]);
   assert.equal(rows[0].episode.episode_no, 2);
-  assert.equal(rows[0].providerName, "本地图片");
+  assert.equal(rows[0].providerName, "平台图片");
   assert.equal(rows[0].modelName, "image-model");
   assert.equal(taskShotLabel(rows[0]), "SHOT 002");
   assert.equal(rows[1].providerName, "本机导出");

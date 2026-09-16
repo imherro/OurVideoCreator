@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from backend.app import app
 from backend import store as s
 from tests.auth_helpers import login_admin
+from tests.platform_model_helpers import publish_test_model
 
 
 @pytest.fixture(scope="module")
@@ -16,20 +17,9 @@ def client():
 
 
 @pytest.fixture()
-def configured_provider():
-    previous = s.get_setting("providers", [])
-    provider = {
-        "id": "setup-ark",
-        "name": "Setup Ark",
-        "type": "volcengine_ark",
-        "local": False,
-        "models": {"text": "text-1", "image": "image-1", "video": "video-1"},
-    }
-    s.set_setting("providers", [provider])
-    try:
-        yield provider
-    finally:
-        s.set_setting("providers", previous)
+def configured_provider(client):
+    return {kind: publish_test_model(client, "setup-"+kind, kind=kind, provider_type="volcengine_ark")
+            for kind in ("text", "image", "video")}
 
 
 def test_project_create_with_setup_fields_owns_data_and_has_no_generation_side_effects(client, configured_provider):
@@ -47,7 +37,7 @@ def test_project_create_with_setup_fields_owns_data_and_has_no_generation_side_e
         "platform": "抖音",
         "brief": "十五秒概念扩展",
         "generation_policy": {
-            kind: {"providerId": configured_provider["id"], "modelId": configured_provider["models"][kind]}
+            kind: {"model_id": configured_provider[kind]["id"]}
             for kind in ("text", "image", "video")
         },
         "film_bible": {
@@ -129,7 +119,7 @@ def test_invalid_generation_policy_leaves_no_partial_rows(client, configured_pro
         before = tuple(db.execute(f"SELECT COUNT(*) count FROM {table}").fetchone()['count'] for table in ("productions", "projects"))
     response = client.post("/api/projects", json={
         "name": "不应创建",
-        "generation_policy": {"text": {"providerId": "missing", "modelId": "x"}, "image": None, "video": None},
+        "generation_policy": {"text": {"model_id": "missing"}, "image": None, "video": None},
     })
     assert response.status_code == 400
     with s.db() as db:
@@ -141,13 +131,13 @@ def test_project_create_rejects_removed_local_text_runtime_target(client, config
     response = client.post("/api/projects", json={
         "name": "本地文本项目",
         "generation_policy": {
-            "text": {"providerId": "local", "modelId": "qwen-local"},
+            "text": {"model_id": "local"},
             "image": None,
             "video": None,
         },
     })
     assert response.status_code == 400
-    assert "已移除的本地推理" in response.json()["detail"]
+    assert "不会自动切换" in response.json()["detail"]
 
 
 def test_production_rename_is_revision_protected_and_preserves_episode_and_context(client):

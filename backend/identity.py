@@ -354,7 +354,7 @@ def authorize_request(request: Request, principal: Principal) -> None:
             raise HTTPException(403, '需要平台管理员权限')
         return
     if ((path == '/api/settings' and method != 'GET') or
-            (path.startswith('/api/providers/') and method != 'GET')):
+            path.startswith('/api/providers/')):
         if not principal.is_admin:
             raise HTTPException(403, '需要平台管理员权限')
         return

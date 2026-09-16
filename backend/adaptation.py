@@ -458,10 +458,9 @@ def project_script_to_document(connection, project_id, document):
         return value
     text_target = (value.get('generationPolicy') or {}).get('text') or {}
     inherited_target = {}
-    if text_target.get('providerId'):
+    if text_target.get('model_id'):
         inherited_target = {
-            'provider': text_target['providerId'],
-            'model': text_target.get('modelId', ''),
+            'model_id': text_target['model_id'],
             'generationPolicyInherited': True,
         }
     data = {
@@ -473,9 +472,8 @@ def project_script_to_document(connection, project_id, document):
     # Preserve a deliberate node override.  Older projections had neither
     # field, so they inherit the production policy on their next read.
     old_data = node.get('data', {})
-    if old_data.get('provider') and old_data.get('generationPolicyInherited') is not True:
-        data['provider'] = old_data['provider']
-        data['model'] = old_data.get('model', '')
+    if old_data.get('model_id') and old_data.get('generationPolicyInherited') is not True:
+        data['model_id'] = old_data['model_id']
         data['generationPolicyInherited'] = False
     node = {**node, 'id': node_id, 'data': {**old_data, **data}}
     nodes.append(node)
