@@ -43,7 +43,7 @@ def main() -> int:
                 if re.search(pattern, route_map) is None:
                     unclassified.append(f"{method} {item['path']}")
         payload = {
-            "audit": "P0-R1 actual app.routes",
+            "audit": "P1 read-only actual app.routes report (not an ACL CI guard)",
             "isolated_data_dir": True,
             "dist_exists": (repo / "dist").is_dir(),
             "route_count": len(routes),
@@ -52,6 +52,7 @@ def main() -> int:
             ),
             "classified_api_route_count": len(api_routes) - len(unclassified),
             "unclassified_api_routes": unclassified,
+            "enforcement": "report-only; P3 ACL-09 will make unclassified routes fail CI",
             "framework_entries_documented": {
                 "openapi": "/openapi.json" in route_map,
                 "static_mount": "StaticFiles" in route_map and "Mount" in route_map,

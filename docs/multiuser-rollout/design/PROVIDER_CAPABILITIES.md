@@ -4,8 +4,8 @@
 
 | 类型 | 文本 | 图片 | 视频 | 语音 | 异步恢复 | 参考素材 | 取消 | P0 证据 |
 |---|---:|---:|---:|---:|---|---|---|---|
-| 本地 llama/openai bridge | 是 | 否 | 否 | 否 | 同步 | 否 | 本地进程 | `runtime.py`、`worker.py::local_text`；P1 移除 |
-| Maestro/WanGP | 否 | 是 | 是 | 否 | provider_job_id 查询 | 首帧/尾帧按能力 | `/cancel` | `worker.py::maestro`；P1 移除内嵌启动，未来外部 API 另登记 |
+| 本地 llama/openai bridge | — | — | — | — | — | — | — | P1 已删除，无本地回退 |
+| Maestro/WanGP 外部 API | 否 | 是 | 是 | 否 | provider_job_id 查询 | 首帧/尾帧按能力 | `/cancel` | `worker.py::maestro`；P1 仅保留 HTTP 适配器，不自动启动或读取服务端文件 |
 | OpenAI-compatible | 是 | 可配置 | 否 | 否 | 多为同步 | 图片 data | 无统一协议 | `worker.py` |
 | ComfyUI | 否 | 是 | 是 | **否（项目未接通）** | prompt_id | 工作流上传；当前尾帧不支持 | queue delete | `worker.py::comfy`；上游工作流潜力不等于当前能力 |
 | JSON video gateway | 否 | 否 | 是 | 否 | task id 查询 | 当前不支持 | 未统一 | `worker.py::video_api` |

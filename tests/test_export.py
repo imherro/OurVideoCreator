@@ -3,18 +3,16 @@ import io
 import subprocess
 from pathlib import Path
 from PIL import Image
-from backend import store as s, runtime
+from backend import store as s
+from backend.media import ffmpeg_executable
 from backend.worker import Worker,register
 import time
 
 def test_real_export_two_stills_and_decode():
     s.init()
-    binaries=list((runtime.INFERENCE_ENV/'Lib'/'site-packages'/'imageio_ffmpeg'/'binaries').glob('ffmpeg*.exe'))
-    if not binaries:
-        import shutil,pytest
-        if not shutil.which('ffmpeg'): pytest.skip('FFmpeg not installed')
-        ffmpeg='ffmpeg'
-    else: ffmpeg=str(binaries[0])
+    import pytest
+    try: ffmpeg=ffmpeg_executable()
+    except ValueError: pytest.skip('FFmpeg not installed')
     s.set_setting('ffmpeg',ffmpeg)
     pid=s.uid();jid=s.uid();now=time.time()
     with s.db() as c:

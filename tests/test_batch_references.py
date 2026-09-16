@@ -15,7 +15,6 @@ from test_api import project
 @pytest.fixture
 def batch_authenticated():
     with TestClient(app) as client:
-        app.state.worker.stop()
         status=client.get('/api/auth/status').json()
         endpoint='/api/auth/login' if status['configured'] else '/api/auth/setup'
         assert client.post(endpoint,json={'password':'integration-test-only'}).status_code==200

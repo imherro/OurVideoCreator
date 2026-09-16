@@ -3,18 +3,15 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from . import runtime
 from .store import get_setting
 
 def ffmpeg_executable():
     configured=get_setting('ffmpeg','ffmpeg')
     if shutil.which(configured) or Path(configured).is_file(): return configured
-    existing=list((runtime.INFERENCE_ENV/'Lib'/'site-packages'/'imageio_ffmpeg'/'binaries').glob('ffmpeg*.exe'))
-    if existing:return str(existing[0])
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
-    except ImportError: raise ValueError('未找到 FFmpeg，请在设置中指定可执行程序路径')
+    except ImportError: raise ValueError('未找到 FFmpeg，请在 Worker 主机安装或在设置中指定可执行程序路径')
 
 def probe(path):
     executable=ffmpeg_executable()

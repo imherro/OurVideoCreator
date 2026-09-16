@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from . import store as s, runtime
+from . import store as s
 from .prompts import TEMPLATES
 from .generation_policy import default_ark_policy, validate_generation_policy
 from .project_schema import empty_film_bible, migrate_document, new_document
@@ -29,14 +29,7 @@ from .production_context import (
 @asynccontextmanager
 async def lifespan(app):
     s.init()
-    runtime.bootstrap()
-    from .worker import Worker
-    worker = Worker()
-    app.state.worker = worker
-    worker.start()
     yield
-    worker.stop()
-    runtime.unload()
 
 app = FastAPI(title='安影 AI 视频工作室',lifespan=lifespan,docs_url=None,redoc_url=None)
 PUBLIC = {'/api/health','/api/auth/status','/api/auth/setup','/api/auth/login'}
@@ -668,12 +661,18 @@ def provider_asset_file(aid:str,expires:int,signature:str):
 
 @app.get('/api/system')
 def system():
-    return {'hardware':runtime.hardware(),'runtime':runtime.status(),'models':runtime.discover(),'templates':TEMPLATES,'inventory':runtime.inventory()}
+    return {'execution_mode':'external-api','worker':'separate-process','models':[],'templates':TEMPLATES}
 
 @app.get('/api/settings')
 def settings():
     value=s.get_setting('providers',[])
-    return {'providers':[{**{k:v for k,v in p.items() if k!='api_key'},'api_key_set':bool(p.get('api_key'))} for p in value], 'model_directories':s.get_setting('model_directories',[]),'llama_context':s.get_setting('llama_context',8192),'llama_gpu_layers':s.get_setting('llama_gpu_layers',-1),'ffmpeg':s.get_setting('ffmpeg','ffmpeg')}
+    return {
+        'providers':[
+            {**{k:v for k,v in p.items() if k not in ('api_key','auto_start')},'api_key_set':bool(p.get('api_key'))}
+            for p in value
+        ],
+        'ffmpeg':s.get_setting('ffmpeg','ffmpeg'),
+    }
 
 @app.put('/api/settings')
 async def update_settings(request:Request):
@@ -682,6 +681,7 @@ async def update_settings(request:Request):
         old={p['id']:p for p in s.get_setting('providers',[])}
         for p in body['providers']:
             masked_key_set=bool(p.pop('api_key_set',False))
+            p.pop('auto_start',None)
             if not p.get('id') or p.get('type') not in ('openai','comfy','maestro','video_api','minimax','replicate','volcengine_ark','volcengine_speech','hc_atom','runninghub'): raise ValueError('模型服务配置无效')
             if p.get('type')=='volcengine_ark':
                 from .providers.volcengine_ark import DEFAULT_BASE_URL
@@ -722,19 +722,9 @@ async def update_settings(request:Request):
             if 'api_key' not in p or (not p.get('api_key') and masked_key_set):
                 p['api_key']=old.get(p['id'],{}).get('api_key','')
         s.set_setting('providers',body['providers'])
-    for key in ('model_directories','llama_context','llama_gpu_layers','ffmpeg'):
+    for key in ('ffmpeg',):
         if key in body: s.set_setting(key,body[key])
     return settings()
-
-@app.post('/api/runtime/unload')
-def unload(request:Request):
-    if request.app.state.worker.busy: raise HTTPException(409,'任务运行中，不能卸载模型')
-    runtime.unload()
-    return runtime.status()
-
-@app.post('/api/runtime/maestro/start')
-def start_maestro():
-    return runtime.start_maestro()
 
 @app.get('/api/providers/{provider_id}/models')
 def provider_models(provider_id:str,kind:str|None=None):
@@ -761,10 +751,6 @@ def provider_models(provider_id:str,kind:str|None=None):
         if kind in ('text','image','video'):
             models=[model for model in models if model['kind']==kind]
         return {'models':models,'status':'ready'}
-    if provider['type']=='maestro' and provider.get('local') and provider.get('auto_start') and url=='http://127.0.0.1:7870':
-        state=runtime.start_maestro()
-        if state['status']=='starting':
-            return {'models':[],'status':'starting'}
     try:
         with httpx.Client(timeout=20,trust_env=not provider.get('local'),headers=headers) as client:
             if provider['type']=='maestro':
@@ -898,12 +884,14 @@ def create_job_record(c,pid,body):
             state['document'] if state else {},body.node_id,body.kind,
             body.input,s.get_setting('providers',[]),
         )
-    if body.kind in ('image','video') and body.input.get('provider','local')=='local':raise ValueError('请为图像或视频节点选择对应的本地媒体服务')
+    provider_id=str(body.input.get('provider') or '').strip()
+    if body.kind!='export' and (not provider_id or provider_id=='local'):
+        raise ValueError('未配置外部模型服务，请先选择已连接的 Provider；系统不会自动回退到本地或其他付费模型')
     selected = None
-    if body.input.get('provider','local')!='local' and body.kind!='export':
+    if body.kind!='export':
         configured={p['id']:p for p in s.get_setting('providers',[])}
-        selected=configured.get(body.input['provider'])
-        if not selected: raise ValueError('模型服务未配置')
+        selected=configured.get(provider_id)
+        if not selected: raise ValueError('所选外部模型服务未配置；系统不会自动切换到其他服务')
         if selected.get('type') in ('volcengine_ark','hc_atom','runninghub'):
             # Defend jobs created from settings saved by an older build.
             selected={**selected,'local':False}
@@ -1576,8 +1564,10 @@ async def run_workflow(pid:str,request:Request):
     for node,_ in plan:
         data=node.get('data',{})
         if data.get('kind') not in ('text','storyboard','image','video'): continue
-        provider=providers.get(data.get('provider','local'))
-        if data.get('provider','local')!='local' and not provider: raise ValueError('部分节点的模型服务未配置')
+        provider_id=str(data.get('provider') or '').strip()
+        provider=providers.get(provider_id)
+        if not provider_id or provider_id=='local' or not provider:
+            raise ValueError('部分节点未配置外部模型服务；系统不会自动回退或切换到其他服务')
     for node,parents in plan:
         data=node.get('data',{})
         if data.get('kind') not in ('text','storyboard','image','video'): continue
@@ -1666,7 +1656,7 @@ async def run_workflow(pid:str,request:Request):
             generated_image_parents=0
         for aid in data['asset_ids']:
             reference_asset(pid,aid)
-        provider=providers.get(data.get('provider','local'))
+        provider=providers.get(data.get('provider'))
         if provider and provider.get('type')=='volcengine_ark':
             if kind=='video':
                 data=bind_fixed_dialogue_audio(

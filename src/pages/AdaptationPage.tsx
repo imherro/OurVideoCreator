@@ -32,12 +32,12 @@ export function AdaptationPage({
   const [active, setActive] = useState(1);
   const [busy, setBusy] = useState(false);
   const textProviders = useMemo(
-    () => [{ id: "local", name: "本地 llama.cpp", local: true, model: "" }, ...providers.filter((p) => !p.kind || p.kind === "text")],
+    () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
   );
-  const fallbackTextProvider = textProviders.find((provider) => !provider.local) || textProviders[0];
-  const defaultProviderId = defaultTarget?.providerId || fallbackTextProvider.id;
-  const defaultModelId = defaultTarget?.modelId || fallbackTextProvider.models?.text || fallbackTextProvider.model || "";
+  const configuredDefault = textProviders.find((provider) => provider.id === defaultTarget?.providerId);
+  const defaultProviderId = configuredDefault?.id || "";
+  const defaultModelId = defaultTarget?.modelId || configuredDefault?.models?.text || configuredDefault?.model || "";
   const [providerId, setProviderId] = useState(defaultProviderId);
   const [model, setModel] = useState(defaultModelId);
 
@@ -86,9 +86,10 @@ export function AdaptationPage({
   async function generate() {
     if (!draft) return;
     const provider = textProviders.find((item) => item.id === providerId);
+    if (!provider) throw new Error("请先为作品配置外部文本 Provider；系统不会自动选择其他付费模型");
     const modelId = model || provider?.models?.text || provider?.model || "";
-    if (providerId !== "local" && !modelId) throw new Error("请填写文本模型 ID");
-    if (!window.confirm(`将依据 ${draft.sourceEventCount} 条原著事件重新生成完整改编策划。\n服务：${provider?.name || providerId}\n模型：${modelId || "本地默认"}\n生成结果会进入待审核状态。确认创建文本任务？`)) return;
+    if (!modelId) throw new Error("请填写文本模型 ID");
+    if (!window.confirm(`将依据 ${draft.sourceEventCount} 条原著事件重新生成完整改编策划。\n服务：${provider.name}\n模型：${modelId}\n生成结果会进入待审核状态。确认创建文本任务？`)) return;
     const episodePlans = createEpisodePlans(draft.adaptationPlan.format.episodeCount, draft.adaptationPlan.format.targetDuration, draft.episodePlans);
     const saved = await request(`/productions/${productionId}/adaptation`, {
       method: "PUT",
@@ -137,7 +138,7 @@ export function AdaptationPage({
       </article>
       <MonetizationEditor draft={draft} setDraft={setDraft} />
     </main><aside className="episode-plan-list"><h3>分集导航</h3>{draft.episodePlans.map((item: EpisodePlan) => <button key={item.episodeNo} className={active === item.episodeNo ? "active" : ""} onClick={() => setActive(item.episodeNo)}><span>EP{String(item.episodeNo).padStart(2, "0")}</span><small className={item.status}>{STATUS_LABELS[item.status] || item.status}</small></button>)}</aside></div>
-    <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => { setProviderId(e.target.value); const p = textProviders.find((x) => x.id === e.target.value); setModel(p?.models?.text || p?.model || ""); }}>{textProviders.map((item) => <option key={item.id} value={item.id}>{item.local ? "本地" : "云端"} · {item.name}</option>)}</select></label><label>模型<input value={model} placeholder="本地默认" onChange={(e) => setModel(e.target.value)} /></label>{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
+    <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => { setProviderId(e.target.value); const p = textProviders.find((x) => x.id === e.target.value); setModel(p?.models?.text || p?.model || ""); }}><option value="" disabled>请选择外部 Provider</option>{textProviders.map((item) => <option key={item.id} value={item.id}>外部 API · {item.name}</option>)}</select></label><label>模型<input value={model} placeholder="外部模型 ID" onChange={(e) => setModel(e.target.value)} /></label>{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
   </section>;
 }
 

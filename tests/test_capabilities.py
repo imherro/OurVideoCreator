@@ -20,7 +20,7 @@ def test_uninstalled_and_excess_references_rejected():
     model=catalogue()
     with pytest.raises(ValueError,match='最多支持 1'):validate_media(model,'video',{'frames':49,'asset_ids':['a','b']})
     model['installed']=False
-    with pytest.raises(ValueError,match='尚未安装'):validate_media(model,'video',{'frames':49})
+    with pytest.raises(ValueError,match='Maestro API 中不可用'):validate_media(model,'video',{'frames':49})
 
 def test_h3_uses_its_own_frame_offset():
     model=catalogue();model['capabilities'].update(min_frames=124,max_frames=345,frame_step=17)

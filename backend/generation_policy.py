@@ -22,9 +22,8 @@ def validate_generation_policy(policy, providers, allow_missing=False):
             continue
         if not isinstance(target, dict) or not target.get('providerId'):
             raise ValueError(f'项目默认{kind}模型配置无效')
-        if kind == 'text' and target['providerId'] == 'local':
-            result[kind] = {'providerId': 'local', 'modelId': str(target.get('modelId', ''))}
-            continue
+        if target['providerId'] == 'local':
+            raise ValueError(f'项目默认{kind}模型仍指向已移除的本地推理，请选择外部 Provider')
         provider = configured.get(target['providerId'])
         if not provider and allow_missing:
             result[kind] = {'providerId': target['providerId'], 'modelId': str(target.get('modelId', ''))}
@@ -51,8 +50,8 @@ def resolve_generation_target(kind, override, project_policy, providers, local_m
         source = 'project'
     if candidate:
         provider_id = candidate.get('providerId')
-        if provider_id == 'local' and kind == 'text':
-            return {'providerId': 'local', 'modelId': candidate.get('modelId', ''), 'source': source}
+        if provider_id == 'local':
+            raise ValueError(f'{source} 配置仍指向已移除的本地推理，请选择外部 Provider')
         provider = configured.get(provider_id)
         if not provider:
             raise ValueError(f'{source} 配置的模型服务已不存在，请重新选择；未自动切换其他服务')
@@ -60,13 +59,4 @@ def resolve_generation_target(kind, override, project_policy, providers, local_m
             raise ValueError(f'{source} 配置的模型服务不支持 {kind}')
         model = candidate.get('modelId') or (provider.get('models') or {}).get(kind) or provider.get('model', '')
         return {'providerId': provider_id, 'modelId': model, 'source': source}
-    provider = next((p for p in providers if not p.get('local') and (not p.get('kind') or p.get('kind') == kind)), None)
-    if provider:
-        return {'providerId': provider['id'], 'modelId': (provider.get('models') or {}).get(kind) or provider.get('model', ''), 'source': 'system'}
-    if kind == 'text':
-        model = (local_models or [{}])[0].get('id', '') if local_models else ''
-        return {'providerId': 'local', 'modelId': model, 'source': 'system'}
-    provider = next((p for p in providers if p.get('kind') == kind), None)
-    if not provider:
-        return {'providerId': '', 'modelId': '', 'source': 'system'}
-    return {'providerId': provider['id'], 'modelId': (provider.get('models') or {}).get(kind) or provider.get('model', ''), 'source': 'system'}
+    raise ValueError(f'尚未为项目配置默认 {kind} Provider；系统不会自动选择其他付费模型')

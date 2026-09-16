@@ -16,7 +16,7 @@ def maestro_model(model):
 
 def validate_media(model,kind,inp):
     if kind not in model['kinds']:raise ValueError('所选模型不支持当前节点类型，请选择适用模型')
-    if model.get('installed') is False:raise ValueError('所选模型尚未安装，请先在本地引擎中安装所需权重')
+    if model.get('installed') is False:raise ValueError('所选模型在已连接的 Maestro API 中不可用，请由该服务管理员安装所需权重')
     cap=model['capabilities'];refs=inp.get('asset_ids',[])
     if inp.get('end_asset_id') and (kind!='video' or not cap.get('end_frame')):raise ValueError('所选模型不支持尾帧控制')
     if cap.get('requires_reference') and not refs:raise ValueError('此模型需要参考图，请先引用图像素材')

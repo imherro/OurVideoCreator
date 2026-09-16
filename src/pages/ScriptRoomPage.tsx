@@ -21,13 +21,12 @@ export function ScriptRoomPage({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const textProviders = useMemo(
-    () => [{ id: "local", name: "本地 llama.cpp", local: true, model: "" }, ...providers.filter((p) => !p.kind || p.kind === "text")],
+    () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
   );
-  const fallbackTextProvider = textProviders.find((provider) => !provider.local) || textProviders[0];
-  const defaultProviderId = defaultTarget?.providerId || fallbackTextProvider.id;
-  const defaultModelId = defaultTarget?.modelId || fallbackTextProvider.models?.text || fallbackTextProvider.model || "";
-  const configuredDefaultProvider = textProviders.find((provider) => provider.id === defaultProviderId) || fallbackTextProvider;
+  const configuredDefaultProvider = textProviders.find((provider) => provider.id === defaultTarget?.providerId);
+  const defaultProviderId = configuredDefaultProvider?.id || "";
+  const defaultModelId = defaultTarget?.modelId || configuredDefaultProvider?.models?.text || configuredDefaultProvider?.model || "";
 
   async function loadList(preferred = active) {
     const [scripts, sourceChapters] = await Promise.all([
@@ -78,11 +77,12 @@ export function ScriptRoomPage({
   async function generate(episodeNos: number[]) {
     const normalized = normalizeEpisodeSelection(episodeNos, items.length);
     if (!normalized.length) return;
-    const provider = textProviders.find((value) => value.id === defaultProviderId) || fallbackTextProvider;
+    const provider = configuredDefaultProvider;
+    if (!provider) throw new Error("项目默认外部文本 Provider 尚未配置，请到作品设置中选择");
     const providerId = provider.id;
     const modelId = defaultModelId || provider?.models?.text || provider?.model || "";
-    if (providerId !== "local" && !modelId) throw new Error("项目默认文本模型尚未配置，请到作品设置中选择");
-    if (!window.confirm(`将使用项目默认模型生成 ${normalized.length} 集剧本：${normalized.map((no) => `EP${String(no).padStart(2, "0")}`).join("、")}\n服务：${provider?.name || providerId}\n模型：${modelId || "本地默认"}\n确认创建 ${normalized.length} 个文本任务？`)) return;
+    if (!modelId) throw new Error("项目默认外部文本模型 ID 尚未配置，请到作品设置中填写");
+    if (!window.confirm(`将使用项目默认模型生成 ${normalized.length} 集剧本：${normalized.map((no) => `EP${String(no).padStart(2, "0")}`).join("、")}\n服务：${provider.name}\n模型：${modelId}\n确认创建 ${normalized.length} 个文本任务？`)) return;
     const result = await request(`/productions/${productionId}/script-generations`, {
       method: "POST",
       body: JSON.stringify({ episode_nos: normalized, provider: providerId, model: modelId, submission_id: `scripts-${Date.now()}` }),
@@ -121,6 +121,6 @@ export function ScriptRoomPage({
         </div></article><div className="script-state-actions"><button disabled={busy} onClick={() => run(() => transition("needs-changes"))}>退回修改</button><button disabled={busy} onClick={() => run(() => generate([active]))}><Sparkles size={15} />{draft.body ? "重新生成本集" : "生成本集"}</button>{draft.status === "approved" && <button className="primary" disabled={busy || !draft.project_id} onClick={() => run(() => Promise.resolve(onEnterEpisode(active)))} >进入分镜规划<ArrowRight size={15}/></button>}</div>
       </> : <div className="empty-state"><h3>先完成分集规划</h3><p>改编策划批准后，可以在这里逐集生成和修订剧本。</p></div>}</main>
     </div>
-    <footer className="domain-generation-bar"><div><b>批量生成所选剧本</b><small>已选 {selected.size} 集 · 使用项目默认模型：{configuredDefaultProvider.name} · {defaultModelId || "服务默认"}</small></div><button className="primary" disabled={busy || !selected.size} onClick={() => run(() => generate([...selected]))}><Sparkles size={15} />生成 {selected.size} 集</button></footer>
+    <footer className="domain-generation-bar"><div><b>批量生成所选剧本</b><small>已选 {selected.size} 集 · 使用项目默认模型：{configuredDefaultProvider?.name || "未配置外部 Provider"} · {defaultModelId || "未配置模型 ID"}</small></div><button className="primary" disabled={busy || !selected.size} onClick={() => run(() => generate([...selected]))}><Sparkles size={15} />生成 {selected.size} 集</button></footer>
   </section>;
 }

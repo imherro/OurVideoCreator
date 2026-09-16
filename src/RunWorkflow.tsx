@@ -86,7 +86,7 @@ export function RunWorkflow({
         <p key={node.id}>
           {node.data.label || node.data.kind} ·{" "}
           {node.data.provider === "local" || !node.data.provider
-            ? "本地文本"
+            ? "未配置外部 Provider"
             : providers.find((provider) => provider.id === node.data.provider)
                 ?.name || "服务未配置"}
         </p>

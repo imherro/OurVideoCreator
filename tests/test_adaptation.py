@@ -13,10 +13,14 @@ from backend.adaptation import validate_adaptation_bundle
 @pytest.fixture(scope="module")
 def adaptation_client():
     with TestClient(app) as client:
-        app.state.worker.stop()
         status = client.get("/api/auth/status").json()
         endpoint = "/api/auth/login" if status["configured"] else "/api/auth/setup"
         response = client.post(endpoint, json={"password": "integration-test-only"})
+        assert response.status_code == 200, response.text
+        response = client.put("/api/settings", json={"providers": [{
+            "id": "p1-test-openai", "name": "P1 test gateway", "type": "openai",
+            "kind": "text", "url": "http://127.0.0.1:1/v1", "local": False,
+        }]})
         assert response.status_code == 200, response.text
         yield client
 
@@ -166,13 +170,13 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
     ).json()
     blocked = client.post(
         f'/api/productions/{production["id"]}/script-generations',
-        json={"episode_nos": [5], "provider": "local", "model": "", "allow_cloud": False, "submission_id": "phase3-before-approval"},
+        json={"episode_nos": [5], "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False, "submission_id": "phase3-before-approval"},
     )
     assert blocked.status_code == 400
     reviewed = client.post(f'/api/productions/{production["id"]}/adaptation/review',json={"revision": saved["revision"]}).json()
     approved = client.post(f'/api/productions/{production["id"]}/adaptation/approve',json={"revision": reviewed["revision"]}).json()
 
-    body = {"episode_nos": [5, 8, 12], "provider": "local", "model": "", "allow_cloud": False, "submission_id": "phase3-selected-batch"}
+    body = {"episode_nos": [5, 8, 12], "provider": "p1-test-openai", "model": "test-text", "allow_cloud": False, "submission_id": "phase3-selected-batch"}
     first = client.post(f'/api/productions/{production["id"]}/script-generations',json=body)
     second = client.post(f'/api/productions/{production["id"]}/script-generations',json=body)
     assert first.status_code == second.status_code == 200, first.text

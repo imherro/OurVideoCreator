@@ -1,6 +1,6 @@
 # P0 路由认证与授权地图
 
-实际注册源：`backend/app.py`，共 **69** 条业务路由。当前认证只有共享工作室 session。表中“Session”表示仅检查共享 cookie，没有 Workspace/Production/对象权限；“Signed”表示 HMAC 素材 capability。
+实际注册源：`backend/app.py`，P1 共 **67** 条业务路由。当前认证只有共享工作室 session。表中“Session”表示仅检查共享 cookie，没有 Workspace/Production/对象权限；“Signed”表示 HMAC 素材 capability。
 
 目标角色缩写：PA=platform_admin，WO=workspace owner，PM=production manager，ED=对象 editor，VI=viewer，SYS=受限系统身份。
 
@@ -53,15 +53,13 @@
 
 `visual-usage` 只在总路由计数中计算一次；本表为安全域交叉索引。
 
-## 系统、Provider 与提示词（10）
+## 系统、Provider 与提示词（8）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
-| GET `/api/system` | Session | 删除本地硬件/模型细节；普通用户只得安全能力 | P1/P4 |
+| GET `/api/system` | Session | P1 只返回 external-api / separate-process 状态和模板，不含本地硬件/模型细节 | P1/P4 |
 | GET `/api/settings` | Session | 普通入口退役；安全模型目录另设 | P4 |
 | PUT `/api/settings` | Session | 退役；仅 PA 管理 API 可写 | P4 |
-| POST `/api/runtime/unload` | Session | 移除 | P1 |
-| POST `/api/runtime/maestro/start` | Session | 移除 | P1 |
 | GET `/api/providers/{provider_id}/models` | Session | PA 管理目录或普通安全 catalog；无 Key | P4 |
 | POST `/api/providers/{provider_id}/verify` | Session | PA；只做无生成验证 | P4 |
 | POST `/api/providers/{provider_id}/test` | Session | PA；当前只检测配置模型，不得付费生成 | P4 |
@@ -118,15 +116,15 @@
 | GET `/openapi.json` | Public（FastAPI 默认） | 开发环境受限；生产默认关闭或仅 PA 可访问，不得泄露管理面 | P3/P7 |
 | Mount `/` -> `dist` | 仅 build 后注册，Public | SPA 静态文件公开；API/素材仍由前述服务端授权，不得把私有素材放入 dist | P1/P7 |
 
-`docs_url=None` 与 `redoc_url=None` 不会关闭默认 `/openapi.json`。`dist` 不存在时只缺少根 `StaticFiles` Mount；69 个 `/api` 入口与 OpenAPI 路由仍注册。build 完成后实际 `app.routes` 多一个根 Mount，且因为它最后注册，不覆盖前面的 API 匹配。
+`docs_url=None` 与 `redoc_url=None` 不会关闭默认 `/openapi.json`。`dist` 不存在时只缺少根 `StaticFiles` Mount；67 个 `/api` 入口与 OpenAPI 路由仍注册。build 完成后实际 `app.routes` 多一个根 Mount，且因为它最后注册，不覆盖前面的 API 匹配。
 
 ## 覆盖核对
 
-业务表去重后覆盖 69 个 `/api` 装饰器入口：5+15+9+10+23+7=69。`scripts/audit_routes.py` 在临时 `MVC_DATA_DIR` 中导入应用并导出实际 `app.routes`，并逐个核对本文中的方法+路径分类，额外捕获 `/openapi.json` 与可选静态 Mount；首次模块路径失败保留在 `evidence/P0-R1/06-route-audit.log`，最终完整输出见 `11-route-audit-classification.log`。成功输出为 71 个注册项：69 API + 1 OpenAPI + 1 build 后静态 Mount，69 个 API 全部已分类且框架入口已登记。P3 应把同一枚举升级为 CI 授权登记守卫；任何新增未分类资源路由使测试失败（ACL-09）。
+业务表去重后覆盖 67 个 `/api` 装饰器入口：5+15+9+8+23+7=67。`scripts/audit_routes.py` 在临时 `MVC_DATA_DIR` 中导入应用并导出实际 `app.routes`，逐个报告本文中的方法+路径分类，并额外捕获 `/openapi.json` 与可选静态 Mount。P1 的成功输出为 69 个注册项：67 API + 1 OpenAPI + 1 build 后静态 Mount。该脚本目前仍是**只读报告工具**，不会以未分类路由令 CI 失败；只有 P3 实施 ACL-09 时才升级为“未分类即失败”的 CI 守卫，不把 P0/P1 的报告能力夸大为认证守卫。
 
 ## 当前最高风险缺口
 
-1. 任意已登录者可写全局 Provider/Key 设置并控制 runtime。
+1. 任意已登录者仍可写全局 Provider/Key 设置；P4 才迁到平台管理员后台。
 2. job id、asset id、revision id 和 trash 条目只凭 ID 读取或操作。
 3. SSE 广播全部事件，没有租户/作品过滤。
 4. `PUT /api/projects/{pid}` 可修改整份 document，未来 editor 会形成越权旁路。

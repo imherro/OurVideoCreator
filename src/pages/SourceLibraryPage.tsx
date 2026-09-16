@@ -25,12 +25,12 @@ export function SourceLibraryPage({
   const [chapterContent, setChapterContent] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const textProviders = useMemo(
-    () => [{ id: "local", name: "本地 llama.cpp", local: true, model: "" }, ...providers.filter((provider) => !provider.kind || provider.kind === "text")],
+    () => providers.filter((provider) => !provider.kind || provider.kind === "text"),
     [providers],
   );
-  const fallbackTextProvider = textProviders.find((provider) => !provider.local) || textProviders[0];
-  const defaultProviderId = defaultTarget?.providerId || fallbackTextProvider.id;
-  const defaultModelId = defaultTarget?.modelId || fallbackTextProvider.models?.text || fallbackTextProvider.model || "";
+  const configuredDefault = textProviders.find((provider) => provider.id === defaultTarget?.providerId);
+  const defaultProviderId = configuredDefault?.id || "";
+  const defaultModelId = defaultTarget?.modelId || configuredDefault?.models?.text || configuredDefault?.model || "";
   const [providerId, setProviderId] = useState(defaultProviderId);
   const [model, setModel] = useState(defaultModelId);
   const chapter = chapters.find((item) => item.id === active);
@@ -141,8 +141,9 @@ export function SourceLibraryPage({
     if (!selected.size) return;
     const provider = textProviders.find((item) => item.id === providerId);
     const modelId = model || provider?.models?.text || provider?.model || "";
-    if (!modelId && providerId !== "local") throw new Error("请填写文本模型 ID");
-    if (!window.confirm(`将分析 ${selected.size} 个章节\n模型：${provider?.name || providerId} / ${modelId || "本地默认"}\n确认创建文本任务？`)) return;
+    if (!provider) throw new Error("请先为作品配置外部文本 Provider；系统不会自动选择其他付费模型");
+    if (!modelId) throw new Error("请填写文本模型 ID");
+    if (!window.confirm(`将分析 ${selected.size} 个章节\n模型：${provider.name} / ${modelId}\n确认创建文本任务？`)) return;
     setBusy(true);
     try {
       await request(`/productions/${productionId}/source-extractions`, { method: "POST", body: JSON.stringify({
@@ -180,8 +181,8 @@ export function SourceLibraryPage({
       </> : <div className="empty-state"><BookOpen/><h3>导入或新建原著</h3></div>}</main>
       <aside className="source-analysis">
         <h3>AI 事件提取</h3><p>作品级分析 · 已选 {selected.size} 章。任务失败时保留已有事件。</p>
-        <label>文本服务<select value={providerId} onChange={(event) => { setProviderId(event.target.value); const provider = textProviders.find((item) => item.id === event.target.value); setModel(provider?.models?.text || provider?.model || ""); }}>{textProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.local ? "本地" : "云端"} · {provider.name}</option>)}</select></label>
-        <label>模型 ID<input value={model} placeholder="本地留空使用默认模型" onChange={(event) => setModel(event.target.value)}/></label>
+        <label>文本服务<select value={providerId} onChange={(event) => { setProviderId(event.target.value); const provider = textProviders.find((item) => item.id === event.target.value); setModel(provider?.models?.text || provider?.model || ""); }}><option value="" disabled>请选择外部 Provider</option>{textProviders.map((provider) => <option key={provider.id} value={provider.id}>外部 API · {provider.name}</option>)}</select></label>
+        <label>模型 ID<input value={model} placeholder="外部模型 ID" onChange={(event) => setModel(event.target.value)}/></label>
         <button disabled={busy || !selected.size} onClick={() => run(extract)}><Sparkles size={15}/>提取所选章节事件</button>
       </aside>
     </div>

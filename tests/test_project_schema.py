@@ -30,14 +30,15 @@ def test_invalid_or_future_schema_is_rejected(version):
     with pytest.raises(ValueError,match=message):
         migrate_document({'schemaVersion':version,'nodes':[]})
 
-def test_generation_policy_precedence_fallback_and_deleted_provider():
+def test_generation_policy_precedence_requires_explicit_external_target():
     providers=[{'id':'ark','type':'volcengine_ark','models':{'text':'doubao','image':'seedream','video':'seedance'},'local':False},
-               {'id':'local-image','kind':'image','model':'flux','local':True}]
+               {'id':'connected-image','kind':'image','model':'flux','local':True}]
     policy=default_ark_policy(providers)
     assert resolve_generation_target('image',None,policy,providers)['modelId']=='seedream'
-    override={'mode':'override','providerId':'local-image','modelId':'flux-special'}
-    assert resolve_generation_target('image',override,policy,providers)=={'providerId':'local-image','modelId':'flux-special','source':'override'}
-    assert resolve_generation_target('image',None,{'text':None,'image':None,'video':None},providers)['providerId']=='ark'
+    override={'mode':'override','providerId':'connected-image','modelId':'flux-special'}
+    assert resolve_generation_target('image',override,policy,providers)=={'providerId':'connected-image','modelId':'flux-special','source':'override'}
+    with pytest.raises(ValueError,match='不会自动选择'):
+        resolve_generation_target('image',None,{'text':None,'image':None,'video':None},providers)
     with pytest.raises(ValueError,match='自动切换'):
         resolve_generation_target('video',None,{'video':{'providerId':'deleted','modelId':'paid'}},providers)
     with pytest.raises(ValueError,match='已不存在'):

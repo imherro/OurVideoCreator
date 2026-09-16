@@ -10,7 +10,6 @@ from backend import store as s
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as value:
-        app.state.worker.stop()
         status = value.get("/api/auth/status").json()
         endpoint = "/api/auth/login" if status["configured"] else "/api/auth/setup"
         assert value.post(endpoint, json={"password": "integration-test-only"}).status_code == 200
@@ -139,7 +138,7 @@ def test_invalid_generation_policy_leaves_no_partial_rows(client, configured_pro
     assert after == before
 
 
-def test_project_create_accepts_local_text_runtime_target(client, configured_provider):
+def test_project_create_rejects_removed_local_text_runtime_target(client, configured_provider):
     response = client.post("/api/projects", json={
         "name": "本地文本项目",
         "generation_policy": {
@@ -148,10 +147,8 @@ def test_project_create_accepts_local_text_runtime_target(client, configured_pro
             "video": None,
         },
     })
-    assert response.status_code == 200, response.text
-    assert response.json()["document"]["generationPolicy"]["text"] == {
-        "providerId": "local", "modelId": "qwen-local",
-    }
+    assert response.status_code == 400
+    assert "已移除的本地推理" in response.json()["detail"]
 
 
 def test_production_rename_is_revision_protected_and_preserves_episode_and_context(client):

@@ -417,7 +417,7 @@ function MediaNode({ data, selected }: { data: Any; selected?: boolean }) {
         <Icon size={15} />
         <span>{data.label || titles[data.kind]}</span>
         <small>
-          {data.provider && data.provider !== "local" ? "服务模型" : "本地"}
+          {data.provider && data.provider !== "local" ? "外部 API" : "未配置"}
         </small>
       </div>
       <div
@@ -531,7 +531,7 @@ function Auth({ onLogin }: { onLogin: () => void }) {
         </h1>
         <p>你的故事，你的模型，你的工作室。</p>
         <div className="auth-meta">
-          <Monitor size={18} /> 浏览器创作 · 云端与本地模型
+          <Monitor size={18} /> 浏览器创作 · 外部模型 API
         </div>
       </div>
       <form onSubmit={submit} className="auth-form">
@@ -612,11 +612,9 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
     [system, setSystem] = useState<Any>({
       models: [],
       templates: {},
-      hardware: {},
     }),
     [config, setConfig] = useState<Any>({
       providers: [],
-      model_directories: [],
     });
   const [workflowStage, setWorkflowStage] = useState<WorkflowStage>(initialWorkflowStage);
   const [selected, setSelected] = useState<string | null>(null),
@@ -1634,11 +1632,13 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
       await save();
       if (dirty.current) throw new Error("项目尚未保存，请先解决保存冲突");
       const targetProvider = config.providers.find(
-        (provider: Any) => provider.id === (n.data.provider || "local"),
+        (provider: Any) => provider.id === n.data.provider,
       );
+      if (!targetProvider || n.data.provider === "local")
+        throw new Error("该节点未配置外部 Provider；系统不会自动回退到其他模型");
       const input = {
         ...n.data,
-        provider: n.data.provider || "local",
+        provider: n.data.provider,
         asset_ids: sourceAssets(n.id),
         parameters: n.data.kind === "video" && ["volcengine_ark", "hc_atom", "runninghub"].includes(targetProvider?.type)
           ? { resolution: doc?.videoResolution || "720p", outputFormat: doc?.videoFormat || "mp4", ...(n.data.parameters || {}) }
@@ -1814,7 +1814,7 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
       if (!String(imageNode?.data?.prompt || "").trim())
         throw new Error("所选镜头存在空的 Image Prompt，请先填写后再生成");
       const provider = config.providers.find(
-        (item: Any) => item.id === (imageNode?.data?.provider || "local"),
+        (item: Any) => item.id === imageNode?.data?.provider,
       );
       if (!provider || imageNode?.data?.provider === "local")
         throw new Error("所选镜头尚未选择可用的图片生成服务");
@@ -4658,15 +4658,8 @@ function SettingsPanel({
   return (
     <>
       <div className="hardware-card">
-        <Monitor size={23} />
-        <div>
-          <b>{system.hardware.name}</b>
-          <span>
-            {system.hardware.total_mb
-              ? `${(system.hardware.free_mb / 1024).toFixed(1)} / ${(system.hardware.total_mb / 1024).toFixed(0)} GB 显存可用`
-              : "可连接本地或远端推理服务"}
-          </span>
-        </div>
+        <Link2 size={23} />
+        <div><b>外部 API-only</b><span>Web 与任务 Worker 独立运行，不加载模型或管理本地推理环境</span></div>
         <button
           className="icon-button"
           onClick={() => onRefresh().catch(onError)}
@@ -4676,87 +4669,9 @@ function SettingsPanel({
         </button>
       </div>
       <p className="muted">
-        内置推理基于 Maestro /
-        WanGP，供个人非商业学习使用。推理代码、环境和模型路径均在本项目内。
+        所有生成任务必须显式选择已连接的外部 Provider；没有配置时会明确报错，
+        不会自动回退到其他模型或产生意外付费请求。
       </p>
-      <h3>默认模型组件</h3>
-      {system.inventory?.models?.map((group: Any) => (
-        <details className="model-inventory" key={group.kind}>
-          <summary>
-            {group.ready ? "文件齐全" : "缺少文件"} · {group.name}
-          </summary>
-          {group.files.map((file: Any) => (
-            <p
-              className={file.present ? "muted" : "error"}
-              key={file.path}
-              title={file.path}
-            >
-              {file.present ? "✓" : "缺失"} {file.name} · {file.size_gb} GB
-            </p>
-          ))}
-        </details>
-      ))}
-      <h3>本地文本模型</h3>
-      <div className="model-list">
-        {system.models.map((m: Any) => (
-          <div key={m.id}>
-            <FileText size={15} />
-            <span title={m.id}>{m.name}</span>
-            <small>{m.size_gb} GB</small>
-          </div>
-        ))}
-      </div>
-      <label>
-        额外模型目录（每行一个）
-        <textarea
-          value={(value.model_directories || []).join("\n")}
-          onChange={(e) =>
-            setValue({
-              ...value,
-              model_directories: e.target.value.split("\n").filter(Boolean),
-            })
-          }
-        />
-      </label>
-      <div className="two-fields">
-        <label>
-          上下文长度
-          <input
-            type="number"
-            min="1024"
-            max="65536"
-            value={value.llama_context}
-            onChange={(e) =>
-              setValue({ ...value, llama_context: Number(e.target.value) })
-            }
-          />
-        </label>
-        <label>
-          GPU 层数（-1 自动）
-          <input
-            type="number"
-            min="-1"
-            max="999"
-            value={value.llama_gpu_layers}
-            onChange={(e) =>
-              setValue({ ...value, llama_gpu_layers: Number(e.target.value) })
-            }
-          />
-        </label>
-      </div>
-      <button
-        className="quiet"
-        onClick={() =>
-          api("/runtime/unload", send("POST"))
-            .then(() => {
-              setStatus("文本模型已卸载");
-              onRefresh();
-            })
-            .catch(onError)
-        }
-      >
-        卸载空闲文本模型
-      </button>
       <h3>模型服务</h3>
       <p className="muted">配置文本、图像和视频服务，并在项目设置中选择默认模型。</p>
       {value.providers.map((p: Any, i: number) => (
@@ -4814,7 +4729,7 @@ function SettingsPanel({
                 }
               >
                 <option value="openai">OpenAI 兼容文本 / 图像</option>
-                <option value="maestro">内置 / WanGP 兼容引擎</option>
+                <option value="maestro">Maestro / WanGP 兼容 API</option>
                 <option value="comfy">ComfyUI 工作流</option>
                 <option value="video_api">异步视频 JSON 网关</option>
                 <option value="minimax">MiniMax 原生视频</option>
@@ -4869,7 +4784,7 @@ function SettingsPanel({
               type="password"
               autoComplete="off"
               placeholder={
-                p.api_key_set ? "已保存，留空保持不变" : "本地服务可留空"
+                p.api_key_set ? "已保存，留空保持不变" : "服务无需密钥时可留空"
               }
               value={p.api_key || ""}
               onChange={(e) => patchProvider(i, { api_key: e.target.value })}
@@ -4920,7 +4835,7 @@ function SettingsPanel({
                 checked={!!p.local}
                 onChange={(e) => patchProvider(i, { local: e.target.checked })}
               />
-              本地服务，不产生云端调用费用
+              直连受控网关（绕过系统代理；不代表免计费）
             </label>
           )}
           {p.type === "comfy" && (
@@ -5213,28 +5128,9 @@ function SettingsPanel({
             })
           }
         >
-          连接 Maestro
+          连接 Maestro API
         </button>
       </div>
-      {system.runtime?.maestro_found && (
-        <button
-          className="secondary full"
-          onClick={() =>
-            api("/runtime/maestro/start", send("POST"))
-              .then((r) =>
-                setStatus(
-                  r.status === "ready"
-                    ? "内置引擎已就绪"
-                    : "内置引擎正在启动，请稍后刷新",
-                ),
-              )
-              .catch(onError)
-          }
-        >
-          <Play size={15} />
-          启动内置推理引擎
-        </button>
-      )}
       <label>
         FFmpeg 路径
         <input

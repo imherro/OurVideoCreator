@@ -1,4 +1,4 @@
-"""A durable queue: local inference is serialized while Ark jobs may run concurrently."""
+"""Durable single-process worker for external Providers and FFmpeg jobs."""
 import base64
 import json
 import mimetypes
@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 import httpx
-from . import store as s, runtime
+from . import store as s
 from .prompts import TEMPLATES, SHOT_SCHEMA, validate_shots
 from .media import ffmpeg_executable,probe
 from .process_lock import ProcessLock
@@ -24,7 +24,7 @@ class Worker:
         self.concurrency=max(1,int(concurrency))
         self.activity_lock=threading.Lock()
         self.active_count=0
-        self.local_execution_lock=threading.Lock()
+        self.serial_execution_lock=threading.Lock()
         self.process_lock=ProcessLock(s.DATA/'worker.lock')
     def start(self):
         self.process_lock.acquire()
@@ -63,7 +63,6 @@ class Worker:
             self.busy=self.active_count>0
 
     def ark_job(self,job):
-        if job.get('input',{}).get('provider','local')=='local':return False
         with s.db() as c:
             row=c.execute('SELECT provider FROM job_private WHERE job_id=?',(job['id'],)).fetchone()
         if not row:return False
@@ -95,8 +94,9 @@ class Worker:
                 if self.ark_job(job):
                     result=self.execute(job)
                 else:
-                    # Local GPU runtimes and legacy providers remain serialized.
-                    with self.local_execution_lock:result=self.execute(job)
+                    # P1 deliberately keeps one Worker process. Providers not
+                    # explicitly proven concurrent stay serialized until P6.
+                    with self.serial_execution_lock:result=self.execute(job)
                 if not self.cancelled(job): s.job_update(job['id'],status='succeeded',result=result,progress=100,phase='已完成')
             except InterruptedError:
                 if self.halt.is_set():
@@ -165,20 +165,14 @@ class Worker:
         job={**job,'input':inp}
         self.progress(job,'准备任务')
         if kind=='export':
-            runtime.unload()
             return self.export(job)
-        provider_id=inp.get('provider','local')
+        provider_id=str(inp.get('provider') or '').strip()
+        if not provider_id or provider_id=='local':
+            raise ValueError('未配置外部模型服务；系统不会自动回退到本地或其他付费模型')
         with s.db() as c:
             snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=?',(job['id'],)).fetchone()
-        if provider_id=='local':
-            if kind not in ('text','storyboard'):
-                raise ValueError('本地图像/视频服务尚未选择。请配置 ComfyUI 或连接本机 Maestro，然后选择对应模型。')
-            model=inp.get('model') or next(iter(runtime.discover()),{}).get('id')
-            url=runtime.load(model,lambda phase,pct:self.progress(job,phase,pct),lambda:self.cancelled(job))
-            provider={'url':url,'type':'openai','local':True,'model':model,'api_key':runtime.credentials()}
-        else:
-            provider=json.loads(snapshot['provider']) if snapshot else None
-            if not provider: raise ValueError('模型服务配置不存在')
+        provider=json.loads(snapshot['provider']) if snapshot else None
+        if not provider: raise ValueError('任务缺少冻结的外部 Provider 配置')
         if provider['type']=='replicate':
             from .replicate_api import execute
             return execute(self,job,provider)
@@ -192,10 +186,7 @@ class Worker:
             elif provider['type']=='runninghub':
                 from .providers.runninghub import model_for, text_base_url
                 provider={**provider,'url':text_base_url(provider),'model':model_for(provider,'text')}
-            try: return self.text(job,provider)
-            finally:
-                if provider_id=='local': runtime.schedule_idle()
-        runtime.unload()
+            return self.text(job,provider)
         if kind=='audio' and provider['type']=='volcengine_speech':
             from .providers.volcengine_speech import synthesize
             return synthesize(self,job,provider)
@@ -220,12 +211,10 @@ class Worker:
     def _chat_text(self,job,p,system_prompt,user_prompt,schema=None,phase='生成文本'):
         inp=job['input']
         headers={'Authorization':'Bearer '+p['api_key']} if p.get('api_key') else {}
-        if schema and not (inp.get('provider','local')=='local' or p.get('structured')):
+        if schema and not p.get('structured'):
             user_prompt+='\n\n必须严格输出以下 JSON Schema 对应的单个 JSON 值，不要输出 Markdown 或解释：\n'+json.dumps(schema,ensure_ascii=False)
-        body={'model':inp.get('model') or p.get('model','local'),'messages':[{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}], 'temperature':0.6,'max_tokens':min(int(inp.get('max_tokens',4096)),12000),'stream':True}
-        if inp.get('provider','local')=='local':
-            body['chat_template_kwargs']={'enable_thinking':False}
-        if schema and (inp.get('provider','local')=='local' or p.get('structured')):
+        body={'model':inp.get('model') or p.get('model',''),'messages':[{'role':'system','content':system_prompt},{'role':'user','content':user_prompt}], 'temperature':0.6,'max_tokens':min(int(inp.get('max_tokens',4096)),12000),'stream':True}
+        if schema and p.get('structured'):
             body['response_format']={'type':'json_schema','json_schema':{'name':'structured_result','strict':True,'schema':schema}}
         self.progress(job,phase)
         chunks=[]; last=0
@@ -234,9 +223,7 @@ class Worker:
                 if not response.is_success:
                     response.read(); checked(response)
                 for line in response.iter_lines():
-                    if self.cancelled(job):
-                        if inp.get('provider','local')=='local': runtime.unload()
-                        raise InterruptedError()
+                    if self.cancelled(job): raise InterruptedError()
                     if not line.startswith('data:'): continue
                     data=line[5:].strip()
                     if data=='[DONE]': break
@@ -300,8 +287,8 @@ class Worker:
                     if error:entry['validation_error']=error[:1200]
                     publish_trace()
             return extract_storyboard(
-                inp['prompt'],inp.get('target_duration'),inp.get('provider','local'),
-                inp.get('model') or p.get('model','local'),
+                inp['prompt'],inp.get('target_duration'),inp.get('provider',''),
+                inp.get('model') or p.get('model',''),
                 request_stage,inp.get('prompt_stages'),report_stage,
             )
         prompt=inp['prompt']
@@ -354,19 +341,6 @@ class Worker:
 
     def maestro(self,job,p):
         inp=job['input']; url=p['url'].rstrip('/')
-        if p.get('auto_start') and url=='http://127.0.0.1:7870':
-            self.progress(job,'启动本地媒体引擎')
-            runtime.start_maestro()
-            with httpx.Client(timeout=3,trust_env=False) as probe:
-                ready=False
-                for _ in range(120):
-                    if self.cancelled(job): raise InterruptedError()
-                    try:
-                        if probe.get(url+'/api/v1/system-stats').is_success:
-                            ready=True;break
-                    except httpx.HTTPError: pass
-                    time.sleep(1)
-                if not ready: raise ValueError('本地媒体引擎未能启动，请查看 data/logs/inference-engine.log')
         with httpx.Client(timeout=httpx.Timeout(3600,connect=10),trust_env=not p.get('local',False)) as client:
             remote=job.get('provider_job_id')
             if not remote:
@@ -375,7 +349,7 @@ class Worker:
                 from .capabilities import maestro_model,validate_media
                 catalogue=checked(client.get(url+'/api/v1/models')).get('models',[])
                 entry=next((m for m in catalogue if m['model_type']==model),None)
-                if not entry:raise ValueError('所选模型不在本地引擎目录中，请刷新模型列表')
+                if not entry:raise ValueError('所选模型不在已连接的 Maestro API 目录中，请刷新模型列表')
                 validate_media(maestro_model(entry),job['kind'],inp)
                 defaults=checked(client.get(url+'/api/v1/defaults/'+quote(model,safe='')))
                 if 'defaults' in defaults: defaults=defaults['defaults']
@@ -414,7 +388,7 @@ class Worker:
                         uploaded=checked(client.post(url+'/api/v1/upload',files={'file':(tail['name'],file,tail['mime'])}))
                     body['image_end']=uploaded['path']
                     body['image_prompt_type']+='E'
-                self.progress(job,'提交本地生成任务')
+                self.progress(job,'提交 Maestro API 任务')
                 result=checked(client.post(url+'/api/v1/generate',json=body))
                 remote=result.get('job_id') or result.get('id')
                 if not remote: raise ValueError('Maestro 未返回任务编号')
@@ -425,8 +399,8 @@ class Worker:
                     raise InterruptedError()
                 status=checked(client.get(url+'/api/v1/status/'+remote))
                 s.job_update(job['id'],telemetry={key:status.get(key) for key in ('step','total_steps','generation_eta_seconds','eta_confidence','current_clip','total_clips','current_window','total_windows')})
-                self.progress(job,status.get('message') or status.get('phase') or '本地生成中',status.get('progress'))
-                if status['status'] in ('failed','cancelled'): raise ValueError(status.get('error') or status.get('message') or ('本地生成失败，请查看引擎日志' if status['status']=='failed' else '本地任务已取消'))
+                self.progress(job,status.get('message') or status.get('phase') or 'Maestro API 生成中',status.get('progress'))
+                if status['status'] in ('failed','cancelled'): raise ValueError(status.get('error') or status.get('message') or ('Maestro API 生成失败' if status['status']=='failed' else 'Maestro API 任务已取消'))
                 if status['status']=='completed':
                     outputs=[]
                     for output in status.get('output_files',[]):
@@ -434,26 +408,21 @@ class Worker:
                         if not name: continue
                         output_kind=(mimetypes.guess_type(name)[0] or '').split('/')[0]
                         if output_kind!=job['kind']: continue
-                        # Existing local bridge is restricted to its own output tree.
-                        base=(runtime.MAESTRO/'outputs').resolve()
-                        candidate=Path(name)
-                        if not candidate.is_absolute(): candidate=base/candidate
-                        candidate=candidate.resolve()
-                        if candidate.is_relative_to(base) and candidate.is_file(): outputs.append(register(job,candidate))
-                        else:
-                            downloaded=client.get(url+'/api/v1/uploads/'+quote(Path(name).name,safe=''))
-                            downloaded.raise_for_status()
-                            temp=s.DATA/(s.uid()+Path(name).suffix)
-                            try:
-                                temp.write_bytes(downloaded.content); outputs.append(register(job,temp,Path(name).name))
-                            finally: temp.unlink(missing_ok=True)
-                    if not outputs: raise ValueError('本地任务完成，但没有可读取的输出文件')
+                        output_name=name.replace('\\','/').rsplit('/',1)[-1]
+                        downloaded=client.get(url+'/api/v1/uploads/'+quote(output_name,safe=''))
+                        downloaded.raise_for_status()
+                        suffix='.'+output_name.rsplit('.',1)[-1] if '.' in output_name else ''
+                        temp=s.DATA/(s.uid()+suffix)
+                        try:
+                            temp.write_bytes(downloaded.content); outputs.append(register(job,temp,output_name))
+                        finally: temp.unlink(missing_ok=True)
+                    if not outputs: raise ValueError('Maestro API 任务完成，但没有可下载的输出文件')
                     return {'assets':outputs}
         raise InterruptedError()
 
     def comfy(self,job,p):
         inp=job['input']; template=p.get('workflow')
-        if inp.get('end_asset_id'):raise ValueError('当前 ComfyUI 适配器未配置尾帧输入，请清除尾帧或使用内置引擎')
+        if inp.get('end_asset_id'):raise ValueError('当前 ComfyUI 适配器未配置尾帧输入，请清除尾帧或改用支持尾帧的外部 Provider')
         if not isinstance(template,dict): raise ValueError('请在模型服务中配置 ComfyUI API 工作流 JSON')
         refs=assets_for(job); url=p['url'].rstrip('/')
         width,height=(int(v) for v in inp.get('resolution','832x480').split('x'))

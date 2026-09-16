@@ -4,11 +4,11 @@
 
 | 路径 | 实际职责 | 多用户改造阶段 |
 |---|---|---|
-| `backend/app.py:30` `lifespan` | 调用 `store.init()`、`runtime.bootstrap()`，创建并启动 `Worker`，关闭时卸载 runtime | P1 拆分 Web/Worker 与本地推理 |
-| `backend/worker.py:19` `Worker` | 单 Worker 进程默认创建 4 个领取线程；Ark/豆包语音可并发，其他路径受 `local_execution_lock` 串行；进程级锁禁止第二 Worker 进程 | P1 独立入口；P6 多 Worker 进程 lease/fencing |
-| `backend/runtime.py` | 发现/启动 llama 与 Maestro、GPU/权重环境、空闲卸载 | P1 移除运行依赖 |
+| `backend/app.py:29` `lifespan` | 仅调用 `store.init()`；不创建 Worker、不取 worker.lock、不加载模型 | P1 已拆分；P2 替换存储 |
+| `backend/worker.py:19` `Worker` | 独立单 Worker 进程默认创建 4 个领取线程；Ark/豆包语音可并发，其他路径受 `serial_execution_lock` 串行；进程级锁禁止第二 Worker | P1 已由 `backend.worker_cli` 独立启动；P6 多 Worker lease/fencing |
+| `backend/runtime.py`、`inference/` | P1 已删除内置 llama/Maestro 启动、GPU/权重环境和模型安装代码 | 删除目标；Maestro 仅保留外部 HTTP 适配器 |
 | `backend/process_lock.py` | 单机进程锁 | P1 保留为过渡或移除；不能作为 P6 正确性依据 |
-| `Start-Studio.ps1` | 启动单机 Web 与相关本地服务 | P1/P7 更新部署方式 |
+| `Start-Studio.ps1` / `Stop-Studio.ps1` | 分别管理 Web 与 Worker PID；支持 `-WebOnly` / `-WorkerOnly` | P1 已拆分；P7 部署加固 |
 | `Install-Studio.ps1` | 安装 Python/Node 依赖并构建 | P1/P7 移除推理假设、补部署路径 |
 
 ## 当前持久化与主源

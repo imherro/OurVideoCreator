@@ -12,8 +12,6 @@ from backend.worker import Worker
 @pytest.fixture(scope='module')
 def client():
     with TestClient(app) as c:
-        # Keep queue tests deterministic; runtime integration is a separate test.
-        app.state.worker.stop()
         yield c
 
 @pytest.fixture(scope='module')
@@ -142,15 +140,19 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     assert listed[first['id']]['production_id']==production['id']
 
     other=c.post('/api/projects',json={'name':'另一个 Production'}).json()
+    prior_providers=s.get_setting('providers',[])
+    reference_provider={'id':'reference-test-api','name':'Reference test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
+    s.set_setting('providers',[*prior_providers,reference_provider])
     accepted_job=c.post(f'/api/projects/{second["id"]}/jobs',json={
         'node_id':'same-production-reference','kind':'text','submission_id':'same-production-reference-1',
-        'input':{'prompt':'只验证引用边界','provider':'local','asset_ids':[reference['id']]},
+        'input':{'prompt':'只验证引用边界','provider':reference_provider['id'],'asset_ids':[reference['id']]},
     })
     assert accepted_job.status_code==200,accepted_job.text
     rejected_job=c.post(f'/api/projects/{other["id"]}/jobs',json={
         'node_id':'cross-production-reference','kind':'text','submission_id':'cross-production-reference-1',
-        'input':{'prompt':'只验证引用边界','provider':'local','asset_ids':[reference['id']]},
+        'input':{'prompt':'只验证引用边界','provider':reference_provider['id'],'asset_ids':[reference['id']]},
     })
+    s.set_setting('providers',prior_providers)
     assert rejected_job.status_code==400
     assert '其他 Production' in rejected_job.json()['detail']
     rejected=c.patch(
@@ -811,9 +813,33 @@ def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(auth
         frozen=db.execute('SELECT provider FROM job_private WHERE job_id=?',(first['id'],)).fetchone()['provider']
     assert 'do-not-expose' in frozen
 
+def test_missing_or_removed_local_provider_fails_before_any_upstream_request(authenticated,monkeypatch):
+    import httpx
+    c=authenticated;p=project(c)
+    previous=s.get_setting('providers',[])
+    s.set_setting('providers',[])
+    calls=[]
+    monkeypatch.setattr(httpx,'Client',lambda *args,**kwargs:calls.append((args,kwargs)))
+    missing=c.post('/api/projects/'+p['id']+'/jobs',json={
+        'node_id':'missing-provider','kind':'text','submission_id':'missing-provider-001',
+        'input':{'prompt':'must not leave this process'},
+    })
+    legacy=c.post('/api/projects/'+p['id']+'/jobs',json={
+        'node_id':'legacy-local','kind':'text','submission_id':'legacy-local-001',
+        'input':{'provider':'local','prompt':'must not leave this process'},
+    })
+    s.set_setting('providers',previous)
+    assert missing.status_code==400 and legacy.status_code==400
+    assert '不会自动回退' in missing.json()['detail']
+    assert calls==[]
+
 def test_cancel_wins_late_completion(authenticated):
     c=authenticated;p=project(c)
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'cancel-submission-001','input':{'provider':'local','prompt':'你好'}}).json()
+    old=s.get_setting('providers',[])
+    provider={'id':'cancel-test-api','name':'Cancel test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
+    s.set_setting('providers',[*old,provider])
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'cancel-submission-001','input':{'provider':provider['id'],'prompt':'你好'}}).json()
+    s.set_setting('providers',old)
     s.job_update(job['id'],status='running')
     assert c.post('/api/jobs/'+job['id']+'/cancel').json()['status']=='cancelled'
     assert s.job_update(job['id'],status='succeeded',result={'text':'late'}) is False
@@ -848,7 +874,9 @@ def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticate
 
 def test_restart_marks_ambiguous_running_job(authenticated):
     c=authenticated;p=project(c)
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'prompt':'test'}}).json()
+    provider={'id':'restart-test-api','name':'Restart test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
+    s.set_setting('providers',[provider])
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'provider':provider['id'],'prompt':'test'}}).json()
     with s.db() as db:
         db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND id!=?",(job['id'],))
     s.job_update(job['id'],status='running',provider_job_id='upstream-paid-id')
@@ -891,6 +919,8 @@ def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'graph-run-test-001'}).json()
     assert result['count']==2
+    with s.db() as db:
+        db.execute("UPDATE jobs SET status='cancelled' WHERE status='queued' AND project_id!=?",(p['id'],))
     queued=c.get('/api/projects/'+p['id']+'/jobs').json()
     assert all(job['input']['target_duration']==15 for job in queued)
     received=[]
@@ -949,7 +979,9 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
 
 def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(authenticated):
     c=authenticated;p=project(c)
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'prompt':'test'}}).json()
+    provider={'id':'resume-test-api','name':'Resume test API','type':'openai','kind':'text','url':'http://127.0.0.1:1/v1','local':True,'model':'test'}
+    s.set_setting('providers',[provider])
+    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'provider':provider['id'],'prompt':'test'}}).json()
     s.job_update(job['id'],status='interrupted',error='restart',phase='old phase',progress=42,telemetry={'old':True})
     resumed=c.post('/api/jobs/'+job['id']+'/resume').json()
     assert resumed['status']=='queued'

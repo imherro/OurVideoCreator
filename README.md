@@ -1,6 +1,6 @@
-# 安影 · MyVideoCreator
+# 安影 · OurVideoCreator
 
-个人 AI 视频创作 Web 工作室。浏览器编辑项目，有显卡的主机运行模型与持久化队列。团队协作不在当前范围内。
+安影协作版 AI 视频创作工作室。当前处于多用户改造 P1 内部开发阶段：浏览器 Web 与持久任务 Worker 已分离，所有生成只调用显式配置的外部 Provider API。本阶段仍使用 SQLite 和共享工作室密码，不具备公网多用户安全条件。
 
 ## 运行
 
@@ -11,7 +11,17 @@ Windows，Python 3.11+ 与 Node.js 20+：
 .\Start-Studio.cmd
 ```
 
-首次部署后，可从能够访问工作室地址的浏览器设置工作室密码。其他电脑使用同一地址和密码登录。服务主机需要保持运行；关闭浏览器不会中断队列。远程访问可使用已有私人组网，或者配置 HTTPS 反向代理；不要将未受保护的推理引擎直接暴露到公网。
+`Start-Studio` 会启动两个独立进程：Web 和单实例 Worker。也可以分别执行：
+
+```powershell
+.\Start-Studio.ps1 -WebOnly
+.\Start-Studio.ps1 -WorkerOnly
+.\Stop-Studio.ps1
+```
+
+开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。第二个 Worker 会因 `data/worker.lock` 明确拒绝启动；多 Worker 要等 P6。
+
+首次部署后，可从能够访问工作室地址的浏览器设置工作室密码。P3 完成前只能在受控开发网络使用，不得公网部署。
 
 当前主机的局域网地址在首次开发检查时为 `192.168.2.100`，可能随网络改变。程序不会自行修改防火墙。允许 Python 入站访问时限定到需要的私人网络。
 
@@ -19,9 +29,9 @@ Windows，Python 3.11+ 与 Node.js 20+：
 
 ## 创作
 
-1. 创建剧本节点，选择本地 GGUF，输入故事并生成。
+1. 在设置中连接外部文本 Provider，并为作品显式选择默认模型。
 2. 点击“继续拆解分镜”，生成后导入分镜表。
-3. 按镜头建立图像和视频节点，连接参考图，选择本地图像/视频服务。
+3. 按镜头建立图像和视频节点，连接参考图，选择对应外部 Provider。
 4. 生成结果自动关联到节点；历史生成可切换版本。
 5. 点击“剪辑”进入 Twick 多轨工作区，生成初剪后继续精剪并导出 MP4。
 
@@ -45,23 +55,11 @@ Windows，Python 3.11+ 与 Node.js 20+：
 - 全景：素材库中的全景构图可浏览等距柱状全景图，保存指定视角为普通参考图。
 - 3D 导演台：添加角色与物体占位，调整位置、大小、朝向，保存多个机位；截图后创建带构图参考的图像节点。场景随项目保存，截图隐藏辅助网格与选中高亮。
 
-## 默认模型与独立推理
+## 外部 API-only
 
-按用户指定，默认使用：
+仓库不再包含模型权重、CUDA/GPU 探测、模型下载、本地推理虚拟环境或 llama/Maestro 自动启动逻辑。Web 启动不需要模型文件；Worker 只消费持久任务并调用已冻结的外部 Provider 配置或 FFmpeg。没有显式 Provider 时请求会在出站前失败，系统不会回退到其他付费模型。
 
-- 生文：Qwen3.8-27B-Uncensored-noMTP-Q4_K_M.gguf。
-- 生图：Flux 2 Klein Base 9B INT8，加载 Flux_Klein_9B_NSFW.safetensors，默认强度 1。
-- 生视频：MiniMax-H3-FL2VA-pruned_rank8_int8_convrot.safetensors，文本编码器暂用已有 qwen3vl-32B-MiniMax-H3-Q2_K.gguf。Q4_K_M 暂不下载。
-
-推理代码位于 `inference/engine`，独立 Python 环境位于 `.inference-env`，权重位于 `inference/engine/ckpts`，LoRA 位于 `inference/engine/loras`。运行时不需要 TestMaestro 的代码、环境或服务。工作室自动启动只监听本机的 7870 推理服务；其他电脑只访问工作室 7868 端口。
-
-内置推理基于 Maestro / WanGP，按用户声明用于个人非商业学习。来源、许可和改动见 `inference/NOTICE.md` 与 `inference/engine/LICENSE.txt`，第三方组件保留原许可证。大权重通过 NTFS 硬链接导入本项目，删除原文件路径不影响本项目；它不是指向原目录的快捷方式或符号链接。不要原地修改权重文件内容；替换权重时使用新文件。
-
-`Install-Studio.ps1` 仅安装 Web 前后端依赖并构建页面，不下载模型，也不新建 GPU 推理环境。当前机器已具备独立推理环境；迁移到新机器后仍需重新创建匹配的 Python/CUDA 环境，不能直接假定复制的 venv 可移植。
-
-首次迁移使用 `scripts/import_local_engine.py`；它只用于一次性导入，日常运行不调用它。模型环境已在本机导入，软件备份应包含独立环境、推理目录及工作室 data。
-
-此外保留 ComfyUI API 工作流、OpenAI 兼容图文和异步 JSON 视频网关。MiniMax Hailuo 2.3 已有原生视频适配器：支持 768P 的 6/10 秒文生视频或单首帧图生视频，以及 1080P 的 6 秒模式；首帧为 JPEG、PNG 或 WebP，短边大于 300px、文件小于 20MB。该适配器在任务提交后保存供应商任务编号，服务中断可恢复查询而不重复提交；供应商实际账号验收仍需使用者配置密钥后完成。其余厂商原生 API 尚未全面接入。项目或节点选择并配置云端 Provider 后可直接提交，本地失败不会自动切换云端。
+保留 ComfyUI API 工作流、OpenAI 兼容图文、Maestro/WanGP 兼容 HTTP API 和异步 JSON 视频网关。Maestro 在这里是已连接的独立服务，不由本仓库启动，也不读取其服务器文件系统。MiniMax Hailuo 2.3 已有原生视频适配器：支持 768P 的 6/10 秒文生视频或单首帧图生视频，以及 1080P 的 6 秒模式；首帧为 JPEG、PNG 或 WebP，短边大于 300px、文件小于 20MB。该适配器在任务提交后保存供应商任务编号，服务中断可恢复查询而不重复提交；供应商实际账号验收仍需使用者配置密钥后完成。
 
 Replicate 模型平台也可作为云端服务添加。它能运行平台提供的官方模型，例如 Seedance、Kling、Veo、Flux、Imagen，以及填写 `owner/model:版本 ID` 的社区模型。每个服务配置选择一种用途并填写该模型的输入 JSON；`{{prompt}}`、`{{system_prompt}}`、`{{target_duration}}`、`{{image}}` 和 `{{images}}` 会在提交时替换。参考素材会作为 data URI 发送给该云端服务。Replicate 的输入和输出字段随模型而异，请在模型 API 页面核对输入模板与计费；取消按钮会同时请求取消远端 prediction。真实账号调用尚未在本机验收。
 
@@ -79,7 +77,7 @@ RunningHub 也作为统一 Provider 接入：在“模型与服务”中点击�
 
 已锁定的视觉版本不会原地修改。用户可从它派生新版本；视觉卡会指向新版，但已有分镜继续绑定旧版，直到用户按镜头、场景或段落明确升级。升级只把现有生成结果标记为待更新，不删除素材、不自动重新生成。分镜图片任务会保存确定性的 Generation Fingerprint，覆盖镜头变量、绑定版本、风格版本、提示词编译器版本和最终 Provider/模型，用于判断当前结果是否陈旧。详细证据见 [PHASE_5_ACCEPTANCE.md](PHASE_5_ACCEPTANCE.md)。
 
-“我的项目”面板可分别设置项目默认文本、图片和视频 Provider/Model。解析顺序为“节点显式覆盖 → 项目默认 → 现有系统回退”；继承结果不会被写回成节点覆盖。新建项目在已经配置火山方舟时默认选择该服务的三类模型；迁移后的旧项目保持三个空策略，继续使用原有回退。Provider 被删除后配置会保留并显示失效，生成解析不会静默切换到其他收费服务。项目文档只保存 Provider ID 和 Model ID，不保存 API Key。
+“我的项目”面板可分别设置项目默认文本、图片和视频 Provider/Model。解析顺序为“节点显式覆盖 → 项目默认”；继承结果不会被写回成节点覆盖。新建项目在已经配置火山方舟时默认选择该服务的三类模型；迁移后的旧项目保持三个空策略，生成前必须显式配置。Provider 被删除后配置会保留并显示失效，生成解析不会静默切换到其他收费服务。项目文档只保存 Provider ID 和 Model ID，不保存 API Key。
 
 ## 数据与队列
 
@@ -87,16 +85,17 @@ RunningHub 也作为统一 Provider 接入：在“模型与服务”中点击�
 
 素材同时具有两个独立维度：`kind` 表示图片、视频、音频或字幕，`category` 表示角色、场景、道具、分镜、音乐、音效、人声、参考或其他；`source` 记录上传或系统生成。旧素材启动后无损迁移为 `category=other`、`source=uploaded`，文件仍保持 `data/assets/asset-uuid.ext`，分类变化不会移动或修改文件。素材库可组合筛选媒体类型与业务分类，上传时可指定分类，已有素材可直接重新归类。系统生成器可以通过任务上下文指定分类，为 Film Bible 的角色、场景和道具参考图预留接口。
 
-生成任务固化输入及服务配置；提交 ID 防止重复提交。当前单 worker 串行调度 GPU。取消状态不能被迟到的成功结果覆盖。服务重启将原运行任务标记为“待恢复”。已取得 Maestro、ComfyUI 或视频网关任务编号时，可点击“恢复查询已有任务”，沿用提交时的服务配置查询和取回结果；没有编号时必须先核对上游状态，不自动重新提交。
+生成任务固化输入及服务配置；提交 ID 防止重复提交。当前只允许一个独立 Worker 进程；少量已验证 Provider 可在线程内并发，其他执行保持串行。取消状态不能被迟到的成功结果覆盖。Worker 重启将原运行任务标记为“待恢复”，Web 重启不修改任务状态。已取得 Maestro、ComfyUI 或视频网关任务编号时，可点击“恢复查询已有任务”，沿用提交时的服务配置查询和取回结果；没有编号时必须先核对上游状态，不自动重新提交。
 
 画布、分镜表和宫格顶部提供“全部资产”“全部分镜图”“全部视频”三个智能批量入口，数字表示当前可提交项。批量生成跳过已有有效结果和正在执行的任务，只重试缺失、失败或过期结果；分镜图和视频使用精确节点模式，不会重新生成剧本或分镜规划。视频必须先有当前有效的分镜图，并通过适用的首帧状态核验。资产状态版本仍要求先人工确认并锁定父版本；任务按项目或节点已经选定的 Provider 直接提交。原“高级运行”保留完整画布和分支重跑能力。
 
-FFmpeg 优先使用配置路径或系统 PATH，也能发现本项目独立推理环境中的 imageio-ffmpeg 可执行程序。合成统一为 24fps、H.264/AAC。legacy 时间线和新的 Twick 多轨工程均可导出；素材范围会在渲染前校验，跨项目素材 ID 会被拒绝。
+FFmpeg 优先使用配置路径或系统 PATH，也可使用已安装的 `imageio-ffmpeg` 包。合成统一为 24fps、H.264/AAC。legacy 时间线和新的 Twick 多轨工程均可导出；素材范围会在渲染前校验，跨项目素材 ID 会被拒绝。
 
 ## 开发与验证
 
 ```powershell
 python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868
+python -m backend.worker_cli
 npm run dev
 npm run build
 npm test

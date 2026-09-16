@@ -17,22 +17,22 @@
 | Replicate | `replicate_api.py`、`test_replicate_api.py` | 保留 | P4/P6；REG-03 |
 | MiniMax 原生视频 | `minimax_video.py`、`test_minimax_video.py` | 保留外部适配器 | P1 与 runtime 解耦；P4/P6 |
 | ComfyUI/API 网关 | `worker.py::comfy/video_api` | 保留为外部 Provider | P1；P4 收敛到管理员配置 |
-| 内置 llama 文本运行时 | `runtime.py::load`、`worker.py` local dispatch、模型目录 UI | 移除 | P1；无本地回退 |
-| 内置 Maestro/WanGP 启动 | `runtime.py::start_maestro`、`inference/`、runtime API | 移除本仓库运行依赖 | P1；未来作为受控外部 API |
-| GPU/CUDA/权重发现和模型安装 | `runtime.py`、`inference/`、`scripts/import_local_engine.py` | 移除 | P1；CLOUD-01/04 |
-| FFmpeg/ffprobe/缩略图 | `media.py`、`editor_renderer.py`、`worker.py::export*` | 保留 | P1 不误删；P7 加固；CLOUD-05、MEDIA-06 |
+| 内置 llama 文本运行时 | 原 `runtime.py::load`、`worker.py` local dispatch、模型目录 UI | P1 已删除；缺配置明确失败且不出站 | `test_missing_or_removed_local_provider_fails_before_any_upstream_request`；CLOUD-01/04 |
+| 内置 Maestro/WanGP 启动 | 原 `runtime.py::start_maestro`、`inference/`、runtime API | P1 已删除仓库运行依赖；只保留已连接外部 HTTP API | `worker.py::maestro`；CLOUD-01/04 |
+| GPU/CUDA/权重发现和模型安装 | 原 `runtime.py`、`inference/`、`scripts/import_local_engine.py` | P1 已删除 | Web 无模型环境进程测试；CLOUD-01/04 |
+| FFmpeg/ffprobe/缩略图 | `media.py`、`editor_renderer.py`、`worker.py::export*` | 保留；从系统/配置路径发现 | `test_export.py` 真实导出与解码；CLOUD-05、MEDIA-06 |
 | 旧 `timeline: Clip[]` 与 Twick 多轨剪辑/字幕/初剪 | `src/timeline.ts`、`src/editor/`、`initialTimeline.ts`、`test_export.py` | 保留；旧简剪一次性导入同一 `editor_timelines` 主源，禁止双写 | P5 revision+租约；P7 E2E；REG-05 |
 | 画布/节点/连线 | `src/main.tsx`、`graph.ts`、`shotNodes.ts` | 保留并拆主源 | P5 graph revision；COLLAB-11 |
 | 宫格图板 | `contact_sheet.py`、`StoryboardGrid.tsx` | 保留 | P3 文件授权；REG-06 |
 | 全景浏览/视角保存 | `panorama.ts`、`PanoramaViewer.tsx` | 保留 | P5 对象映射；REG-06 |
-| 3D 导演台 | `document.director`、`directorScene.ts`、`DirectorStage.tsx` | 保留为 Episode director-stage 对象；capture 同时受素材/节点权限约束 | P5 revision；COLLAB-12、REG-06 |
-| 提示词库与模板历史 | `app.py::save_prompt_template`、`settings.prompt_library` | 保留为平台级 PA 管理目录，普通用户只读启用模板 | P4 关系化+revision；MODEL-07 |
+| 3D 导演台 | `document.director`、`directorScene.ts`、`DirectorStage.tsx` | 保留为 Episode director-stage 对象；capture 同时受素材/节点权限约束 | P5 对象自身 revision；COLLAB-11、REG-06 |
+| 提示词库与模板历史 | `app.py::save_prompt_template`、`settings.prompt_library` | 保留为平台级 PA 管理目录，普通用户只读启用模板 | P4 关系化+revision；P4-TPL-01 |
 | 当前共享密码/setup | `app.py:73-123` | 移除 | P3 CLI 初始管理员和个人会话；AUTH-01 |
 | 当前全局 Provider settings | `settings` 表、`app.py:673-727`、`SettingsPanel` | 移除普通入口，迁为后台 | P4；MODEL/SECRET |
 | 当前 SQLite 与启动迁移 | `store.py` | 完整替换，不保留运行兼容 | P2；DB-* |
 | 整份 Project.document 写入 | `app.py:391`、`main.tsx:989` | 退役为只读聚合 | P5；COLLAB-04 |
 | 旧数据/schema 兼容 | `store.init` 与 `project_schema` 历史迁移 | 新库不迁旧数据；保留必要纯函数直到聚合切换 | P1/P2/P5 后清理，删除需测试映射 |
-| SQLite 任务队列/单 Worker 锁 | `worker.py`、`process_lock.py` | 分阶段替换 | P1 独立 Worker；P2 PG；P6 lease/fencing |
+| SQLite 任务队列/单 Worker 锁 | `worker.py`、`worker_cli.py`、`process_lock.py` | P1 已独立进程且第二 Worker 明确拒绝；后续分阶段替换 | `test_p1_processes.py`；P2 PG；P6 lease/fencing |
 | SSE | `events` 表、`app.py:1849`、前端 EventSource | 保留机制并加权限/重连 | P3/P7；EVENT-* |
 
 ## 不在第一版范围
