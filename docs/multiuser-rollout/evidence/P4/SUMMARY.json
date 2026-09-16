@@ -1,0 +1,57 @@
+{
+  "status": "READY_FOR_REVIEW",
+  "external_acceptance": null,
+  "stage": "P4-MODEL-01",
+  "repository": "https://github.com/imherro/OurVideoCreator",
+  "branch": "master",
+  "base_sha": "de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6",
+  "implementation_sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+  "tested_business_sha": "3a73165f74520d0c15ec6f0750d7b2c105108744",
+  "final_head_binding": "Containing docs-only evidence commit; full SHA provided in review request",
+  "backend": {
+    "command": "python -m pytest -q --tb=short",
+    "utc_start": "2026-09-16T17:03:37.7463019Z",
+    "utc_end": "2026-09-16T17:12:02.5591828Z",
+    "passed": 351, "failed": 0, "skipped": 0, "warnings": 2,
+    "duration_seconds": 502.37, "exit_code": 0,
+    "database": "Real isolated PostgreSQL 18.6", "log": "backend-full.txt"
+  },
+  "frontend": {
+    "sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+    "commands": ["npm test", "npm run build"],
+    "utc_start": "2026-09-16T16:52:27.4251127Z",
+    "utc_end": "2026-09-16T16:52:42.1506842Z",
+    "passed": 128, "failed": 0, "skipped": 0,
+    "test_exit": 0, "build_exit": 0,
+    "warning": "Existing Vite chunks above 500kB",
+    "runtime_identical_to_final_business_sha": true,
+    "log": "frontend-test-build.txt"
+  },
+  "routes": {"registered": 99, "api": 96, "classified_api": 96, "unclassified_api": 0, "exit_code": 0},
+  "compile_exit": 0,
+  "browser": {
+    "sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+    "runtime_identical_to_final_business_sha": true,
+    "tool": "mcp__cua_repl.js", "exit_code": null,
+    "exit_code_note": "Browser tool has no aggregate CLI exit code",
+    "tool_calls": 30, "tool_results": 30,
+    "text_job_status": "succeeded", "image_job_status": "succeeded",
+    "ordinary_json_responses_scanned": 199, "sse_scanned": 13,
+    "canary_hits": 0, "unavailable_bodies": 0,
+    "fake_counts": {"text": 1, "submit": 1, "poll": 1, "download": 1, "wrong_auth": 0},
+    "database_tables_scanned": 37, "database_rows_scanned": 60, "log_files_scanned": 4,
+    "user_assisted_clicks": 0,
+    "raw_trace": "browser-tool-trace.json", "db_projection": "browser-db-audit.json"
+  },
+  "matrix": {
+    "MODEL-01": "developer-verified", "MODEL-02": "developer-verified",
+    "MODEL-03": "developer-verified", "MODEL-04": "developer-verified",
+    "MODEL-05": "developer-verified", "MODEL-06": "developer-verified",
+    "MODEL-07": "developer-verified", "MODEL-08": "developer-verified",
+    "SECRET-01": "developer-verified", "SECRET-02": "developer-verified",
+    "P4-TPL-01": "developer-verified"
+  },
+  "not_run": ["Real paid Provider calls", "Real upstream authentication", "Public deployment", "Hundreds-user load"],
+  "retained_resources": ["P4 preliminary browser fixture 6313", "P4 formal browser fixture 6185"],
+  "p5_authorized": false
+}

@@ -1,0 +1,16 @@
+........................................................................ [ 20%]
+........................................................................ [ 41%]
+........................................................................ [ 62%]
+........................................................................ [ 83%]
+..........................................................               [100%]
+============================== warnings summary ===============================
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  C:\Users\[USER]\AppData\Roaming\Python\Python314\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  C:\Users\[USER]\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+346 passed, 2 warnings in 441.83s (0:07:21)

@@ -8,7 +8,7 @@
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
 | P3 | P3-R2 已复验 | 通过 | `de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6` | `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md` | 无；原六项及 R1-01/02/03 全部关闭 | P4 |
-| P4 | P4-MODEL-01 实施中 | 未验收 | | `design/P4_MODEL_CONFIG.md` | 尚未提交验收 | 否 |
+| P4 | READY_FOR_REVIEW | 未验收 | 业务 `3a73165f74520d0c15ec6f0750d7b2c105108744` | `evidence/P4/REPORT.md` | 待外部审核 | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
 | P7 | 未提交 | 未验收 | | | | 否 |
@@ -237,3 +237,11 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 本次关闭 `OVC-P3-R1-01`、`OVC-P3-R1-02`、`OVC-P3-R1-03`，原 `OVC-P3-01…06` 整体关闭，无新增阻塞，不需要 P3-R3。浏览器证据按人工协助验证认可，不冒称全自动。P0/P1/P2 历史通过不变，既有 warning 和历史未归因超时继续保留。
 
 下一单一授权任务：**P4-MODEL-01，平台统一 Provider/Key/模型后台与受控调用闭环**。只授权 P4；P5/P6 等后续阶段、公网部署、真实付费 API 仍未授权。完整外部任务归档于 `prompts/P4_CODEX_PROMPT.md`，P4 完成后必须再次外部验收。
+
+## P4-MODEL-01 待验收记录
+
+状态：**READY_FOR_REVIEW**（2026-09-17）。被测试业务 SHA：`3a73165f74520d0c15ec6f0750d7b2c105108744`；实现 SHA：`0e64bd0540ad53de5ea6d93013c14d5154760867`。
+
+报告及证据：`evidence/P4/REPORT.md`、`SUMMARY.json` 和原始日志/浏览器记录。最终真实 PG 后端 351 passed、前端 128 passed、构建和编译 exit 0，96/96 API 分类。实际 UI 保存 Provider/Key/发布模型后，普通获权账号选择并提交文本、异步图片，独立 Worker 成功返回结果；四角色管理拒绝、嵌套覆盖、密钥异常、A/B HTTP 轮换/吊销和出站边界有对应负向测试。浏览器/前端 SHA 与最终业务间仅测试断言不同，运行时代码相同，明确记录而不冒称重跑。
+
+尚未获 P4 外部验收；P5、上线和真实付费 API 仍未授权。只向协作版新仓库提交，外部审核应聚焦已冻结功能与实际缺陷，避免过度设计。

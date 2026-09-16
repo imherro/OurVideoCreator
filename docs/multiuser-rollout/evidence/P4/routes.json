@@ -1,0 +1,816 @@
+{
+  "audit": "P3 ACL-09 actual app.routes classification guard",
+  "isolated_data_dir": true,
+  "dist_exists": true,
+  "route_count": 99,
+  "api_decorator_route_count": 96,
+  "classified_api_route_count": 96,
+  "unclassified_api_routes": [],
+  "enforcement": "fail-closed; any unclassified API route exits non-zero",
+  "framework_entries_documented": {
+    "openapi_disabled": true,
+    "static_mount": true
+  },
+  "openapi_route": null,
+  "static_mounts": [
+    {
+      "type": "Mount",
+      "path": "",
+      "name": "web",
+      "methods": []
+    }
+  ],
+  "without_dist_difference": "backend/app.py conditionally omits only the '/' StaticFiles Mount; API routes remain registered and OpenAPI stays disabled",
+  "routes": [
+    {
+      "type": "APIRoute",
+      "path": "/api/models",
+      "name": "catalog",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/model-providers",
+      "name": "providers",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/model-providers",
+      "name": "create_provider",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/model-providers/{provider_id}",
+      "name": "update_provider",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/model-providers/{provider_id}/check",
+      "name": "check_provider",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/model-providers/{provider_id}/credentials/{credential_id}/revoke",
+      "name": "revoke_provider_key",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/models",
+      "name": "admin_models",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/models",
+      "name": "create_model",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/models/{model_id}",
+      "name": "update_model",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/health",
+      "name": "health",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/status",
+      "name": "auth_status",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/setup",
+      "name": "setup",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/register",
+      "name": "register",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/login",
+      "name": "login",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/logout",
+      "name": "logout",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/auth/password-reset",
+      "name": "consume_password_reset",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/invitations",
+      "name": "list_invitations",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/invitations",
+      "name": "create_invitation",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/invitations/{invitation_id}",
+      "name": "revoke_invitation",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/users",
+      "name": "admin_users",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/users/{user_id}",
+      "name": "update_user_state",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/password-resets",
+      "name": "issue_password_reset",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/workspaces",
+      "name": "workspaces",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/workspaces",
+      "name": "admin_workspaces",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/workspaces",
+      "name": "create_workspace",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/workspaces/{workspace_id}/members",
+      "name": "workspace_members",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/workspaces/{workspace_id}/members/{user_id}",
+      "name": "put_workspace_member",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/workspaces/{workspace_id}/members/{user_id}",
+      "name": "delete_workspace_member",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/members",
+      "name": "production_members",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/members/{user_id}",
+      "name": "put_production_member",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/members/{user_id}",
+      "name": "delete_production_member",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/audit-events",
+      "name": "audit_events",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects",
+      "name": "projects",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions",
+      "name": "productions",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions",
+      "name": "create_production",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}",
+      "name": "update_production",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}",
+      "name": "read_production",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episodes",
+      "name": "production_episodes",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/visual-usage",
+      "name": "production_visual_usage",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episodes",
+      "name": "create_episode",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects",
+      "name": "create_project",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}",
+      "name": "read_project",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}",
+      "name": "delete_project",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/storyboard-sheet",
+      "name": "storyboard_sheet",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}",
+      "name": "save_project",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/revisions",
+      "name": "revisions",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/revisions/{rid}",
+      "name": "revision",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/assets",
+      "name": "assets",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/assets",
+      "name": "production_assets",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/assets",
+      "name": "upload",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/assets/{aid}",
+      "name": "update_asset",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/assets/{aid}",
+      "name": "delete_asset",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/trash",
+      "name": "trash",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/trash/{kind}/{item_id}/restore",
+      "name": "restore_deleted_item",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/assets/{aid}/file",
+      "name": "asset_file",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/provider-assets/{aid}",
+      "name": "provider_asset_file",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/system",
+      "name": "system",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/settings",
+      "name": "settings",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/settings",
+      "name": "update_settings",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/providers/{provider_id}/models",
+      "name": "provider_models",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/providers/{provider_id}/verify",
+      "name": "verify_provider",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/providers/{provider_id}/test",
+      "name": "test_provider",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/prompt-library",
+      "name": "prompt_library",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/prompt-library/{tid}",
+      "name": "save_prompt_template",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/admin/prompt-templates/{tid}",
+      "name": "save_platform_prompt_template",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/audio-jobs",
+      "name": "submit_audio_batch",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/jobs",
+      "name": "submit",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/sources",
+      "name": "source_documents",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/sources",
+      "name": "create_source_document",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/sources/import",
+      "name": "import_source_document",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/sources/{source_id}",
+      "name": "delete_source_document",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/chapters/trash",
+      "name": "delete_source_chapter_batch",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/chapters/{chapter_id}",
+      "name": "delete_source_chapter",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/chapters",
+      "name": "source_chapters",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/sources/{source_id}/chapters",
+      "name": "create_source_chapter",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/chapters/{chapter_id}",
+      "name": "save_source_chapter",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/source-events",
+      "name": "source_events",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/source-extractions",
+      "name": "extract_source_events",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/adaptation",
+      "name": "read_adaptation",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/adaptation",
+      "name": "save_adaptation",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/adaptation/review",
+      "name": "review_adaptation",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/adaptation/approve",
+      "name": "approve_adaptation",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/adaptation/generate",
+      "name": "generate_adaptation",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/scripts",
+      "name": "production_scripts",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episode-scripts/{episode_no}",
+      "name": "read_episode_script",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episode-scripts/{episode_no}",
+      "name": "save_episode_script",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episode-scripts/{episode_no}/review",
+      "name": "review_episode_script",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episode-scripts/{episode_no}/approve",
+      "name": "approve_episode_script",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/episode-scripts/{episode_no}/needs-changes",
+      "name": "revise_episode_script",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/productions/{production_id}/script-generations",
+      "name": "generate_episode_scripts",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/run",
+      "name": "run_workflow",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/projects/{pid}/jobs",
+      "name": "jobs",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/jobs/{jid}",
+      "name": "read_job",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/jobs/{jid}/cancel",
+      "name": "cancel",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/jobs/{jid}/resume",
+      "name": "resume",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/api/events",
+      "name": "events",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/admin",
+      "name": "admin_page",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "APIRoute",
+      "path": "/members",
+      "name": "members_page",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "type": "Mount",
+      "path": "",
+      "name": "web",
+      "methods": []
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "utc_start": "2026-09-16T17:08:25.0076081Z",
+  "utc_end": "2026-09-16T17:08:26.7404347Z",
+  "business_sha": "3a73165f74520d0c15ec6f0750d7b2c105108744",
+  "routes_command": "python scripts/audit_routes.py",
+  "routes_exit": 0,
+  "compile_command": "python -m compileall -q backend tests scripts",
+  "compile_exit": 0,
+  "runtime_diff_exit": 0
+}

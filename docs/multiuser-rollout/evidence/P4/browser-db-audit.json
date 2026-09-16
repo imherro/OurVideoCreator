@@ -1,0 +1,381 @@
+{
+  "utc": "2026-09-16T17:02:16.970849+00:00",
+  "projection": "No credentials, auth headers, cookies, password hashes, DSN or ciphertext values",
+  "database_name": "ovc_test_6360_1c0f38899a8f",
+  "postgres_version": {
+    "server_version": "18.6"
+  },
+  "project_id": "project-3f78425000124d6390093efb549f9f5f",
+  "processes": {
+    "harness": 6360,
+    "web": 27040,
+    "worker": 31708
+  },
+  "web_url": "http://127.0.0.2:6185",
+  "ordinary": [
+    {
+      "id": "p4-ui-manager-dcbe14625ae441f885cced71dc1ae337",
+      "platform_role": "user",
+      "workspace_role": "member",
+      "production_role": "manager"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "job-3c744c71d4d04ee6a89bcf77433e1c1c",
+      "kind": "text",
+      "status": "succeeded",
+      "provider_job_id": null,
+      "created": 1789577912.020587,
+      "finished": 1789577913.33152,
+      "actor_user_id": "p4-ui-manager-dcbe14625ae441f885cced71dc1ae337",
+      "model_id": "model-f053db6102cb4f99928943d407fe6343",
+      "model_version_id": "model-version-753ef30ffdeb4f9b8cd4d7cbeb029d53",
+      "config_version_id": "provider-config-181e5fcc8fba431abb2b09e125dc252f",
+      "credential_version_id": "credential-444da8926d374ef7a8b75f4f2d42dad1",
+      "parameters": {
+        "max_tokens": 100
+      }
+    },
+    {
+      "id": "job-8ed002bfbc6d47e191759e239fee0c4a",
+      "kind": "image",
+      "status": "succeeded",
+      "provider_job_id": "p4-ui-image-1",
+      "created": 1789577982.9768887,
+      "finished": 1789577989.6915545,
+      "actor_user_id": "p4-ui-manager-dcbe14625ae441f885cced71dc1ae337",
+      "model_id": "model-fd424ba478b74201af5cc1b7b7e4c3ed",
+      "model_version_id": "model-version-09c409e025bc44b88e751d50f94dab1e",
+      "config_version_id": "provider-config-6081ac1cb880431e86d857e79dba1088",
+      "credential_version_id": "credential-8da62e90e86542e4b0709b0640ef728e",
+      "parameters": {}
+    }
+  ],
+  "audit": [
+    {
+      "id": 4,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-8489570e723341bf8eda22618106090d",
+      "actor_user_id": "user-test-admin-f9a41c0a4f744f5d91b2fbec843dd857",
+      "created": 1789577766.5045707,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-181e5fcc8fba431abb2b09e125dc252f",
+        "credential_version_id": "credential-444da8926d374ef7a8b75f4f2d42dad1"
+      }
+    },
+    {
+      "id": 5,
+      "action": "platform_model.save",
+      "target_type": "platform_model",
+      "target_id": "model-f053db6102cb4f99928943d407fe6343",
+      "actor_user_id": "user-test-admin-f9a41c0a4f744f5d91b2fbec843dd857",
+      "created": 1789577783.156966,
+      "payload": {
+        "default": true,
+        "enabled": true,
+        "published": true,
+        "provider_id": "provider-8489570e723341bf8eda22618106090d",
+        "model_version_id": "model-version-753ef30ffdeb4f9b8cd4d7cbeb029d53"
+      }
+    },
+    {
+      "id": 6,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-4c9d54452ada47a9b84f18a6c4326def",
+      "actor_user_id": "user-test-admin-f9a41c0a4f744f5d91b2fbec843dd857",
+      "created": 1789577795.1711693,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-6081ac1cb880431e86d857e79dba1088",
+        "credential_version_id": "credential-8da62e90e86542e4b0709b0640ef728e"
+      }
+    },
+    {
+      "id": 7,
+      "action": "platform_model.save",
+      "target_type": "platform_model",
+      "target_id": "model-fd424ba478b74201af5cc1b7b7e4c3ed",
+      "actor_user_id": "user-test-admin-f9a41c0a4f744f5d91b2fbec843dd857",
+      "created": 1789577812.594179,
+      "payload": {
+        "default": true,
+        "enabled": true,
+        "published": true,
+        "provider_id": "provider-4c9d54452ada47a9b84f18a6c4326def",
+        "model_version_id": "model-version-09c409e025bc44b88e751d50f94dab1e"
+      }
+    }
+  ],
+  "credentials_metadata": [
+    {
+      "id": "credential-444da8926d374ef7a8b75f4f2d42dad1",
+      "provider_id": "provider-8489570e723341bf8eda22618106090d",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 312
+    },
+    {
+      "id": "credential-8da62e90e86542e4b0709b0640ef728e",
+      "provider_id": "provider-4c9d54452ada47a9b84f18a6c4326def",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 312
+    }
+  ],
+  "table_scan": [
+    {
+      "table": "alembic_version",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "assets",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "audit_events",
+      "rows": 8,
+      "canary_hits": 0
+    },
+    {
+      "table": "auth_rate_limits",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "deleted_items",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "episode_script_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "episode_scripts",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "events",
+      "rows": 14,
+      "canary_hits": 0
+    },
+    {
+      "table": "invitations",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "job_private",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "jobs",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_catalog",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_defaults",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_providers",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_versions",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "password_reset_tokens",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "production_members",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "production_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "productions",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "projects",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_library_state",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_template_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_templates",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_asset_groups",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_asset_mappings",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_config_versions",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_credential_versions",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_keyring",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "revisions",
+      "rows": 8,
+      "canary_hits": 0
+    },
+    {
+      "table": "sessions",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "settings",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_chapters",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_documents",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_events",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "users",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "workspace_members",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "workspaces",
+      "rows": 1,
+      "canary_hits": 0
+    }
+  ],
+  "log_scan": [
+    {
+      "file": "web.stderr.log",
+      "canary_hit": false,
+      "bytes": 202
+    },
+    {
+      "file": "web.stdout.log",
+      "canary_hit": false,
+      "bytes": 29116
+    },
+    {
+      "file": "worker.stderr.log",
+      "canary_hit": false,
+      "bytes": 0
+    },
+    {
+      "file": "worker.stdout.log",
+      "canary_hit": false,
+      "bytes": 190
+    }
+  ],
+  "fake_counts": {
+    "text": 1,
+    "submit": 1,
+    "poll": 1,
+    "download": 1,
+    "wrong_auth": 0
+  },
+  "fake_calls": [
+    {
+      "utc": "2026-09-16T16:54:26.604092+00:00",
+      "event": "started-no-calls"
+    },
+    {
+      "utc": "2026-09-16T16:58:33.174654+00:00",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "account": "UI-A",
+      "status": 200
+    },
+    {
+      "utc": "2026-09-16T16:59:43.858500+00:00",
+      "method": "POST",
+      "path": "/v1/models/test/image/predictions",
+      "account": "UI-A",
+      "status": 200
+    },
+    {
+      "utc": "2026-09-16T16:59:49.005517+00:00",
+      "method": "GET",
+      "path": "/v1/predictions/p4-ui-image-1",
+      "account": "UI-A",
+      "status": 200
+    },
+    {
+      "utc": "2026-09-16T16:59:49.350200+00:00",
+      "method": "GET",
+      "path": "/result.png",
+      "account": "anonymous",
+      "status": 200
+    }
+  ]
+}

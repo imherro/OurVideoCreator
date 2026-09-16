@@ -1,0 +1,83 @@
+{
+  "utc": "2026-09-16T17:14:08.2885576Z",
+  "scheme": "sha256 UTF-8 without BOM, CRLF normalized to LF (Git text normalization)",
+  "self_excluded": true,
+  "secret_scan_hit_count": 0,
+  "files": [
+    {
+      "file": "ATTEMPT_HISTORY.md",
+      "canonical_bytes": 4971,
+      "sha256": "2a64410c3c06bc7d6f4f237507ae322281e8734f8edae995554661e913c69fe6"
+    },
+    {
+      "file": "backend-0e64bd0.txt",
+      "canonical_bytes": 1514,
+      "sha256": "2f1646a39b578154e35dc8fb919c54604fa65005835b4824f437916dce341a9a"
+    },
+    {
+      "file": "backend-full.txt",
+      "canonical_bytes": 1514,
+      "sha256": "1d890c34901f0b394931b1bd64ae20f3c9181c325399e6d3cb1ff70a4e0e1323"
+    },
+    {
+      "file": "browser-db-audit.json",
+      "canonical_bytes": 9066,
+      "sha256": "bc77fa2bd9d06edbac3b194fbac74ee73f2fc96c27b4f82a5235e3716fa6de26"
+    },
+    {
+      "file": "browser-pre-generation.json",
+      "canonical_bytes": 7106,
+      "sha256": "e12a5331df56ddf2a98fea5acaf441f3da8f0d9dbdc7f983ae2616b5c14d54aa"
+    },
+    {
+      "file": "browser-tool-trace.json",
+      "canonical_bytes": 68204,
+      "sha256": "a518729a220b20b7d4fa1c8fc2d2371316dd43019d2ec07dd515a27b28013b9c"
+    },
+    {
+      "file": "browser-web-access.txt",
+      "canonical_bytes": 28856,
+      "sha256": "c9e7fcddfe1961daf32848a689fa12f49cbdd467cc186aa97452b2067bde5bee"
+    },
+    {
+      "file": "checks.json",
+      "canonical_bytes": 348,
+      "sha256": "7c77949f39ac6d22263012b0bd8646edbead300156bcfced65f87808b662b0e6"
+    },
+    {
+      "file": "development-backend-r2.txt",
+      "canonical_bytes": 1390,
+      "sha256": "341e705cfc149cd5ef1c709282bd1125860ce7e944b32316ed4137073dccb8ee"
+    },
+    {
+      "file": "extract_browser_trace.py",
+      "canonical_bytes": 2827,
+      "sha256": "c0f112232ea62a5f35efe72b96289280e4a5bbd0cda1fe3c7ea2753d524da0f1"
+    },
+    {
+      "file": "frontend-test-build.txt",
+      "canonical_bytes": 12269,
+      "sha256": "fdb1e75fce855ef9a3c1eb2b0edf14184af1e9ef1585f2507df3ef038d7b12b1"
+    },
+    {
+      "file": "provenance.json",
+      "canonical_bytes": 1064,
+      "sha256": "21816072f519bf60ed6ac643042c9ac8868b07621a7458d9d05a3fce73976291"
+    },
+    {
+      "file": "REPORT.md",
+      "canonical_bytes": 12221,
+      "sha256": "e614948946cf1b79b98f45c1ffe85b1f27cdbe55b0f9ce666f09887139f6dc3f"
+    },
+    {
+      "file": "routes.json",
+      "canonical_bytes": 16855,
+      "sha256": "731ac9f5ca5cc072be4246365a5e734320ed45a97f2464f830909c712b08a8e6"
+    },
+    {
+      "file": "SUMMARY.json",
+      "canonical_bytes": 2812,
+      "sha256": "4eacf02311488f7a51846580ce97eff44fb957eb1d92a121e7f588b90315d898"
+    }
+  ]
+}

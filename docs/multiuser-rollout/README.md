@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2、P3**
 
-状态：**P4-MODEL-01 实施中**（P4 未验收）
+状态：**P4-MODEL-01 READY_FOR_REVIEW**（P4 未验收）
 
 当前阶段：**P4-MODEL-01 — 平台统一 Provider/Key/模型后台与受控调用闭环**
 
@@ -61,6 +61,7 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P3-R2/EXTERNAL_ACCEPTANCE.md`](evidence/P3-R2/EXTERNAL_ACCEPTANCE.md)（ChatGPT 外部通过记录及 P4 授权）
 - [`prompts/P4_CODEX_PROMPT.md`](prompts/P4_CODEX_PROMPT.md)（本次外部授权完整任务原文，网页文本格式化归档）
 - [`design/P4_MODEL_CONFIG.md`](design/P4_MODEL_CONFIG.md)（P4 实现契约与入口/验证映射，非完成声明）
+- [`evidence/P4/REPORT.md`](evidence/P4/REPORT.md)（平台模型治理、独立 Worker 真实 UI 闭环及安全矩阵；最终业务 `3a73165f74520d0c15ec6f0750d7b2c105108744`，待外部验收）
 
 ## 阶段边界
 

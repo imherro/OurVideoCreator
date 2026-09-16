@@ -1,0 +1,29 @@
+{
+  "utc": "2026-09-16T17:04:19.3927480Z",
+  "development_base": "de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6",
+  "implementation_sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+  "tested_business_sha": "3a73165f74520d0c15ec6f0750d7b2c105108744",
+  "branch": "master",
+  "origin": "https://github.com/imherro/OurVideoCreator.git",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "node": "v24.13.0",
+  "npm": "11.8.0",
+  "versions": {
+    "python": "3.14.2",
+    "pytest": "9.0.3",
+    "cryptography": "50.0.1",
+    "httpx": "0.28.1",
+    "psycopg": "3.3.5",
+    "fastapi": "0.136.3"
+  },
+  "runtime_diff_between_business_commits": [],
+  "all_diff_between_business_commits": [
+    "tests/test_p4_model_foundation.py"
+  ],
+  "frontend_sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+  "browser_sha": "0e64bd0540ad53de5ea6d93013c14d5154760867",
+  "browser_tool": "mcp__cua_repl.js / Codex in-app browser",
+  "computer_use_skill_version": "26.908.70816",
+  "browser_engine_version": "unavailable: Browser.getVersion not supported",
+  "browser_total_exit_code": null
+}
