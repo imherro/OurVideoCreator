@@ -1,0 +1,159 @@
+Exploratory run after expiry fix; before HTTP harness correction.
+Command: python -m pytest tests/test_p3_r2_interleavings.py -q -s
+Exit: 1
+Captured final output (earlier progress letters omitted):
+F{"scenario": "expires_while_waiting", "status": 400}
+.
+================================== FAILURES ===================================
+____________ test_first_bucket_http_waiters_respect_budget[absent] ____________
+
+admin = <starlette.testclient.TestClient object at 0x0000023B0702B230>
+clients = <function clients.<locals>.make at 0x0000023B090EC930>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000023B090649D0>
+initial = 'absent'
+
+    @pytest.mark.parametrize('initial', ['absent', 'expired', 'cleared'])
+    def test_first_bucket_http_waiters_respect_budget(admin, clients, monkeypatch, initial):
+        _, _, phone = register(admin, clients, nickname='HTTP rate test')
+        keys = ['login:ip:127.0.0.1', 'login:account:' + identity.digest(identity.normalize_phone(phone))]
+        with s.db() as c:
+            c.execute('DELETE FROM auth_rate_limits')
+            if initial != 'absent':
+                for key in keys:
+                    c.execute('INSERT INTO auth_rate_limits VALUES (%s,%s,10,%s)',
+                              (key, time.time() - 301, time.time() - 1))
+            if initial == 'cleared':
+                identity.clear_rate_limit(c, keys)
+        entered, release = threading.Event(), threading.Event()
+        calls = 0
+        mutex = threading.Lock()
+        original = identity.verify_password
+    
+        def verify(encoded, password):
+            nonlocal calls
+            with mutex:
+                calls += 1
+                first = calls == 1
+            if first:
+                entered.set()
+                assert release.wait(15)
+            return original(encoded, password)
+    
+        monkeypatch.setattr(identity, 'verify_password', verify)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+            def login():
+                with httpx.Client(base_url=url, timeout=25) as client:
+                    return client.post('/api/auth/login', json={
+                        'phone': phone, 'password': '[REDACTED_TEST_PASSWORD]',
+                    }).status_code
+            first = pool.submit(login)
+            try:
+>               assert entered.wait(10)
+E               assert False
+E                +  where False = wait(10)
+E                +    where wait = <threading.Event at 0x23b091056d0: unset>.wait
+
+tests\test_p3_r2_interleavings.py:90: AssertionError
+___________ test_first_bucket_http_waiters_respect_budget[expired] ____________
+
+admin = <starlette.testclient.TestClient object at 0x0000023B0713CA50>
+clients = <function clients.<locals>.make at 0x0000023B090ECE00>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000023B09064C30>
+initial = 'expired'
+
+    @pytest.mark.parametrize('initial', ['absent', 'expired', 'cleared'])
+    def test_first_bucket_http_waiters_respect_budget(admin, clients, monkeypatch, initial):
+        _, _, phone = register(admin, clients, nickname='HTTP rate test')
+        keys = ['login:ip:127.0.0.1', 'login:account:' + identity.digest(identity.normalize_phone(phone))]
+        with s.db() as c:
+            c.execute('DELETE FROM auth_rate_limits')
+            if initial != 'absent':
+                for key in keys:
+                    c.execute('INSERT INTO auth_rate_limits VALUES (%s,%s,10,%s)',
+                              (key, time.time() - 301, time.time() - 1))
+            if initial == 'cleared':
+                identity.clear_rate_limit(c, keys)
+        entered, release = threading.Event(), threading.Event()
+        calls = 0
+        mutex = threading.Lock()
+        original = identity.verify_password
+    
+        def verify(encoded, password):
+            nonlocal calls
+            with mutex:
+                calls += 1
+                first = calls == 1
+            if first:
+                entered.set()
+                assert release.wait(15)
+            return original(encoded, password)
+    
+        monkeypatch.setattr(identity, 'verify_password', verify)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+            def login():
+                with httpx.Client(base_url=url, timeout=25) as client:
+                    return client.post('/api/auth/login', json={
+                        'phone': phone, 'password': '[REDACTED_TEST_PASSWORD]',
+                    }).status_code
+            first = pool.submit(login)
+            try:
+>               assert entered.wait(10)
+E               assert False
+E                +  where False = wait(10)
+E                +    where wait = <threading.Event at 0x23b0929a270: unset>.wait
+
+tests\test_p3_r2_interleavings.py:90: AssertionError
+___________ test_first_bucket_http_waiters_respect_budget[cleared] ____________
+
+admin = <starlette.testclient.TestClient object at 0x0000023B09065F30>
+clients = <function clients.<locals>.make at 0x0000023B090EDA60>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000023B09276D50>
+initial = 'cleared'
+
+    @pytest.mark.parametrize('initial', ['absent', 'expired', 'cleared'])
+    def test_first_bucket_http_waiters_respect_budget(admin, clients, monkeypatch, initial):
+        _, _, phone = register(admin, clients, nickname='HTTP rate test')
+        keys = ['login:ip:127.0.0.1', 'login:account:' + identity.digest(identity.normalize_phone(phone))]
+        with s.db() as c:
+            c.execute('DELETE FROM auth_rate_limits')
+            if initial != 'absent':
+                for key in keys:
+                    c.execute('INSERT INTO auth_rate_limits VALUES (%s,%s,10,%s)',
+                              (key, time.time() - 301, time.time() - 1))
+            if initial == 'cleared':
+                identity.clear_rate_limit(c, keys)
+        entered, release = threading.Event(), threading.Event()
+        calls = 0
+        mutex = threading.Lock()
+        original = identity.verify_password
+    
+        def verify(encoded, password):
+            nonlocal calls
+            with mutex:
+                calls += 1
+                first = calls == 1
+            if first:
+                entered.set()
+                assert release.wait(15)
+            return original(encoded, password)
+    
+        monkeypatch.setattr(identity, 'verify_password', verify)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+            def login():
+                with httpx.Client(base_url=url, timeout=25) as client:
+                    return client.post('/api/auth/login', json={
+                        'phone': phone, 'password': '[REDACTED_TEST_PASSWORD]',
+                    }).status_code
+            first = pool.submit(login)
+            try:
+>               assert entered.wait(10)
+E               assert False
+E                +  where False = wait(10)
+E                +    where wait = <threading.Event at 0x23b0935f150: unset>.wait
+
+tests\test_p3_r2_interleavings.py:90: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p3_r2_interleavings.py::test_first_bucket_http_waiters_respect_budget[absent]
+FAILED tests/test_p3_r2_interleavings.py::test_first_bucket_http_waiters_respect_budget[expired]
+FAILED tests/test_p3_r2_interleavings.py::test_first_bucket_http_waiters_respect_budget[cleared]
+3 failed, 1 passed in 34.64s

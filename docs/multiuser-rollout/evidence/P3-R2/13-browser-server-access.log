@@ -1,0 +1,399 @@
+Business SHA: cd61996bf6908f66cfd3429d27fa42acb03c144d
+Source: isolated port 7895 Uvicorn access log, captured after browser completion 2026-09-16T14:41Z. No bodies or headers logged. Server stays running; this is not a process exit report.
+INFO:     127.0.0.1:10900 - "GET /admin HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10900 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10900 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13818 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10900 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10900 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8844 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8844 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8844 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8844 - "GET /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8844 - "GET /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10363 - "POST /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10363 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1259 - "GET /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10363 - "GET /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4588 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7985 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4588 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4588 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4588 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13845 - "POST /api/auth/register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13845 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12966 - "GET /admin HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12966 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:12966 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:12966 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12966 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12966 - "GET /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3836 - "GET /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12858 - "POST /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12858 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5379 - "GET /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12858 - "GET /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8147 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8147 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:8147 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:8147 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8147 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8214 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8147 - "GET /api/projects?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6521 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8214 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8214 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5167 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2085 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6537 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8147 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8214 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4456 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2841 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10682 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1124 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14109 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3176 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2091 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14360 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2475 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11448 - "GET /members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10127 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:1795 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:1795 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10127 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1795 - "GET /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1795 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6840 - "PUT /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members/user-154b047680f846ecb06c9483b8c9eafe HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6840 - "GET /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6840 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7887 - "PUT /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members/user-154b047680f846ecb06c9483b8c9eafe HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7887 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13874 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:13874 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:3724 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:3724 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3724 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13874 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2134 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12188 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5992 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2393 - "PUT /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members/user-a85e057c48654c7dabc9f115ac7b2c8f HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:4108 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5767 - "GET /api/projects?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5767 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5767 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4108 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9883 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4940 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1343 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1343 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1113 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14728 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11784 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8457 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13317 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12517 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9066 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6908 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14517 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3827 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12322 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8180 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6381 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2290 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8850 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5063 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1943 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14984 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /?stage=overview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:14984 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:8720 - "PUT /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members/user-a85e057c48654c7dabc9f115ac7b2c8f HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:14984 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8850 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1943 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14984 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5063 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5559 - "GET /admin HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5559 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:5559 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:5559 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5559 - "GET /api/admin/users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11386 - "GET /api/admin/workspaces HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13590 - "GET /api/admin/invitations HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9651 - "POST /api/admin/password-resets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13739 - "POST /api/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13739 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3474 - "POST /api/auth/password-reset HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3474 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3474 - "GET /api/admin/users HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:3474 - "GET /api/admin/workspaces HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:3474 - "GET /api/admin/invitations HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:8850 - "GET /api/events HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:9901 - "GET /members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9901 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:9685 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:9685 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9685 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6235 - "GET /api/projects HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:6273 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6273 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11134 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:11134 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:11134 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:6273 - "GET /api/workspaces/workspace-2820c504e48a4f3e95c0c8f9ee36af4b/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7065 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11134 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11134 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5131 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9391 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5131 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11134 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10510 - "POST /api/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10510 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11917 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:11917 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11917 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14978 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4506 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3929 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11357 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5837 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11880 - "GET /api/projects?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4640 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5837 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4640 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10682 - "GET /api/projects?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5837 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4640 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11880 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11956 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9383 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8806 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6323 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14718 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2692 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2692 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5837 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10682 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2692 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6323 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7523 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11956 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11880 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9383 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14718 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4640 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2290 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5568 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7879 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1942 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5588 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5588 - "GET /members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5588 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1942 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5588 - "GET /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5588 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13606 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7246 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9565 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5332 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10887 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12383 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5443 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4321 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7447 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3361 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1028 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6207 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11482 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14497 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8458 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7773 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3273 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5811 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5830 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6352 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14518 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13286 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6004 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13082 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12117 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10682 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6104 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9247 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9391 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4305 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7208 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12525 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14874 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13809 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9109 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7958 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8290 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5892 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10897 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3033 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2041 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7417 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1943 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7080 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5486 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12941 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1423 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11242 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5789 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8662 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1868 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9859 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11245 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6945 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6993 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10087 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1193 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13170 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5956 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1320 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14921 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10214 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14510 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1636 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1391 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1802 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13353 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5020 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12236 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14742 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3180 - "DELETE /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members/user-154b047680f846ecb06c9483b8c9eafe HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8153 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7891 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:9291 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:9355 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4217 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3180 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4419 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1760 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10407 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2078 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11585 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7949 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:6433 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3539 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11296 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:5068 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1203 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1771 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:13721 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4248 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:14021 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11999 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11851 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:6629 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:8002 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:8859 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3317 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3315 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:8699 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7157 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2116 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:8284 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10477 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1670 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2595 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4641 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:13407 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1166 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:9774 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3930 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11144 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12421 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3577 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4854 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:5461 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7569 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12838 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3247 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:5425 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:13038 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10256 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12865 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3398 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:13884 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1363 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:9915 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4354 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3811 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7405 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:5224 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:11524 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:6726 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:1377 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7153 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7602 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10817 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7280 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12755 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7514 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4888 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2663 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2693 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10815 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7311 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4838 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:14451 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12171 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2692 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:6173 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7232 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:4995 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3776 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2564 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:9331 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3664 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:2521 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10307 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/assets?scope=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:7171 - "GET /api/projects/project-cefcb6b7534a4236b25818e78494555d/jobs HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:3171 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/visual-usage HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10682 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/adaptation HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10782 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/scripts HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:12200 - "GET /?stage=overview HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:12200 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:4108 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:4108 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12200 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4108 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5126 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4805 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1950 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3225 - "GET /members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3225 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:3225 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:3225 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4272 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:4272 - "GET /assets/index-Dpdho9mO.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:7353 - "GET /assets/index-3RWlzYn6.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:3225 - "GET /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9014 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9014 - "GET /api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7353 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7353 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10224 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4272 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7392 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2290 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13486 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4201 - "GET /api/projects?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "DELETE /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members/user-154b047680f846ecb06c9483b8c9eafe HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8423 - "GET /api/productions?workspace_id=workspace-64a9957b8af54c3ba1fefe07d3f14644 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4524 - "GET /?stage=overview HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:4524 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4524 - "GET /api/productions?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1148 - "GET /api/projects?workspace_id=workspace-2820c504e48a4f3e95c0c8f9ee36af4b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8442 - "GET /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6183 - "GET /api/system HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4806 - "GET /api/settings HTTP/1.1" 200 OK

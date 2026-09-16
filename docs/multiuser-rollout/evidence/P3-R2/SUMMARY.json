@@ -1,0 +1,20 @@
+{
+  "status": "READY_FOR_REVIEW",
+  "repository": "imherro/OurVideoCreator",
+  "branch": "master",
+  "base": "5e0c5e36d37415d4867d380f4e86dd47c87eebce",
+  "business_sha": "cd61996bf6908f66cfd3429d27fa42acb03c144d",
+  "targeted_passed": 27,
+  "python_full_passed": 303,
+  "frontend_passed": 126,
+  "formal_command_exit_codes": {"targeted":0,"full":0,"frontend":0,"build":0,"routes":0,"compile":0},
+  "browser_result": "Expected final state reached with human-assisted native confirmations; no aggregate CLI exit code",
+  "browser_contexts": "Same IAB profile, independent localhost and 127.0.0.1 host-only cookies/origin storage",
+  "browser_start_utc": "2026-09-16T14:23:05.486Z",
+  "browser_end_utc": "2026-09-16T14:40:46.087Z",
+  "audit_rows": 12,
+  "audit_id_range": [9,20],
+  "external_acceptance": "PENDING",
+  "p4_started": false,
+  "paid_api_calls": 0
+}

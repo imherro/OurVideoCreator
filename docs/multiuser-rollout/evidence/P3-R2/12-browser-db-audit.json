@@ -1,0 +1,154 @@
+{
+  "captured_utc": "2026-09-16T14:41:02.427810+00:00",
+  "business_sha": "cd61996bf6908f66cfd3429d27fa42acb03c144d",
+  "query": "SELECT id, actor_user_id, action, target_type, target_id, workspace_id, production_id, created, to_timestamp(created) AS created_utc FROM audit_events WHERE created >= %s ORDER BY id",
+  "parameters": [
+    1789568585.486
+  ],
+  "row_count": 12,
+  "rows": [
+    {
+      "id": 9,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "session.login",
+      "target_type": "user",
+      "target_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789568610.6562722,
+      "created_utc": "2026-09-16 22:23:30.656272+08:00"
+    },
+    {
+      "id": 10,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "invitation.create",
+      "target_type": "invitation",
+      "target_id": "invite-fee3db7b8d0947719f5bc9d562deb245",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789568633.9663193,
+      "created_utc": "2026-09-16 22:23:53.966319+08:00"
+    },
+    {
+      "id": 11,
+      "actor_user_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "action": "user.register",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789568658.0552354,
+      "created_utc": "2026-09-16 22:24:18.055235+08:00"
+    },
+    {
+      "id": 12,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "workspace.create",
+      "target_type": "workspace",
+      "target_id": "workspace-2820c504e48a4f3e95c0c8f9ee36af4b",
+      "workspace_id": "workspace-2820c504e48a4f3e95c0c8f9ee36af4b",
+      "production_id": null,
+      "created": 1789568685.2238436,
+      "created_utc": "2026-09-16 22:24:45.223844+08:00"
+    },
+    {
+      "id": 13,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "workspace_member.put",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": "workspace-64a9957b8af54c3ba1fefe07d3f14644",
+      "production_id": null,
+      "created": 1789568729.3985987,
+      "created_utc": "2026-09-16 22:25:29.398599+08:00"
+    },
+    {
+      "id": 14,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "production_member.put",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": "workspace-64a9957b8af54c3ba1fefe07d3f14644",
+      "production_id": "production-ce4c46fbf4084ca2ba2ac1d927258422",
+      "created": 1789568752.144253,
+      "created_utc": "2026-09-16 22:25:52.144253+08:00"
+    },
+    {
+      "id": 15,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "password_reset.issue",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789568932.8531861,
+      "created_utc": "2026-09-16 22:28:52.853186+08:00"
+    },
+    {
+      "id": 16,
+      "actor_user_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "action": "user.password_reset",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789569005.9744742,
+      "created_utc": "2026-09-16 22:30:05.974474+08:00"
+    },
+    {
+      "id": 17,
+      "actor_user_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "action": "session.login",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789569068.2584999,
+      "created_utc": "2026-09-16 22:31:08.258500+08:00"
+    },
+    {
+      "id": 18,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "session.login",
+      "target_type": "user",
+      "target_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "workspace_id": null,
+      "production_id": null,
+      "created": 1789569093.4143953,
+      "created_utc": "2026-09-16 22:31:33.414395+08:00"
+    },
+    {
+      "id": 19,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "production_member.remove",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": "workspace-64a9957b8af54c3ba1fefe07d3f14644",
+      "production_id": "production-ce4c46fbf4084ca2ba2ac1d927258422",
+      "created": 1789569218.3642604,
+      "created_utc": "2026-09-16 22:33:38.364260+08:00"
+    },
+    {
+      "id": 20,
+      "actor_user_id": "user-a85e057c48654c7dabc9f115ac7b2c8f",
+      "action": "workspace_member.remove",
+      "target_type": "user",
+      "target_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "workspace_id": "workspace-64a9957b8af54c3ba1fefe07d3f14644",
+      "production_id": null,
+      "created": 1789569616.8584764,
+      "created_utc": "2026-09-16 22:40:16.858476+08:00"
+    }
+  ],
+  "membership_query": "SELECT workspace_id,user_id,role FROM workspace_members WHERE user_id=%s ORDER BY workspace_id",
+  "production_query": "SELECT production_id,user_id,role FROM production_members WHERE user_id=%s",
+  "user_parameter": "user-154b047680f846ecb06c9483b8c9eafe",
+  "workspace_members": [
+    {
+      "workspace_id": "workspace-2820c504e48a4f3e95c0c8f9ee36af4b",
+      "user_id": "user-154b047680f846ecb06c9483b8c9eafe",
+      "role": "owner"
+    }
+  ],
+  "production_members": []
+}

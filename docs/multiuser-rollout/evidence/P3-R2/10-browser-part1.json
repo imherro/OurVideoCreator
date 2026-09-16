@@ -1,0 +1,429 @@
+{
+  "business_sha": "cd61996bf6908f66cfd3429d27fa42acb03c144d",
+  "started_utc": "2026-09-16T14:23:05.486Z",
+  "tool": "mcp__cua_repl.js + CUA/Playwright/CDP",
+  "tool_version": "API documentation from current session; runtime did not expose package version",
+  "skill_version": "computer-use/26.908.70816",
+  "browser_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "contexts": {
+    "admin": "IAB tab 4 http://localhost:7895; initially administrator, temporarily switched to reset recipient, then administrator again",
+    "member": "IAB tab 5 http://127.0.0.1:7895; separate host-only cookies and origin storage; not a second browser profile"
+  },
+  "status": "PARTIAL: reset/registration/authorization complete; removal dialog pending",
+  "projection": "Network rows [CDP sequence,method,path,status], duplicate sequence entries and routine GETs omitted. Assertions preserve first matching raw AX line. Failed assertions/collection warnings retained. No request bodies, headers, tokens or passwords exported.",
+  "rows": [
+    {
+      "utc": "2026-09-16T14:23:36.489Z",
+      "context": "admin",
+      "action": "填写测试管理员手机号、密码并点击进入工作室",
+      "network": [
+        [
+          31,
+          "POST",
+          "/api/auth/login",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "平台管理",
+          "raw": "\t\t\t4 heading 平台管理, Value: 1",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:24:00.477Z",
+      "context": "admin",
+      "action": "点击创建邀请",
+      "network": [
+        [
+          62,
+          "POST",
+          "/api/admin/invitations",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "已创建 48 小时一次性邀请",
+          "raw": "\t\t30 text 已创建 48 小时一次性邀请",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:24:10.006Z",
+      "context": "member",
+      "action": "打开独立 host，上下文没有继承管理员 Cookie",
+      "network": [],
+      "assertions": [
+        {
+          "expected": "登录安影",
+          "raw": "\t\t\t12 heading 登录安影, Value: 2",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:24:27.311Z",
+      "context": "member",
+      "action": "填写测试手机号、昵称、邀请及密码，点击注册并登录",
+      "network": [
+        [
+          31,
+          "POST",
+          "/api/auth/register",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "等待加入团队",
+          "raw": "\t\t3 heading 等待加入团队, Value: 1",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:24:51.400Z",
+      "context": "admin",
+      "action": "填写第二团队名称和新成员 ID，点击创建",
+      "network": [
+        [
+          157,
+          "POST",
+          "/api/admin/workspaces",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "P3R2 Recorded Team",
+          "raw": "\t\t\t33 text P3R2 Recorded Team workspace-2820c504e48a4f3e95c0c8f9ee36af4b owner ·  P3R2 Recorded Member  ·  user-154b047680f846ecb06c9483b8c9eafe P3R2 成员团队 workspace-f148e29095e34f6baa098639e57f5296 owner ·  P3R2 Browser Member  ·  user-3e21d9772d88427b8c4fe8764a7c2354 安影工作室 workspace-64a9957b8af54c3ba1fefe07d3f14644 owner ·  P3R2 Browser Admin  ·  user-a85e057c48654c7dabc9f115ac7b2c8f",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:25:51.858Z",
+      "context": "admin",
+      "action": "填写新成员 ID，点击确认入组；页面以成员行更新反馈，无成功 toast",
+      "network": [
+        [
+          247,
+          "GET",
+          "/api/projects",
+          200
+        ],
+        [
+          455,
+          "PUT",
+          "/api/workspaces/workspace-64a9957b8af54c3ba1fefe07d3f14644/members/user-154b047680f846ecb06c9483b8c9eafe",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "P3R2 Recorded Member",
+          "raw": "\t\t\t41 text P3R2 Recorded Member user-154b047680f846ecb06c9483b8c9eafe  ·  +8613900000203 member",
+          "passed": true
+        },
+        {
+          "expected": "+8613900000203 member",
+          "raw": "\t\t\t41 text P3R2 Recorded Member user-154b047680f846ecb06c9483b8c9eafe  ·  +8613900000203 member",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:26:05.298Z",
+      "context": "admin",
+      "action": "填写新成员 ID、保持 viewer，点击授权作品",
+      "network": [
+        [
+          475,
+          "PUT",
+          "/api/productions/production-ce4c46fbf4084ca2ba2ac1d927258422/members/user-154b047680f846ecb06c9483b8c9eafe",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "user-154b047680f846ecb06c9483b8c9eafe viewer",
+          "raw": "\t\t\t45 text P3R2 Recorded Member user-154b047680f846ecb06c9483b8c9eafe viewer",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:26:53.276Z",
+      "context": "member",
+      "action": "刷新成员上下文，默认进入自己的空团队",
+      "network": [
+        [
+          100,
+          "GET",
+          "/api/projects",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "P3R2 Recorded Team · owner",
+          "raw": "\t\t4 pop up button (collapsed, settable) Description: 切换团队, Value: P3R2 Recorded Team · owner, Secondary Actions: Expand",
+          "passed": true
+        },
+        {
+          "expected": "创建第一部作品",
+          "raw": "\t\t8 heading 创建第一部作品, Value: 1",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:27:18.389Z",
+      "context": "admin",
+      "action": "读取 owner 409 证据时 CDP 缓冲报告 truncated；该次响应未计入已验证网络证据，后续重做安全拒绝用例",
+      "evidence_warning": true
+    },
+    {
+      "utc": "2026-09-16T14:27:28.242Z",
+      "context": "member",
+      "action": "切换安影工作室后看到获权作品，保存按钮禁用",
+      "network": [
+        [
+          144,
+          "GET",
+          "/api/projects",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "heading P3R2 浏览器作品",
+          "raw": "\t\t\t80 heading P3R2 浏览器作品, Value: 1",
+          "passed": true
+        },
+        {
+          "expected": "(disabled) Description: 保存项目",
+          "raw": "\t\t\t60 button (disabled) Description: 保存项目, Help: 保存 Ctrl+S",
+          "passed": true
+        },
+        {
+          "expected": "当前为  viewer",
+          "raw": "\t\t\t64 text 当前为  viewer  视图。整份作品写入在 P3 仅开放给 manager / owner。",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:27:42.465Z",
+      "context": "admin",
+      "action": "重新执行唯一 owner 降级拒绝用例，记录未截断响应",
+      "network": [],
+      "assertions": [
+        {
+          "expected": "不能降级最后一位有效团队 owner",
+          "raw": "\t\t46 text 不能降级最后一位有效团队 owner",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:27:42.607Z",
+      "context": "member",
+      "action": "刷新后获权作品与 viewer 只读状态保持",
+      "network": [
+        [
+          385,
+          "GET",
+          "/api/projects",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "heading P3R2 浏览器作品",
+          "raw": null,
+          "passed": false
+        },
+        {
+          "expected": "(disabled) Description: 保存项目",
+          "raw": null,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:28:39.842Z",
+      "context": "member",
+      "action": "修正测试预期：刷新会重新选择第一个团队；当前为空团队，不泄漏另一团队作品",
+      "network": [],
+      "assertions": [
+        {
+          "expected": "P3R2 Recorded Team · owner",
+          "raw": "\t\t4 pop up button (collapsed, settable) Description: 切换团队, Value: P3R2 Recorded Team · owner, Secondary Actions: Expand",
+          "passed": true
+        },
+        {
+          "expected": "创建第一部作品",
+          "raw": "\t\t8 heading 创建第一部作品, Value: 1",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:29:31.632Z",
+      "context": "admin",
+      "action": "页面导航清除了旧 CDP 缓冲；当前页的签发请求仍保留为 sequence 568/571、HTTP 200。以当前页起点 514 重新读取，无重复签发。",
+      "evidence_warning": true
+    },
+    {
+      "utc": "2026-09-16T14:29:31.667Z",
+      "context": "admin",
+      "action": "点击成员签发重置；从当前页保留的原始事件恢复记录，未重复提交",
+      "network": [
+        [
+          571,
+          "POST",
+          "/api/admin/password-resets",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "已为 P3R2 Recorded Member 签发 30 分钟一次性重置令牌",
+          "raw": "\t\t34 text 已为 P3R2 Recorded Member 签发 30 分钟一次性重置令牌",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:30:27.302Z",
+      "context": "admin",
+      "action": "在 localhost 的重置表单填写一次性令牌与测试新密码，点击重置并登录；普通成员无权进入 /admin",
+      "network": [
+        [
+          577,
+          "POST",
+          "/api/auth/logout",
+          200
+        ],
+        [
+          592,
+          "POST",
+          "/api/auth/password-reset",
+          200
+        ],
+        [
+          607,
+          "GET",
+          "/api/admin/users",
+          403
+        ],
+        [
+          612,
+          "GET",
+          "/api/admin/workspaces",
+          403
+        ],
+        [
+          616,
+          "GET",
+          "/api/admin/invitations",
+          403
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "无权访问",
+          "raw": "\t\t3 heading 无权访问, Value: 1",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:30:52.410Z",
+      "context": "member",
+      "action": "保持旧 Cookie 打开成员页，密码重置后返回登录页",
+      "network": [
+        [
+          485,
+          "GET",
+          "/api/events",
+          401
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "登录安影",
+          "raw": "\t\t\t13 heading 登录安影, Value: 2",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:31:02.184Z",
+      "context": "member",
+      "action": "额外直开 /api/projects 被浏览器客户端拦截，未据此断言服务器结果；已有旧 Cookie 的 /api/events 返回 401（sequence 485）及登录页证据。",
+      "evidence_warning": true
+    },
+    {
+      "utc": "2026-09-16T14:31:15.739Z",
+      "context": "member",
+      "action": "输入测试新密码并点击进入工作室，成员页恢复",
+      "network": [
+        [
+          561,
+          "POST",
+          "/api/auth/login",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "团队与作品成员",
+          "raw": "\t\t\t5 heading 团队与作品成员, Value: 1",
+          "passed": true
+        },
+        {
+          "expected": "P3R2 Recorded Team",
+          "raw": "\t\t\t11 pop up button (collapsed, settable) 团队, Value: P3R2 Recorded Team · owner, Secondary Actions: Expand",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "utc": "2026-09-16T14:31:44.324Z",
+      "context": "member",
+      "action": "新密码登录后切换回获权团队，撤权前 viewer 作品仍可见",
+      "network": [
+        [
+          658,
+          "GET",
+          "/api/projects",
+          200
+        ],
+        [
+          675,
+          "GET",
+          "/api/projects",
+          200
+        ]
+      ],
+      "assertions": [
+        {
+          "expected": "heading P3R2 浏览器作品",
+          "raw": "\t\t\t80 heading P3R2 浏览器作品, Value: 1",
+          "passed": true
+        },
+        {
+          "expected": "(disabled) Description: 保存项目",
+          "raw": "\t\t\t60 button (disabled) Description: 保存项目, Help: 保存 Ctrl+S",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

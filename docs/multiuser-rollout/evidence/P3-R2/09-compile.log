@@ -1,0 +1,3 @@
+Business SHA: cd61996bf6908f66cfd3429d27fa42acb03c144d
+Command: python -m compileall -q backend migrations scripts tests
+Exit: 0

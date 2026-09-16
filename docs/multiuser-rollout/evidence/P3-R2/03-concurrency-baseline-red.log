@@ -1,0 +1,238 @@
+Baseline: 5e0c5e36d37415d4867d380f4e86dd47c87eebce
+Only test file copied into isolated detached worktree; no business mutations.
+Command: python -m pytest tests/test_p3_r2_interleavings.py -q -s -k "three_login or two_issuers"
+Exit: 1
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\http\httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\uvicorn\middleware\proxy_headers.py", line 62, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\_utils.py", line 87, in collapse_excgroups
+    raise exc
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Local\Temp\ovc-p3r2-red-5e6499caa1\backend\app.py", line 69, in auth
+    result = await call_next(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py", line 330, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\starlette\concurrency.py", line 32, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\anyio\to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py", line 2518, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py", line 1002, in run
+    result = context.run(func, *args)
+  File "C:\Users\kunpeng\AppData\Local\Temp\ovc-p3r2-red-5e6499caa1\backend\app.py", line 183, in login
+    user=c.execute('SELECT * FROM users WHERE phone=%s FOR UPDATE',(phone,)).fetchone()
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kunpeng\AppData\Roaming\Python\Python314\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.DeadlockDetected: deadlock detected
+DETAIL:  Process 40708 waits for ShareLock on transaction 25626; blocked by process 28380.
+Process 28380 waits for ShareLock on transaction 25627; blocked by process 40708.
+HINT:  See server log for query details.
+CONTEXT:  while locking tuple (0,2) in relation "users"
+{"scenario": "three_login_empty_to_existing", "B_waits_before_A_commit": [{"pid": 28380, "wait_event_type": "Lock", "wait_event": "transactionid", "blockers": [6752]}], "C_waits_after_A_commit": [{"pid": 40708, "wait_event_type": "Lock", "wait_event": "transactionid", "blockers": [28380]}], "statuses": [401, 401, 500], "verify_calls": 2}
+F{"scenario": "two_issuers_between_revoke_insert", "database_waiters": [], "overlapping_revoke_steps": true, "statuses": [200, 200], "active_token_count": 2}
+F
+================================== FAILURES ===================================
+_______________ test_three_login_empty_to_existing_bucket_order _______________
+
+admin = <starlette.testclient.TestClient object at 0x00000234EAD7C980>
+clients = <function clients.<locals>.make at 0x00000234EAE48460>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000234EAE50050>
+
+    def test_three_login_empty_to_existing_bucket_order(admin, clients, monkeypatch):
+        _, _, phone = register(admin, clients, nickname='Three request lock order')
+        with s.db() as c:
+            c.execute('DELETE FROM auth_rate_limits')
+        entered = [threading.Event(), threading.Event()]
+        release = [threading.Event(), threading.Event()]
+        original = identity.verify_password
+        calls = 0
+        mutex = threading.Lock()
+    
+        def verify(encoded, password):
+            nonlocal calls
+            with mutex:
+                index = calls
+                calls += 1
+            if index < 2:
+                entered[index].set()
+                assert release[index].wait(15)
+            return original(encoded, password)
+    
+        monkeypatch.setattr(identity, 'verify_password', verify)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            def login():
+                with httpx.Client(base_url=url, trust_env=False, timeout=25) as client:
+                    return client.post('/api/auth/login', json={
+                        'phone': phone, 'password': '[REDACTED_TEST_PASSWORD]',
+                    }).status_code
+            a = pool.submit(login)
+            try:
+                assert entered[0].wait(10)
+                b = pool.submit(login)
+                waiting_b = wait_for_db_waiters(1)
+                release[0].set()
+                status_a = a.result(timeout=15)
+                assert entered[1].wait(10)
+                c = pool.submit(login)
+                waiting_c = wait_for_db_waiters(1)
+            finally:
+                for event in release:
+                    event.set()
+            statuses = [status_a, b.result(timeout=15), c.result(timeout=15)]
+        print(json.dumps({'scenario': 'three_login_empty_to_existing',
+                          'B_waits_before_A_commit': waiting_b, 'C_waits_after_A_commit': waiting_c,
+                          'statuses': statuses, 'verify_calls': calls}))
+>       assert statuses == [401, 401, 401]
+E       assert [401, 401, 500] == [401, 401, 401]
+E         
+E         At index 2 diff: 500 != 401
+E         Use -v to get more diff
+
+tests\test_p3_r2_interleavings.py:245: AssertionError
+____________________ test_two_issuers_revoke_before_insert ____________________
+
+admin = <starlette.testclient.TestClient object at 0x00000234E9E38A50>
+clients = <function clients.<locals>.make at 0x00000234EAE48930>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000234EAF6F950>
+
+    def test_two_issuers_revoke_before_insert(admin, clients, monkeypatch):
+        _, user, _ = register(admin, clients, nickname='Two issuer linearization')
+        entered = [threading.Event(), threading.Event()]
+        release = threading.Event()
+        original_db = s.db
+        calls = 0
+        mutex = threading.Lock()
+    
+        class ObservedConnection:
+            def __init__(self, connection):
+                self.connection = connection
+    
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+    
+            def execute(self, query, params=None):
+                nonlocal calls
+                result = self.connection.execute(query, params)
+                if (isinstance(query, str) and query.startswith('UPDATE password_reset_tokens SET revoked_at=')
+                        and params and params[-1] == user['id']):
+                    with mutex:
+                        index = calls
+                        calls += 1
+                    if index < 2:
+                        entered[index].set()
+                        assert release.wait(15)
+                return result
+    
+        @contextmanager
+        def observed_db():
+            with original_db() as c:
+                yield ObservedConnection(c)
+    
+        monkeypatch.setattr(s, 'db', observed_db)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            def issue():
+                with httpx.Client(base_url=url, trust_env=False, timeout=25,
+                                  cookies=dict(admin.cookies), headers={
+                                      'X-CSRF-Token': admin.cookies.get(identity.CSRF_COOKIE),
+                                  }) as client:
+                    return client.post('/api/admin/password-resets', json={'user_id': user['id']})
+            first = pool.submit(issue)
+            try:
+                assert entered[0].wait(10)
+                second = pool.submit(issue)
+                # Old code reaches the second UPDATE while the first is paused;
+                # correct code waits on the user's lock before reaching it.
+                waiters = wait_for_db_waiters(1, alternate=entered[1])
+                overlapped = entered[1].is_set()
+            finally:
+                release.set()
+            responses = [first.result(), second.result()]
+        with s.db() as c:
+            active = c.execute('''SELECT id FROM password_reset_tokens WHERE user_id=%s
+                AND revoked_at IS NULL AND consumed_at IS NULL AND expires>%s''',
+                (user['id'], time.time())).fetchall()
+        print(json.dumps({'scenario': 'two_issuers_between_revoke_insert',
+                          'database_waiters': waiters, 'overlapping_revoke_steps': overlapped,
+                          'statuses': [r.status_code for r in responses], 'active_token_count': len(active)}))
+        assert [r.status_code for r in responses] == [200, 200]
+>       assert not overlapped and len(active) == 1
+E       assert (not True)
+
+tests\test_p3_r2_interleavings.py:309: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p3_r2_interleavings.py::test_three_login_empty_to_existing_bucket_order
+FAILED tests/test_p3_r2_interleavings.py::test_two_issuers_revoke_before_insert
+2 failed, 11 deselected in 5.98s

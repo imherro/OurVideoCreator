@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2**
 
-状态：**P3-R2 返修中**
+状态：**P3-R2 READY_FOR_REVIEW**（外部复验待定）
 
 当前阶段：**P3-ID-01 — 邀请制账号、团队/作品隔离与基础页面闭环**
 
@@ -55,6 +55,7 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P2/REPORT.md`](evidence/P2/REPORT.md)（PostgreSQL 唯一主库、空库迁移、完整业务与 Web/Worker 证据）
 - [`evidence/P3/REPORT.md`](evidence/P3/REPORT.md)（邀请制身份、团队/作品 ACL、SSE 撤权和基础页面闭环）
 - [`evidence/P3-R1/REPORT.md`](evidence/P3-R1/REPORT.md)（六项外部阻塞返修、并发不变量、真实浏览器与重新取证）
+- [`evidence/P3-R2/REPORT.md`](evidence/P3-R2/REPORT.md)（限流/重签同步、确定性 PG 红绿测试、可追溯页面和审计原始证据；业务 SHA `cd61996`）
 
 ## 阶段边界
 

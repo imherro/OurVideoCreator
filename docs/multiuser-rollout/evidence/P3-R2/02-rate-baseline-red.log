@@ -1,0 +1,77 @@
+Baseline business/evidence HEAD: 5e0c5e36d37415d4867d380f4e86dd47c87eebce
+Detached disposable worktree; only new test file added, business code unchanged.
+Command: python -m pytest tests/test_p3_r2_interleavings.py -q -s -k absent
+Exit: 1
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+{"scenario": "absent", "database_waiters": [{"pid": 2064, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136]}, {"pid": 36792, "wait_event_type": "Lock", "wait_event": "transactionid", "blockers": [8072]}, {"pid": 27476, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064, 34772, 25492, 28172, 5436]}, {"pid": 34772, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064]}, {"pid": 36860, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064, 34772, 25492, 28172, 5436, 27476]}, {"pid": 28172, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064, 34772, 25492]}, {"pid": 26136, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176]}, {"pid": 27176, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792]}, {"pid": 5436, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064, 34772, 25492, 28172]}, {"pid": 25492, "wait_event_type": "Lock", "wait_event": "tuple", "blockers": [36792, 27176, 26136, 2064, 34772]}], "401": 11, "429": 0, "verify_calls": 11, "final_counts": [11, 11]}
+F
+================================== FAILURES ===================================
+____________ test_first_bucket_http_waiters_respect_budget[absent] ____________
+
+admin = <starlette.testclient.TestClient object at 0x000001D0ACE5B230>
+clients = <function clients.<locals>.make at 0x000001D0AEDE07D0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001D0AF45CE90>
+initial = 'absent'
+
+    @pytest.mark.parametrize('initial', ['absent', 'expired', 'cleared'])
+    def test_first_bucket_http_waiters_respect_budget(admin, clients, monkeypatch, initial):
+        _, _, phone = register(admin, clients, nickname='HTTP rate test')
+        keys = ['login:ip:127.0.0.1', 'login:account:' + identity.digest(identity.normalize_phone(phone))]
+        with s.db() as c:
+            c.execute('DELETE FROM auth_rate_limits')
+            if initial != 'absent':
+                for key in keys:
+                    c.execute('INSERT INTO auth_rate_limits VALUES (%s,%s,10,%s)',
+                              (key, time.time() - 301, time.time() - 1))
+            if initial == 'cleared':
+                identity.clear_rate_limit(c, keys)
+        entered, release = threading.Event(), threading.Event()
+        calls = 0
+        mutex = threading.Lock()
+        original = identity.verify_password
+    
+        def verify(encoded, password):
+            nonlocal calls
+            with mutex:
+                calls += 1
+                first = calls == 1
+            if first:
+                entered.set()
+                assert release.wait(15)
+            return original(encoded, password)
+    
+        monkeypatch.setattr(identity, 'verify_password', verify)
+        with live_http() as url, concurrent.futures.ThreadPoolExecutor(max_workers=11) as pool:
+            def login():
+                with httpx.Client(base_url=url, timeout=25, trust_env=False) as client:
+                    return client.post('/api/auth/login', json={
+                        'phone': phone, 'password': '[REDACTED_TEST_PASSWORD]',
+                    }).status_code
+            first = pool.submit(login)
+            try:
+                assert entered.wait(10), first.result() if first.done() else 'HTTP request still pending'
+                rest = [pool.submit(login) for _ in range(10)]
+                waiters = wait_for_db_waiters(10)
+                assert all(r['blockers'] for r in waiters)
+            finally:
+                release.set()
+            statuses = [f.result() for f in [first, *rest]]
+        with s.db() as c:
+            counts = [r['attempts'] for r in c.execute(
+                'SELECT attempts FROM auth_rate_limits WHERE key=ANY(%s) ORDER BY key', (keys,))]
+        print(json.dumps({'scenario': initial, 'database_waiters': waiters,
+                          '401': statuses.count(401), '429': statuses.count(429),
+                          'verify_calls': calls, 'final_counts': counts}))
+>       assert sorted(statuses) == [401] * 10 + [429]
+E       assert [401, 401, 40...401, 401, ...] == [401, 401, 40...401, 401, ...]
+E         
+E         At index 10 diff: 401 != 429
+E         Use -v to get more diff
+
+tests\test_p3_r2_interleavings.py:103: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p3_r2_interleavings.py::test_first_bucket_http_waiters_respect_budget[absent]
+1 failed, 7 deselected in 4.34s

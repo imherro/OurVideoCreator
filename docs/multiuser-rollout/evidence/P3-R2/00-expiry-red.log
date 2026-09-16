@@ -1,0 +1,53 @@
+Pre-fix business HEAD: 4a77a39
+Command: python -m pytest tests/test_p3_r2_interleavings.py -q -s -k expiration
+Exit: 1
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+{"scenario": "expires_while_waiting", "status": 200}
+F
+================================== FAILURES ===================================
+_____________ test_reset_expiration_is_rechecked_after_user_lock ______________
+
+admin = <starlette.testclient.TestClient object at 0x000002605D639010>
+clients = <function clients.<locals>.make at 0x000002605D704B40>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002605D583E10>
+
+    def test_reset_expiration_is_rechecked_after_user_lock(admin, clients, monkeypatch):
+        _, user, _ = register(admin, clients, nickname='Expiry after wait')
+        reset = admin.post('/api/admin/password-resets', json={'user_id': user['id']}).json()
+        consumer = clients()
+        entered, release = threading.Event(), threading.Event()
+        original = identity.lock_password_recovery_user
+        base = time.time()
+    
+        def wait_before_lock(c, uid):
+            entered.set()
+            assert release.wait(10)
+            return original(c, uid)
+    
+        monkeypatch.setattr(identity, 'lock_password_recovery_user', wait_before_lock)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(consumer.post, '/api/auth/password-reset', json={
+                'token': reset['token'], 'password': '[REDACTED_TEST_PASSWORD]',
+            })
+            try:
+                assert entered.wait(10)
+                # Expiry is after request start but before the lock is obtained.
+                with s.db() as c:
+                    c.execute('UPDATE password_reset_tokens SET expires=%s WHERE id=%s',
+                              (base + 1, reset['id']))
+                monkeypatch.setattr(time, 'time', lambda: base + 2)
+            finally:
+                release.set()
+            response = future.result(timeout=15)
+        print(json.dumps({'scenario': 'expires_while_waiting', 'status': response.status_code}))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests\test_p3_r2_interleavings.py:136: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p3_r2_interleavings.py::test_reset_expiration_is_rechecked_after_user_lock
+1 failed, 3 deselected in 2.63s
