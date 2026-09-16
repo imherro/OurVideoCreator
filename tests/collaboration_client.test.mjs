@@ -47,6 +47,28 @@ test('actual persistence adapter sends only changed shot, never aggregate docume
   assert.equal(client.drafts.entries.get('shot-x').state,'saved');
 });
 
+test('attached child identity edits already send current graph and shot in one command',async()=>{
+  for(const mode of ['add','remove','rename']){
+    const {client,project,calls}=setup(),edited=copy(project.document);
+    if(mode==='add'){
+      edited.shots[0].videoNode='x-video';
+      edited.nodes.push({id:'x-video',type:'media',position:{x:10,y:20},data:{kind:'video'}});
+    }else if(mode==='remove'){
+      delete edited.shots[0].imageNode;
+      edited.nodes=edited.nodes.filter(node=>node.id!=='x-image');
+    }else{
+      edited.shots[0].imageNode='x-renamed';
+      edited.nodes.find(node=>node.id==='x-image').id='x-renamed';
+    }
+    client.mark(edited,[]);await client.save(edited,project.name,[]);
+    assert.equal(calls.length,1);
+    assert.deepEqual(calls[0].body.updates.map(row=>row.id).sort(),['graph-graph','shot-x']);
+    assert.equal(calls[0].body.updates.find(row=>row.id==='graph-graph').expected_revision,1);
+    assert.equal(calls[0].body.creates.length,0);
+    assert.equal(calls[0].body.deletes.length,0);
+  }
+});
+
 test('canvas child order never dirties another owner shot or blocks its remote update',async()=>{
   const {project,request,calls,server}=setup();
   const video={id:'y-video',type:'media',data:{kind:'video',prompt:'y video'}};

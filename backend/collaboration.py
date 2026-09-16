@@ -410,11 +410,12 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
             identity.require_production(connection, actor, row['production_id'], 'manager')
         if row['kind'] in {'graph', 'timeline', 'director', 'visual_card'}:
             raise HTTPException(422, '固定对象不可删除；视觉卡请保留版本并标记弃用')
-    structural = bool(creates or deletes) or any(
+    node_identity_changed = any(
         validation.node_ids(locked[item['id']]['kind'], item['content']) !=
         validation.node_ids(locked[item['id']]['kind'], validation.object_content(locked[item['id']]))
         for item in updates if locked[item['id']]['kind'] in {'shot','node'}
     )
+    structural = bool(creates or deletes) or node_identity_changed
     if structural:
         validation.structure_lock(connection, project_id)
     visual_changed = any(item['kind'] == 'visual_card' or (
@@ -460,9 +461,9 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     script = connection.execute('SELECT metadata FROM episode_scripts WHERE project_id=%s',(project_id,)).fetchone()
     if script and (project_id,json.loads(script['metadata']).get('projectionNodeId')) in nodes:
         raise HTTPException(422,'正式剧本投影不能声明为独立可写节点')
-    if structural and (any(item['kind'] in {'shot','node'} for item in creates) or deletes):
+    if node_identity_changed or any(item['kind'] in {'shot','node'} for item in creates) or deletes:
         if not any(locked[item['id']]['kind']=='graph' for item in updates):
-            raise HTTPException(422, '节点或镜头增删必须携带同一原子命令的结构版本')
+            raise HTTPException(422, '节点或镜头增删、附属节点编号变化必须携带同一原子命令的结构版本')
     for item in updates:
         validation.graph_transition(connection, locked[item['id']], item['content'], scoped)
     if visual_changed:
