@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2、P3、P4**
 
-状态：**P4-R1 外部通过；P5 已授权，实施中，未提交验收**。
+状态：**P4-R1 外部通过；P5 READY_FOR_REVIEW，等待外部验收，不得进入 P6**。
 
 当前阶段：**P5-COLLAB-01 — 对象级分工协作前后端闭环**。
 
@@ -69,6 +69,8 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P4-R1/REPORT.md`](evidence/P4-R1/REPORT.md)（三个 S2 的真实红绿闭环；业务 `e6c3edd`，正式后端 368 passed、新浏览器 7028，待外部复验）
 
 ## 阶段边界
+
+P5 本轮交付见 [`evidence/P5/REPORT.md`](evidence/P5/REPORT.md)、[`evidence/P5/MATRIX.md`](evidence/P5/MATRIX.md)。完整基线 f4773f0，最终业务 0851dce；最终 HEAD 是其后的 docs-only evidence 提交，不改变被测业务。
 
 P1 已完成内置推理移除并建立独立 Web/Worker 进程边界；P2 已把保留业务切换到 PostgreSQL 唯一主库；P3 身份、团队/作品隔离和 P4 平台模型治理已通过。P5 实施对象级分工协作，继续保持单 Worker、内部试用且不调用真实付费 API。多 Worker、额度与公网发布不在本轮。
 

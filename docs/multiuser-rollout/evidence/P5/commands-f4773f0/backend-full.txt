@@ -1,0 +1,24 @@
+BUSINESS_SHA f4773f0075325625c6cf2e6236c5d2014d416d3f
+UTC_START 2026-09-16T21:40:24.840136+00:00
+COMMAND C:\Python314\python.exe -m pytest -q --tb=short
+........................................................................ [ 15%]
+........................................................................ [ 31%]
+........................................................................ [ 47%]
+........................................................................ [ 62%]
+........................................................................ [ 78%]
+........................................................................ [ 94%]
+..........................                                               [100%]
+============================== warnings summary ===============================
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  [LOCAL_USER]\AppData\Roaming\Python\Python314\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  [LOCAL_USER]\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+458 passed, 2 warnings in 1114.26s (0:18:34)
+
+EXIT_CODE 0
+UTC_END 2026-09-16T21:59:02.538759+00:00

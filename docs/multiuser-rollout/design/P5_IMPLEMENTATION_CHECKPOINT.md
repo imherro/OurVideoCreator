@@ -381,3 +381,24 @@ CUA 原绑定 `p4browser`、`p5candidateA/B`、`p5latestA/B`、`p5secondA` 保�
 - 浏览器 harness 新 `--formal-sha SHA` 在创建资源前复核 clean runtime，使用独立 .11/.12 cookie hosts 并在 manifest 记录业务 SHA。现有 .7/.8、.9/.10 服务未变更。
 - 新 `scripts/collect_p5_browser_evidence.py` 使用只读事务和明确列/项目/作品过滤导出 objects/history/jobs/assets/audit/events 与匹配该 scope 的访问日志，不读凭证、session、手机号、Cookie 或素材字节。已在本轮自有候选环境实际运行 exit 0：10 objects、31 history、2 jobs、4 assets、42 audit、40 events。输出只保留在该环境 `development-db-projection.json`；不是正式 evidence。fake_requests 为 0，因为该旧进程尚未带逐请求原件日志增强，不冒称未调用或零费用以外的证明。
 - diff --check、相关 Python compile 通过。接下来固定业务提交，再在该 SHA 上执行正式取证；P5 仍未外部通过，P6 未授权。
+
+### 固定提交 f4773f0，正式浏览器发现 Twick 远端同步缺口
+
+- 已本地提交 `f4773f0075325625c6cf2e6236c5d2014d416d3f`，master，97 files；未 push。原始 P4-R1 MATRIX 的两个行尾空格保持原件，排除原件后的 staged diff check 通过。
+- **正式完整取证仍运行：session 25641**。`scripts/capture_p5_evidence.py f4773f0075325625c6cf2e6236c5d2014d416d3f`，UTC 21:40:24 开始，输出 `C:\Users\kunpeng\AppData\Local\Temp\ovc-p5-evidence-f7iykkti`。最新 backend-full.txt 已超过 62%，未有最终结果。脚本会继续并发轨迹、npm/TS/build/routes/compile。它每步检查 HEAD 与 runtime 干净，**结束前不要改 src/tests/scripts/backend 或提交新 HEAD**；docs 允许变动。
+- 新正式 browser harness **session 49862**：目录 `C:\Users\kunpeng\AppData\Local\Temp\ovc-p5-browser-kl5p_ken`；DB `ovc_test_22984_61a5d28b1f80`；harness 22984，Web 42960/7672，Worker 25468。仅 loopback fake，两个请求均有独立原件；release-candidate 当前存在。
+- A `http://127.0.0.11:5697`（tab 15，p5formalA / p5formalRawA），B `http://127.0.0.12:5700`（tab 16，p5formalB / p5formalRawB）；第二 A 页 tab 17（p5formalSecond / p5formalRawSecond，p5formalCDP）。同一 project `project-51c347577aac472ea180480d77cd8860` / production `production-193b2ff10b1e417587f07365520818e9`，身份/对象见 manifest。全部普通 editor，密码不入 evidence。
+- 真实 X/Y 各自保存、刷新、退出重登录通过；旧 A 页 r2 草稿与主 A r3 实际 commands 409 比较保留，无自动重发；旧页网络已恢复，草稿保留。两页 lease busy/renew/release/再 acquire/release；后来标题轨测试租约也已显式释放。
+- 第一候选 seed job `job-16e550964a854bdf9a8a94922d86676c` 阻塞时人工 v2；因真实自动排列改变 graph 引用而采纳拒绝。第二实际按钮提交 `job-7aef0902208e47f0bcf18f2510d4b890`，fake UTC21:45:27.882879 阻塞到人工 v3 保存后放行。B 比较但不可采纳，A 明确采纳 r4，B 收到收据。目标 `object-afc54e0b97664e9fafc935d51fe796ce`。
+- A/B 选中和视口差异保持，共享 v5 同步；后续 A 历史恢复 r3 追加 r6。实际导演台 PNG `asset-18d9a4807e274fa7b74cf0bd592085e1` 创建新图像成功，B 全对象已保存，截图目视正常无网格。章节 A 正文保存 r2，B 页面可读但不可保存。
+- **新缺口：COLLAB-12 的已打开 Twick 编辑器没有应用远端 timeline。** A 取得租约建立 3 秒标题轨并保存，B 协作面板收到 timeline r3，但编辑器还是空。B reload/重进能读到标题，证实持久化正确、前端热更新缺失。`src/editor/EditorWorkspace.tsx` initialTimeline useMemo 仅 [projectId]，TimelinePersistence 只有输出没有输入同步。需正式脚本结束后修复，固定新 SHA 并重跑受影响测试。
+- 播放头实际验证仍未完成。Jump to end、时间尺 click、Play/Pause 有按钮状态变化但时间读数仍 0；不能认定独立播放头通过，也不能仅凭 CSS 伪元素“正在同步预览”声称预览阻塞。截图显示正常标题，实际 overlay display none，document hidden false。需要继续定位或如实提交限制；不改三方 node_modules 解决。
+- 新 `evidence/P5/ATTEMPT_HISTORY.md`、MATRIX（明确进行中）、只读 DB 投影（7 objects/24 history/2 jobs/1 asset/38 audit/39 events/2 fake），真实 browser export 46 calls/46 results（390457 bytes）已建立。后续调用尚需补充导出；工具原件路径为 `C:\Users\kunpeng\.codex\sessions\2026\09\16\rollout-2026-09-16T11-11-38-01a0a832-d396-7a61-99cd-80a69762a975.jsonl`。导出脚本仅 docs，不改 runtime。
+- 所有旧 P5 .3… .10、7895 等用户/测试资源保留。此时间点 P5 尚不完整；下方是后续收尾结果，旧记录不作为当前状态。
+
+### 正式收尾：0851dce / READY_FOR_REVIEW
+
+- 上述 session25641 已结束 exit0，禁止再次轮询。固定 f4773f0 全量后端458通过、PG并发轨迹10通过、前端172、TS/build/routes/compile全过；原件进入 evidence/P5/commands-f4773f0。
+- Twick热更新、回执/首次规范化不回声保存、标题轨兼容性已修正并提交0851dce；未修改node_modules/后端/依赖。固定SHA受影响补跑178前端、30renderer、TS/build/diff全过，session47270已结束exit0。
+- 最终浏览器A 0.5s/B 1.5s，选择独立且共享标题实时同步；B草稿面对A新正文保留、明确处理后载入远端；本地FFmpeg真实导出成功。租约释放，旧第二A镜头冲突仍保留。
+- REPORT/SUMMARY/MATRIX/ATTEMPT_HISTORY/PROVENANCE与原始日志在evidence/P5，最后证据提交只含docs。P5仅READY_FOR_REVIEW，推送后直接送主ChatGPT审核；P6未授权。

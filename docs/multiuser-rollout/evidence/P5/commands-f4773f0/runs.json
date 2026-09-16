@@ -1,0 +1,74 @@
+{
+  "business_sha": "f4773f0075325625c6cf2e6236c5d2014d416d3f",
+  "repository": "https://github.com/imherro/OurVideoCreator.git",
+  "utc_start": "2026-09-16T21:40:24.774247+00:00",
+  "directory": "[LOCAL_USER]\\AppData\\Local\\Temp\\ovc-p5-evidence-f7iykkti",
+  "runs": [
+    {
+      "name": "backend-full",
+      "command": "C:\\Python314\\python.exe -m pytest -q --tb=short",
+      "utc_start": "2026-09-16T21:40:24.840136+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T21:59:02.538759+00:00",
+      "seconds": 1117.73058090001
+    },
+    {
+      "name": "concurrency-traces",
+      "command": "C:\\Python314\\python.exe -m pytest -q -s --tb=short tests/test_p5_object_transactions.py::test_same_revision_real_pg_waiters_one_commit_one_conflict tests/test_p5_object_transactions.py::test_locked_shot_does_not_lock_other_shot tests/test_p5_object_transactions.py::test_timeline_lease_expiry_takeover_old_token_and_locked_clock tests/test_p5_owned_content.py::test_same_version_wait_chain_one_success_one_conflict tests/test_p5_relation_candidates.py::test_two_candidates_same_revision_pg_waiters_only_one_adoption tests/test_p5_storyboard_candidates.py::test_two_storyboard_candidates_compete_through_real_pg_graph_lock tests/test_p5_run_permissions.py::test_two_real_pg_waiting_runs_preserve_independent_batch_receipts tests/test_p5_collaboration_actions.py::test_capture_rechecks_director_after_real_pg_wait tests/test_p5_resume_permissions.py::test_resume_rechecks_after_real_pg_object_lock_wait",
+      "utc_start": "2026-09-16T21:59:02.729595+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T21:59:48.973779+00:00",
+      "seconds": 46.24529990000883
+    },
+    {
+      "name": "frontend",
+      "command": "npm.cmd test",
+      "utc_start": "2026-09-16T21:59:49.162474+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T21:59:51.038156+00:00",
+      "seconds": 1.875728299986804
+    },
+    {
+      "name": "typescript",
+      "command": "npx.cmd tsc --noEmit",
+      "utc_start": "2026-09-16T21:59:51.177263+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T21:59:59.076136+00:00",
+      "seconds": 7.8990606000006665
+    },
+    {
+      "name": "build",
+      "command": "npm.cmd run build",
+      "utc_start": "2026-09-16T21:59:59.205459+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:00:14.887516+00:00",
+      "seconds": 15.682436800008873
+    },
+    {
+      "name": "routes",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "utc_start": "2026-09-16T22:00:15.023200+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:00:16.474910+00:00",
+      "seconds": 1.451745900005335
+    },
+    {
+      "name": "compile",
+      "command": "C:\\Python314\\python.exe -m compileall -q backend tests",
+      "utc_start": "2026-09-16T22:00:16.621527+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:00:16.757686+00:00",
+      "seconds": 0.136170999991009
+    },
+    {
+      "name": "diff-check",
+      "command": "git -c core.safecrlf=false diff --check",
+      "utc_start": "2026-09-16T22:00:16.928232+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:00:17.008295+00:00",
+      "seconds": 0.08006350000505336
+    }
+  ],
+  "external_acceptance": "not_requested_by_this_script",
+  "utc_end": "2026-09-16T22:00:17.085052+00:00"
+}

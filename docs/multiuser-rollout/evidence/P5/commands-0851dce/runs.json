@@ -1,0 +1,64 @@
+{
+  "business_sha": "0851dce02e0f22e87f6247b029fd3faedd39e7dd",
+  "backend_baseline_sha": "f4773f0075325625c6cf2e6236c5d2014d416d3f",
+  "utc_start": "2026-09-16T22:13:59.127204+00:00",
+  "identical_paths": [
+    "backend",
+    "migrations",
+    "scripts",
+    "package.json",
+    "package-lock.json"
+  ],
+  "changed_paths": [
+    "src/editor/EditorWorkspace.tsx",
+    "src/editor/editorActions.ts",
+    "src/editor/editorDocument.ts",
+    "src/editor/timelineInputSync.ts",
+    "tests/editor_document.test.mjs",
+    "tests/legacy_timeline.test.mjs",
+    "tests/timeline_input_sync.test.mjs"
+  ],
+  "runs": [
+    {
+      "name": "frontend",
+      "command": "npm.cmd test",
+      "utc_start": "2026-09-16T22:13:59.222378+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:14:01.119950+00:00",
+      "seconds": 1.8976201000041328
+    },
+    {
+      "name": "typescript",
+      "command": "npx.cmd tsc --noEmit",
+      "utc_start": "2026-09-16T22:14:01.291177+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:14:09.031649+00:00",
+      "seconds": 7.740669100021478
+    },
+    {
+      "name": "build",
+      "command": "npm.cmd run build",
+      "utc_start": "2026-09-16T22:14:09.159954+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:14:24.523056+00:00",
+      "seconds": 15.363491399999475
+    },
+    {
+      "name": "editor-renderer",
+      "command": "C:\\Python314\\python.exe -m pytest -q --tb=short tests/test_editor_renderer.py",
+      "utc_start": "2026-09-16T22:14:24.672662+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:14:30.957332+00:00",
+      "seconds": 6.284822199988412
+    },
+    {
+      "name": "diff-check",
+      "command": "git -c core.safecrlf=false diff --check",
+      "utc_start": "2026-09-16T22:14:31.108104+00:00",
+      "exit_code": 0,
+      "utc_end": "2026-09-16T22:14:31.165651+00:00",
+      "seconds": 0.05754000000888482
+    }
+  ],
+  "utc_end": "2026-09-16T22:14:31.232772+00:00"
+}
