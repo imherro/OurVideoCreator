@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import mimetypes
+import os
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -11,8 +12,9 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from . import store as s
+from . import identity
 from .instance_identity import describe as describe_instance
 from .prompts import TEMPLATES
 from .generation_policy import default_ark_policy, validate_generation_policy
@@ -32,24 +34,42 @@ async def lifespan(app):
     s.init()
     yield
 
-app = FastAPI(title='安影 AI 视频工作室',lifespan=lifespan,docs_url=None,redoc_url=None)
-PUBLIC = {'/api/health','/api/auth/status','/api/auth/setup','/api/auth/login'}
+app = FastAPI(
+    title='安影 AI 视频工作室', lifespan=lifespan,
+    docs_url=None, redoc_url=None, openapi_url=None,
+)
+PUBLIC = {
+    '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
+    '/api/auth/register', '/api/auth/password-reset',
+}
 
 @app.middleware('http')
 async def auth(request: Request, call_next):
+    context_token = None
     if request.url.path.startswith('/api/'):
         # Cookie-authenticated mutations must originate from this deployment.
         origin = request.headers.get('origin')
         if request.method not in ('GET','HEAD','OPTIONS') and origin and urlparse(origin).netloc != request.headers.get('host'):
             return Response('跨站请求已拒绝',status_code=403)
         signed_provider_asset = request.method in ('GET','HEAD') and request.url.path.startswith('/api/provider-assets/')
-        if request.url.path not in PUBLIC and not signed_provider_asset:
-            token = request.cookies.get('mvc_session','')
-            with s.db() as c:
-                row = c.execute('SELECT expires FROM sessions WHERE token=%s',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
-            if not row or row['expires'] < time.time():
-                return Response(s.dumps({'detail':'请登录工作室'}),401,media_type='application/json')
-    result = await call_next(request)
+        principal = identity.resolve_session(request)
+        context_token = identity.set_current(principal)
+        try:
+            if request.url.path not in PUBLIC and not signed_provider_asset:
+                if not principal:
+                    raise HTTPException(401, '请登录工作室')
+                if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+                    identity.require_csrf(request, principal)
+                identity.authorize_request(request, principal)
+        except HTTPException as exc:
+            if context_token is not None:
+                identity.reset_current(context_token)
+            return Response(s.dumps({'detail':exc.detail}),exc.status_code,media_type='application/json')
+    try:
+        result = await call_next(request)
+    finally:
+        if context_token is not None:
+            identity.reset_current(context_token)
     result.headers['X-Content-Type-Options'] = 'nosniff'
     result.headers['Referrer-Policy'] = 'same-origin'
     if request.url.path.startswith('/api/'):
@@ -69,56 +89,363 @@ def health():
 
 @app.get('/api/auth/status')
 def auth_status(request: Request):
-    token = hashlib.sha256(request.cookies.get('mvc_session','').encode()).hexdigest()
+    principal = identity.resolve_session(request)
     with s.db() as c:
-        row = c.execute('SELECT expires FROM sessions WHERE token=%s',(token,)).fetchone()
-    return {'configured':bool(s.get_setting('password')),'authenticated':bool(row and row['expires']>time.time()),'can_setup':True}
-
-class Password(BaseModel):
-    password: str = Field(min_length=8,max_length=128)
-
-def password_hash(password,salt):
-    return hashlib.scrypt(password.encode(),salt=bytes.fromhex(salt),n=16384,r=8,p=1).hex()
-
-def session(response, request):
-    token = secrets.token_urlsafe(48)
-    with s.db() as c:
-        c.execute('DELETE FROM sessions WHERE expires<%s',(time.time(),))
-        c.execute('INSERT INTO sessions VALUES(%s,%s)',(hashlib.sha256(token.encode()).hexdigest(),time.time()+7*86400))
-    response.set_cookie('mvc_session',token,max_age=7*86400,httponly=True,samesite='strict',secure=request.url.scheme=='https')
+        configured=bool(c.execute("SELECT 1 FROM users WHERE platform_role='platform_admin' AND is_active LIMIT 1").fetchone())
+        workspaces=[]
+        if principal:
+            workspaces=[dict(row) for row in c.execute(
+                '''SELECT w.id,w.name,wm.role FROM workspaces w
+                   JOIN workspace_members wm ON wm.workspace_id=w.id
+                   WHERE wm.user_id=%s ORDER BY w.name,w.id''',(principal.user_id,),
+            )]
+    return {
+        'configured':configured, 'authenticated':bool(principal), 'can_setup':False,
+        'user': ({'id':principal.user_id,'nickname':principal.nickname,
+                  'phone':principal.phone,'platform_role':principal.platform_role} if principal else None),
+        'workspaces':workspaces,
+    }
 
 @app.post('/api/auth/setup')
-def setup(body:Password,request:Request,response:Response):
-    salt = secrets.token_hex(16)
-    encoded = s.dumps({'salt':salt,'hash':password_hash(body.password,salt)})
-    with s.db() as c:
-        if c.execute('SELECT 1 FROM settings WHERE key=%s',('password',)).fetchone():
-            raise HTTPException(409,'工作室已经设置密码，请登录。')
-        c.execute('INSERT INTO settings VALUES(%s,%s)',('password',encoded))
-    session(response,request)
-    return {'ok':True}
+def setup():
+    raise HTTPException(410, '公开初始化已退役；请使用受保护的 bootstrap-admin CLI。')
 
-_attempts = {}
+
+class StrictBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+
+class LoginBody(StrictBody):
+    phone: str = Field(min_length=5,max_length=32)
+    password: str = Field(min_length=1,max_length=128)
+
+
+class RegisterBody(StrictBody):
+    invitation_token: str = Field(min_length=20,max_length=256)
+    phone: str = Field(min_length=5,max_length=32)
+    nickname: str = Field(min_length=1,max_length=80)
+    password: str = Field(min_length=15,max_length=128)
+
+
+class ResetPasswordBody(StrictBody):
+    token: str = Field(min_length=20,max_length=256)
+    password: str = Field(min_length=15,max_length=128)
+
+
+@app.post('/api/auth/register')
+def register(body:RegisterBody,request:Request,response:Response):
+    phone=identity.normalize_phone(body.phone);nickname=body.nickname.strip()
+    if not nickname:raise ValueError('昵称不能为空')
+    encoded=identity.hash_password(body.password);now=time.time()
+    invite_hash=identity.digest(body.invitation_token)
+    ip_key='register:ip:'+identity.client_ip(request)
+    failure = None
+    with s.db() as c:
+        identity.rate_limit(c,[ip_key,'register:invite:'+invite_hash],limit=8)
+        invitation=c.execute('SELECT * FROM invitations WHERE token_hash=%s FOR UPDATE',(invite_hash,)).fetchone()
+        if not invitation or invitation['revoked_at'] or invitation['consumed_at'] or invitation['expires']<=now:
+            identity.record_failure(c,[ip_key,'register:invite:'+invite_hash],limit=8)
+            failure = HTTPException(400,'邀请码无效或已失效')
+        else:
+            user_id=s.uid('user-')
+            try:
+                c.execute('''INSERT INTO users(id,phone,nickname,password_hash,platform_role,is_active,created,updated)
+                    VALUES(%s,%s,%s,%s,'user',TRUE,%s,%s)''',(user_id,phone,nickname,encoded,now,now))
+            except Exception as exc:
+                if getattr(exc,'sqlstate',None)=='23505':
+                    raise HTTPException(409,'该手机号已注册') from exc
+                raise
+            changed=c.execute('''UPDATE invitations SET consumed_at=%s,consumed_by=%s
+                WHERE id=%s AND consumed_at IS NULL AND revoked_at IS NULL RETURNING id''',
+                (now,user_id,invitation['id'])).fetchone()
+            if not changed:raise HTTPException(409,'邀请码已被使用')
+            identity.audit(c,'user.register','user',user_id,actor_user_id=user_id,payload={'invitation_id':invitation['id']})
+            identity.clear_rate_limit(c,[ip_key,'register:invite:'+invite_hash])
+            identity.issue_session(c,response,request,user_id)
+    if failure:
+        raise failure
+    return {'ok':True,'user':{'id':user_id,'nickname':nickname,'platform_role':'user'},'waiting_for_workspace':True}
+
+
 @app.post('/api/auth/login')
-def login(body:Password,request:Request,response:Response):
-    ip = request.client.host
-    attempts = [t for t in _attempts.get(ip,[]) if t > time.time()-300]
-    if len(attempts)>=10:
-        raise HTTPException(429,'尝试次数过多，请五分钟后重试。')
-    saved = s.get_setting('password')
-    if not saved or not hmac.compare_digest(password_hash(body.password,saved['salt']),saved['hash']):
-        _attempts[ip] = attempts+[time.time()]
-        raise HTTPException(401,'密码不正确')
-    _attempts.pop(ip,None)
-    session(response,request)
-    return {'ok':True}
+def login(body:LoginBody,request:Request,response:Response):
+    phone=identity.normalize_phone(body.phone)
+    keys=['login:ip:'+identity.client_ip(request),'login:account:'+identity.digest(phone)]
+    failure = None
+    with s.db() as c:
+        identity.rate_limit(c,keys)
+        user=c.execute('SELECT * FROM users WHERE phone=%s',(phone,)).fetchone()
+        if not user or not user['is_active'] or not identity.verify_password(user['password_hash'],body.password):
+            identity.record_failure(c,keys)
+            failure = HTTPException(401,'手机号或密码不正确')
+        else:
+            identity.clear_rate_limit(c,keys)
+            identity.issue_session(c,response,request,user['id'])
+            identity.audit(c,'session.login','user',user['id'],actor_user_id=user['id'])
+    if failure:
+        raise failure
+    return {'ok':True,'user':{'id':user['id'],'nickname':user['nickname'],'platform_role':user['platform_role']}}
 
 @app.post('/api/auth/logout')
 def logout(request:Request,response:Response):
-    with s.db() as c:
-        c.execute('DELETE FROM sessions WHERE token=%s',(hashlib.sha256(request.cookies.get('mvc_session','').encode()).hexdigest(),))
-    response.delete_cookie('mvc_session')
+    identity.clear_session(response,request)
     return {'ok':True}
+
+
+@app.post('/api/auth/password-reset')
+def consume_password_reset(body:ResetPasswordBody,request:Request,response:Response):
+    encoded=identity.hash_password(body.password);now=time.time();token_hash=identity.digest(body.token)
+    keys=['reset:ip:'+identity.client_ip(request),'reset:token:'+token_hash]
+    failure = None
+    with s.db() as c:
+        identity.rate_limit(c,keys,limit=8)
+        item=c.execute('SELECT * FROM password_reset_tokens WHERE token_hash=%s FOR UPDATE',(token_hash,)).fetchone()
+        if not item or item['revoked_at'] or item['consumed_at'] or item['expires']<=now:
+            identity.record_failure(c,keys,limit=8)
+            failure = HTTPException(400,'重置链接无效或已失效')
+        else:
+            c.execute('UPDATE users SET password_hash=%s,updated=%s WHERE id=%s AND is_active',
+                      (encoded,now,item['user_id']))
+            if c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(item['user_id'],)).fetchone() is None:
+                raise HTTPException(400,'账号不可用')
+            c.execute('UPDATE password_reset_tokens SET consumed_at=%s WHERE id=%s',(now,item['id']))
+            c.execute('UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL',(now,item['user_id']))
+            identity.audit(c,'user.password_reset','user',item['user_id'],actor_user_id=item['user_id'])
+            identity.clear_rate_limit(c,keys)
+            identity.issue_session(c,response,request,item['user_id'])
+    if failure:
+        raise failure
+    return {'ok':True}
+
+
+def _masked_phone(phone:str)->str:
+    return phone[:3]+'****'+phone[-4:] if len(phone)>=8 else '***'
+
+
+class InvitationCreate(StrictBody):
+    expires_hours:int=Field(default=48,ge=1,le=720)
+    note:str=Field(default='',max_length=200)
+
+
+@app.get('/api/admin/invitations')
+def list_invitations():
+    with s.db() as c:
+        return [dict(row) for row in c.execute('''SELECT id,created,expires,revoked_at,consumed_at,
+            consumed_by,note FROM invitations ORDER BY created DESC LIMIT 200''')]
+
+
+@app.post('/api/admin/invitations')
+def create_invitation(body:InvitationCreate):
+    principal=identity.current();raw=secrets.token_urlsafe(36);now=time.time();invite_id=s.uid('invite-')
+    with s.db() as c:
+        c.execute('''INSERT INTO invitations(id,token_hash,created_by,created,expires,note)
+            VALUES(%s,%s,%s,%s,%s,%s)''',(invite_id,identity.digest(raw),principal.user_id,now,now+body.expires_hours*3600,body.note))
+        identity.audit(c,'invitation.create','invitation',invite_id,payload={'expires':now+body.expires_hours*3600})
+    # The raw token is returned exactly once and is never stored or logged.
+    return {'id':invite_id,'token':raw,'expires':now+body.expires_hours*3600}
+
+
+@app.delete('/api/admin/invitations/{invitation_id}')
+def revoke_invitation(invitation_id:str):
+    with s.db() as c:
+        row=c.execute('''UPDATE invitations SET revoked_at=%s WHERE id=%s AND consumed_at IS NULL
+            AND revoked_at IS NULL RETURNING id''',(time.time(),invitation_id)).fetchone()
+        if not row:raise HTTPException(404,'邀请不存在或已失效')
+        identity.audit(c,'invitation.revoke','invitation',invitation_id)
+    return {'ok':True}
+
+
+@app.get('/api/admin/users')
+def admin_users():
+    with s.db() as c:
+        return [dict(row) for row in c.execute('''SELECT id,phone,nickname,platform_role,is_active,
+            phone_verified_at,created,updated FROM users ORDER BY created,id''')]
+
+
+class UserStateUpdate(StrictBody):
+    is_active:bool
+
+
+@app.patch('/api/admin/users/{user_id}')
+def update_user_state(user_id:str,body:UserStateUpdate):
+    principal=identity.current();now=time.time()
+    with s.db() as c:
+        user=c.execute('SELECT * FROM users WHERE id=%s FOR UPDATE',(user_id,)).fetchone()
+        if not user:raise HTTPException(404,'用户不存在')
+        if user['platform_role']=='platform_admin' and not body.is_active:
+            active=c.execute("SELECT COUNT(*) count FROM users WHERE platform_role='platform_admin' AND is_active").fetchone()['count']
+            if active<=1:raise HTTPException(409,'不能停用最后一位有效平台管理员')
+        if not body.is_active:
+            sole_owner=c.execute('''SELECT wm.workspace_id FROM workspace_members wm
+                WHERE wm.user_id=%s AND wm.role='owner' AND NOT EXISTS(
+                    SELECT 1 FROM workspace_members other
+                    JOIN users ou ON ou.id=other.user_id AND ou.is_active
+                    WHERE other.workspace_id=wm.workspace_id AND other.role='owner' AND other.user_id<>wm.user_id
+                ) LIMIT 1''',(user_id,)).fetchone()
+            if sole_owner:raise HTTPException(409,'不能停用团队最后一位有效 owner')
+        c.execute('UPDATE users SET is_active=%s,updated=%s WHERE id=%s',(body.is_active,now,user_id))
+        if not body.is_active:c.execute('UPDATE sessions SET revoked_at=%s WHERE user_id=%s AND revoked_at IS NULL',(now,user_id))
+        identity.audit(c,'user.activate' if body.is_active else 'user.deactivate','user',user_id,
+                       payload={'changed_by':principal.user_id})
+    return {'id':user_id,'is_active':body.is_active}
+
+
+class PasswordResetCreate(StrictBody):
+    user_id:str=Field(min_length=1,max_length=100)
+    expires_minutes:int=Field(default=30,ge=5,le=1440)
+
+
+@app.post('/api/admin/password-resets')
+def issue_password_reset(body:PasswordResetCreate):
+    principal=identity.current();raw=secrets.token_urlsafe(36);now=time.time();reset_id=s.uid('reset-')
+    with s.db() as c:
+        if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(body.user_id,)).fetchone():
+            raise HTTPException(404,'用户不存在')
+        c.execute('UPDATE password_reset_tokens SET revoked_at=%s WHERE user_id=%s AND consumed_at IS NULL AND revoked_at IS NULL',(now,body.user_id))
+        c.execute('''INSERT INTO password_reset_tokens(id,token_hash,user_id,created_by,created,expires)
+            VALUES(%s,%s,%s,%s,%s,%s)''',(reset_id,identity.digest(raw),body.user_id,principal.user_id,now,now+body.expires_minutes*60))
+        identity.audit(c,'password_reset.issue','user',body.user_id,payload={'reset_id':reset_id})
+    return {'id':reset_id,'token':raw,'expires':now+body.expires_minutes*60}
+
+
+class WorkspaceCreate(StrictBody):
+    name:str=Field(min_length=1,max_length=100)
+    owner_user_id:str=Field(min_length=1,max_length=100)
+
+
+@app.get('/api/workspaces')
+def workspaces():
+    principal=identity.current()
+    with s.db() as c:
+        return [dict(row) for row in c.execute('''SELECT w.id,w.name,wm.role,w.created,w.updated
+            FROM workspaces w JOIN workspace_members wm ON wm.workspace_id=w.id
+            WHERE wm.user_id=%s ORDER BY w.name,w.id''',(principal.user_id,))]
+
+
+@app.get('/api/admin/workspaces')
+def admin_workspaces():
+    with s.db() as c:
+        return [dict(row) for row in c.execute('''SELECT w.id,w.name,w.created,w.updated,
+            u.id owner_user_id,u.nickname owner_nickname
+            FROM workspaces w
+            JOIN workspace_members wm ON wm.workspace_id=w.id AND wm.role='owner'
+            JOIN users u ON u.id=wm.user_id
+            ORDER BY w.name,w.id,u.id''')]
+
+
+@app.post('/api/admin/workspaces')
+def create_workspace(body:WorkspaceCreate):
+    principal=identity.current();wid=s.uid('workspace-');now=time.time();name=body.name.strip()
+    with s.db() as c:
+        if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(body.owner_user_id,)).fetchone():
+            raise HTTPException(404,'Owner 用户不存在')
+        c.execute('INSERT INTO workspaces(id,name,created_by,created,updated) VALUES(%s,%s,%s,%s,%s)',
+                  (wid,name,principal.user_id,now,now))
+        c.execute("INSERT INTO workspace_members(workspace_id,user_id,role,created) VALUES(%s,%s,'owner',%s)",
+                  (wid,body.owner_user_id,now))
+        identity.audit(c,'workspace.create','workspace',wid,workspace_id=wid,
+                       payload={'owner_user_id':body.owner_user_id})
+    return {'id':wid,'name':name,'owner_user_id':body.owner_user_id}
+
+
+@app.get('/api/workspaces/{workspace_id}/members')
+def workspace_members(workspace_id:str):
+    principal=identity.current()
+    with s.db() as c:
+        role=identity.workspace_role(c,principal,workspace_id)
+        if not role:raise HTTPException(404,'团队不存在')
+        rows=c.execute('''SELECT u.id,u.nickname,u.phone,wm.role,u.is_active
+            FROM workspace_members wm JOIN users u ON u.id=wm.user_id
+            WHERE wm.workspace_id=%s ORDER BY wm.role DESC,u.nickname,u.id''',(workspace_id,)).fetchall()
+    return [{**dict(row),'phone':row['phone'] if role=='owner' else _masked_phone(row['phone'])} for row in rows]
+
+
+class WorkspaceMemberUpdate(StrictBody):
+    role:str=Field(pattern='^(owner|member)$')
+
+
+@app.put('/api/workspaces/{workspace_id}/members/{user_id}')
+def put_workspace_member(workspace_id:str,user_id:str,body:WorkspaceMemberUpdate):
+    principal=identity.current();now=time.time()
+    with s.db() as c:
+        identity.require_workspace_owner(c,principal,workspace_id)
+        if not c.execute('SELECT 1 FROM users WHERE id=%s AND is_active',(user_id,)).fetchone():
+            raise HTTPException(404,'用户不存在')
+        existing=c.execute('''SELECT role FROM workspace_members
+            WHERE workspace_id=%s AND user_id=%s FOR UPDATE''',(workspace_id,user_id)).fetchone()
+        if existing and existing['role']=='owner' and body.role!='owner':
+            other_owner=c.execute('''SELECT 1 FROM workspace_members wm JOIN users u ON u.id=wm.user_id
+                WHERE wm.workspace_id=%s AND wm.role='owner' AND wm.user_id<>%s AND u.is_active LIMIT 1''',
+                (workspace_id,user_id)).fetchone()
+            if not other_owner:raise HTTPException(409,'不能降级最后一位有效团队 owner')
+        c.execute('''INSERT INTO workspace_members(workspace_id,user_id,role,created) VALUES(%s,%s,%s,%s)
+            ON CONFLICT(workspace_id,user_id) DO UPDATE SET role=excluded.role''',(workspace_id,user_id,body.role,now))
+        identity.audit(c,'workspace_member.put','user',user_id,workspace_id=workspace_id,payload={'role':body.role})
+    return {'workspace_id':workspace_id,'user_id':user_id,'role':body.role}
+
+
+@app.delete('/api/workspaces/{workspace_id}/members/{user_id}')
+def delete_workspace_member(workspace_id:str,user_id:str):
+    principal=identity.current();now=time.time()
+    with s.db() as c:
+        identity.require_workspace_owner(c,principal,workspace_id)
+        member=c.execute('SELECT role FROM workspace_members WHERE workspace_id=%s AND user_id=%s FOR UPDATE',(workspace_id,user_id)).fetchone()
+        if not member:raise HTTPException(404,'成员不存在')
+        if member['role']=='owner':
+            other_owner=c.execute('''SELECT 1 FROM workspace_members wm JOIN users u ON u.id=wm.user_id
+                WHERE wm.workspace_id=%s AND wm.role='owner' AND wm.user_id<>%s AND u.is_active LIMIT 1''',
+                (workspace_id,user_id)).fetchone()
+            if not other_owner:raise HTTPException(409,'不能移除最后一位有效团队 owner')
+        c.execute('DELETE FROM production_members WHERE user_id=%s AND production_id IN (SELECT id FROM productions WHERE workspace_id=%s)',(user_id,workspace_id))
+        c.execute('DELETE FROM workspace_members WHERE workspace_id=%s AND user_id=%s',(workspace_id,user_id))
+        identity.audit(c,'workspace_member.remove','user',user_id,workspace_id=workspace_id)
+    return {'ok':True,'revoked_at':now}
+
+
+@app.get('/api/productions/{production_id}/members')
+def production_members(production_id:str):
+    principal=identity.current()
+    with s.db() as c:
+        identity.require_production(c,principal,production_id,'viewer')
+        return [dict(row) for row in c.execute('''SELECT u.id,u.nickname,pm.role,u.is_active
+            FROM production_members pm JOIN users u ON u.id=pm.user_id
+            WHERE pm.production_id=%s ORDER BY pm.role,u.nickname,u.id''',(production_id,))]
+
+
+class ProductionMemberUpdate(StrictBody):
+    role:str=Field(pattern='^(manager|editor|viewer)$')
+
+
+@app.put('/api/productions/{production_id}/members/{user_id}')
+def put_production_member(production_id:str,user_id:str,body:ProductionMemberUpdate):
+    principal=identity.current();now=time.time()
+    with s.db() as c:
+        identity.require_production(c,principal,production_id,'manager')
+        production_row=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
+        if not production_row or not c.execute('SELECT 1 FROM workspace_members WHERE workspace_id=%s AND user_id=%s',(production_row['workspace_id'],user_id)).fetchone():
+            raise HTTPException(409,'目标用户必须先加入作品所属团队')
+        c.execute('''INSERT INTO production_members(production_id,user_id,role,created) VALUES(%s,%s,%s,%s)
+            ON CONFLICT(production_id,user_id) DO UPDATE SET role=excluded.role''',(production_id,user_id,body.role,now))
+        identity.audit(c,'production_member.put','user',user_id,workspace_id=production_row['workspace_id'],
+                       production_id=production_id,payload={'role':body.role})
+    return {'production_id':production_id,'user_id':user_id,'role':body.role}
+
+
+@app.delete('/api/productions/{production_id}/members/{user_id}')
+def delete_production_member(production_id:str,user_id:str):
+    principal=identity.current()
+    with s.db() as c:
+        identity.require_production(c,principal,production_id,'manager')
+        p=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
+        c.execute('DELETE FROM production_members WHERE production_id=%s AND user_id=%s',(production_id,user_id))
+        identity.audit(c,'production_member.remove','user',user_id,workspace_id=p['workspace_id'],production_id=production_id)
+    return {'ok':True}
+
+
+@app.get('/api/admin/audit-events')
+def audit_events(limit:int=100):
+    with s.db() as c:
+        return [dict(row) for row in c.execute('SELECT * FROM audit_events ORDER BY id DESC LIMIT %s',(min(max(limit,1),500),))]
 
 def project(pid):
     with s.db() as c:
@@ -137,12 +464,31 @@ def project(pid):
     from .adaptation import project_script_to_document
     with s.db() as c:
         value['document']=project_script_to_document(c,pid,value['document'])
+        principal=identity.current(False)
+        if principal and value.get('production_id'):
+            workspace_role,production_role=identity.production_role(c,principal,value['production_id'])
+            level=3 if workspace_role=='owner' else identity._ROLE_LEVEL.get(production_role or '',0)
+            value['permissions']={
+                'role':'owner' if workspace_role=='owner' else production_role,
+                'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
+                'legacy_document_write':level>=3,
+            }
     return value
 
 @app.get('/api/projects')
-def projects():
+def projects(workspace_id:str|None=None):
+    principal=identity.current()
     with s.db() as c:
-        return [dict(r) for r in c.execute("SELECT id,name,revision,created,updated,production_id,episode_no,episode_title FROM projects WHERE NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id) ORDER BY updated DESC")]
+        if workspace_id and not identity.workspace_role(c,principal,workspace_id):
+            raise HTTPException(404,'团队不存在')
+        return [dict(r) for r in c.execute('''SELECT e.id,e.name,e.revision,e.created,e.updated,e.production_id,e.episode_no,e.episode_title
+            FROM projects e JOIN productions p ON p.id=e.production_id
+            LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=%s
+            LEFT JOIN production_members pm ON pm.production_id=p.id AND pm.user_id=%s
+            WHERE (wm.role='owner' OR pm.user_id IS NOT NULL)
+            AND (%s::text IS NULL OR p.workspace_id=%s)
+            AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=e.id)
+            ORDER BY e.updated DESC''',(principal.user_id,principal.user_id,workspace_id,workspace_id))]
 
 def production(production_id):
     with s.db() as c:
@@ -154,29 +500,58 @@ def production(production_id):
     if not row:raise HTTPException(404,'Production 不存在')
     value=dict(row)
     value['context']=normalize_production_context(json.loads(value.pop('shared_context')))
+    principal=identity.current(False)
+    if principal:
+        with s.db() as c:
+            workspace_role,production_role=identity.production_role(c,principal,production_id)
+        level=3 if workspace_role=='owner' else identity._ROLE_LEVEL.get(production_role or '',0)
+        value['permissions']={'role':'owner' if workspace_role=='owner' else production_role,
+                              'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
+                              'legacy_document_write':level>=3}
     return value
 
 @app.get('/api/productions')
-def productions():
+def productions(workspace_id:str|None=None):
+    principal=identity.current()
     with s.db() as c:
+        if workspace_id and not identity.workspace_role(c,principal,workspace_id):
+            raise HTTPException(404,'团队不存在')
         return [dict(row) for row in c.execute('''SELECT p.id,p.name,p.revision,p.created,p.updated,
+            p.workspace_id,CASE WHEN wm.role='owner' THEN 'owner' ELSE pm.role END role,
             (SELECT COUNT(*) FROM projects e WHERE e.production_id=p.id AND NOT EXISTS(
                 SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=e.id
             )) episode_count
             FROM productions p
-            WHERE NOT EXISTS(
+            LEFT JOIN workspace_members wm ON wm.workspace_id=p.workspace_id AND wm.user_id=%s
+            LEFT JOIN production_members pm ON pm.production_id=p.id AND pm.user_id=%s
+            WHERE (NOT EXISTS(
                 SELECT 1 FROM projects e WHERE e.production_id=p.id
             ) OR EXISTS(
                 SELECT 1 FROM projects e WHERE e.production_id=p.id AND NOT EXISTS(
                     SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=e.id
                 )
-            )
-            ORDER BY p.updated DESC''')]
+            ))
+            AND (wm.role='owner' OR pm.user_id IS NOT NULL)
+            AND (%s::text IS NULL OR p.workspace_id=%s)
+            ORDER BY p.updated DESC''',(principal.user_id,principal.user_id,workspace_id,workspace_id))]
 
-class ProductionCreate(BaseModel):
+class ProductionCreate(StrictBody):
     name:str=Field(default='未命名剧集',max_length=100)
+    workspace_id:str|None=None
 
-class ProductionUpdate(BaseModel):
+
+def _owned_workspace_id(connection, requested:str|None=None)->str:
+    principal=identity.current()
+    if requested:
+        identity.require_workspace_owner(connection,principal,requested)
+        return requested
+    rows=connection.execute("SELECT workspace_id FROM workspace_members WHERE user_id=%s AND role='owner' ORDER BY workspace_id",
+                            (principal.user_id,)).fetchall()
+    if len(rows)!=1:
+        raise HTTPException(400,'请明确选择要创建作品的团队')
+    return rows[0]['workspace_id']
+
+class ProductionUpdate(StrictBody):
     revision:int=Field(ge=1)
     name:str=Field(max_length=100)
 
@@ -186,7 +561,9 @@ def create_production(body:ProductionCreate):
     now=time.time();name=normalized_project_name(body.name)
     context=new_production_context(default_ark_policy(s.get_setting('providers',[])))
     with s.db() as c:
-        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(production_id,name,s.dumps(context),now,now))
+        workspace_id=_owned_workspace_id(c,body.workspace_id)
+        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated,workspace_id) VALUES(%s,%s,1,%s,%s,%s,%s)',(production_id,name,s.dumps(context),now,now,workspace_id))
+        identity.audit(c,'production.create','production',production_id,workspace_id=workspace_id,production_id=production_id)
     return production(production_id)
 
 @app.patch('/api/productions/{production_id}')
@@ -248,7 +625,7 @@ def production_visual_usage(production_id:str):
                 })
     return [{**item,'episodes':list(item['episodes'].values())} for item in usage.values()]
 
-class EpisodeCreate(BaseModel):
+class EpisodeCreate(StrictBody):
     title:str=Field(default='',max_length=100)
 
 @app.post('/api/productions/{production_id}/episodes')
@@ -273,8 +650,9 @@ def create_episode(production_id:str,body:EpisodeCreate):
         seed_episode_scripts(c)
     return project(pid)
 
-class ProjectCreate(BaseModel):
+class ProjectCreate(StrictBody):
     name:str=Field(default='未命名短片',max_length=100)
+    workspace_id:str|None=None
     episode_title:str|None=Field(default=None,max_length=100)
     style:str|None=Field(default=None,max_length=200)
     ratio:str|None=None
@@ -348,12 +726,14 @@ def create_project(body:ProjectCreate):
     episode_title=(body.episode_title or '').strip() if body.episode_title is not None else name
     episode_title=episode_title or '第 01 集'
     with s.db() as c:
-        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(production_id,name,s.dumps(context),now,now))
+        workspace_id=_owned_workspace_id(c,body.workspace_id)
+        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated,workspace_id) VALUES(%s,%s,1,%s,%s,%s,%s)',(production_id,name,s.dumps(context),now,now,workspace_id))
         c.execute('''INSERT INTO projects(
             id,name,revision,document,created,updated,production_id,episode_no,episode_title
         ) VALUES(%s,%s,1,%s,%s,%s,%s,1,%s)''',(pid,episode_title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_title))
         from .adaptation import seed_episode_scripts
         seed_episode_scripts(c)
+        identity.audit(c,'production.create_legacy','production',production_id,workspace_id=workspace_id,production_id=production_id)
     return project(pid)
 
 @app.get('/api/projects/{pid}')
@@ -363,11 +743,13 @@ def read_project(pid:str):
 @app.delete('/api/projects/{pid}')
 def delete_project(pid:str):
     with s.db() as c:
-        row=c.execute("SELECT * FROM projects WHERE id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id)",(pid,)).fetchone()
+        row=c.execute('''SELECT e.*,p.workspace_id FROM projects e JOIN productions p ON p.id=e.production_id
+            WHERE e.id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=e.id)''',(pid,)).fetchone()
         if not row: raise HTTPException(404,'项目不存在')
         active=c.execute("SELECT COUNT(*) count FROM jobs WHERE project_id=%s AND status IN ('queued','running')",(pid,)).fetchone()['count']
         if active: raise HTTPException(409,f'项目仍有 {active} 个运行中任务，请先取消后再移入回收站。')
         c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('project',%s,%s,%s)",(pid,pid,time.time()))
+        identity.audit(c,'project.trash','project',pid,workspace_id=row['workspace_id'],production_id=row['production_id'])
     return {'deleted':pid,'soft':True}
 
 @app.get('/api/projects/{pid}/storyboard-sheet')
@@ -375,7 +757,7 @@ def storyboard_sheet(pid:str,columns:int=3,page:int=1):
     from .contact_sheet import render_sheet
     return Response(render_sheet(project(pid),columns,page),media_type='image/png',headers={'Content-Disposition':f'attachment; filename="storyboard-{page}.png"'})
 
-class ProjectSave(BaseModel):
+class ProjectSave(StrictBody):
     name:str=Field(max_length=100)
     revision:int
     production_revision:int|None=None
@@ -578,7 +960,7 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
         path.unlink(missing_ok=True)
         raise
 
-class AssetUpdate(BaseModel):
+class AssetUpdate(StrictBody):
     category:str
 
 @app.patch('/api/projects/{pid}/assets/{aid}')
@@ -595,15 +977,19 @@ def delete_asset(pid:str,aid:str):
     row=reference_asset(pid,aid)
     with s.db() as c:
         c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('asset',%s,%s,%s)",(aid,row['project_id'],time.time()))
+        workspace=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(row['production_id'],)).fetchone()
+        identity.audit(c,'asset.trash','asset',aid,workspace_id=workspace['workspace_id'],production_id=row['production_id'])
         episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=%s',(row['production_id'],))]
         for episode_id in episode_ids:s.event(episode_id,{'type':'asset_deleted','id':aid},connection=c)
     return {'deleted':aid,'soft':True}
 
 @app.get('/api/trash')
 def trash():
+    principal=identity.current()
     with s.db() as c:
-        deleted_projects=[dict(row) for row in c.execute("SELECT p.id,p.name,d.deleted_at FROM deleted_items d JOIN projects p ON p.id=d.item_id WHERE d.kind='project' ORDER BY d.deleted_at DESC")]
-        deleted_assets=[dict(row) for row in c.execute("SELECT a.id,a.name,a.kind,a.category,a.project_id,a.production_id,p.name project_name,d.deleted_at FROM deleted_items d JOIN assets a ON a.id=d.item_id JOIN projects p ON p.id=a.project_id WHERE d.kind='asset' ORDER BY d.deleted_at DESC")]
+        allowed=identity.visible_production_ids(c,principal)
+        deleted_projects=[dict(row) for row in c.execute("SELECT p.id,p.name,d.deleted_at FROM deleted_items d JOIN projects p ON p.id=d.item_id WHERE d.kind='project' AND p.production_id=ANY(%s) ORDER BY d.deleted_at DESC",(allowed,))]
+        deleted_assets=[dict(row) for row in c.execute("SELECT a.id,a.name,a.kind,a.category,a.project_id,a.production_id,p.name project_name,d.deleted_at FROM deleted_items d JOIN assets a ON a.id=d.item_id JOIN projects p ON p.id=a.project_id WHERE d.kind='asset' AND a.production_id=ANY(%s) ORDER BY d.deleted_at DESC",(allowed,))]
         deleted_sources=[dict(row) for row in c.execute('''SELECT sd.id,sd.title name,sd.type,
             sd.production_id,p.name production_name,
             (SELECT COUNT(*) FROM source_chapters sc WHERE sc.source_id=sd.id AND NOT EXISTS(
@@ -612,12 +998,12 @@ def trash():
             d.deleted_at
             FROM deleted_items d JOIN source_documents sd ON sd.id=d.item_id
             JOIN productions p ON p.id=sd.production_id
-            WHERE d.kind='source' ORDER BY d.deleted_at DESC''')]
+            WHERE d.kind='source' AND sd.production_id=ANY(%s) ORDER BY d.deleted_at DESC''',(allowed,))]
         deleted_chapters=[dict(row) for row in c.execute('''SELECT sc.id,sc.title name,sc.chapter_no,
             sd.id source_id,sd.title source_name,sd.production_id,p.name production_name,d.deleted_at
             FROM deleted_items d JOIN source_chapters sc ON sc.id=d.item_id
             JOIN source_documents sd ON sd.id=sc.source_id JOIN productions p ON p.id=sd.production_id
-            WHERE d.kind='chapter' ORDER BY d.deleted_at DESC''')]
+            WHERE d.kind='chapter' AND sd.production_id=ANY(%s) ORDER BY d.deleted_at DESC''',(allowed,))]
     return {'projects':deleted_projects,'assets':deleted_assets,'sources':deleted_sources,'chapters':deleted_chapters}
 
 @app.post('/api/trash/{kind}/{item_id}/restore')
@@ -642,6 +1028,11 @@ def restore_deleted_item(kind:str,item_id:str):
             if hidden_source:raise HTTPException(409,'请先恢复章节所属原著。')
             episode_ids=production_event_targets(c,row['project_id'])
         else:episode_ids=[row['project_id']] if row['project_id'] else []
+        production_id=identity.production_for_resource(c,kind,item_id)
+        workspace=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone() if production_id else None
+        identity.audit(c,'trash.restore',kind,item_id,
+                       workspace_id=workspace['workspace_id'] if workspace else None,
+                       production_id=production_id)
         for episode_id in episode_ids:s.event(episode_id,{'type':'restored','kind':kind,'id':item_id},connection=c)
     return {'restored':item_id,'kind':kind}
 
@@ -653,9 +1044,9 @@ def asset_file(aid:str):
     return FileResponse(path,media_type=row['mime'],filename=row['name'],content_disposition_type='inline')
 
 @app.get('/api/provider-assets/{aid}')
-def provider_asset_file(aid:str,expires:int,signature:str):
+def provider_asset_file(aid:str,expires:int,signature:str,purpose:str,request:Request):
     from .provider_assets import valid_signature
-    if not valid_signature(aid,expires,signature):
+    if not valid_signature(aid,expires,signature,request.method,purpose):
         raise HTTPException(403,'素材访问链接无效或已过期')
     row=asset_row(aid)
     path=s.stored_asset_path(row['path'])
@@ -673,6 +1064,16 @@ def system():
 @app.get('/api/settings')
 def settings():
     value=s.get_setting('providers',[])
+    principal=identity.current()
+    if not principal.is_admin:
+        return {
+            'providers':[
+                {k:v for k,v in p.items() if k in ('id','name','type','kind','models')}
+                for p in value
+            ],
+            'ffmpeg':None,
+            'read_only':True,
+        }
     return {
         'providers':[
             {**{k:v for k,v in p.items() if k not in ('api_key','auto_start')},'api_key_set':bool(p.get('api_key'))}
@@ -731,6 +1132,8 @@ async def update_settings(request:Request):
         s.set_setting('providers',body['providers'])
     for key in ('ffmpeg',):
         if key in body: s.set_setting(key,body[key])
+    with s.db() as c:
+        identity.audit(c,'platform_settings.update','settings','global',payload={'keys':sorted(body)})
     return settings()
 
 @app.get('/api/providers/{provider_id}/models')
@@ -808,13 +1211,13 @@ def test_provider(provider_id:str,kind:str='text'):
         from .providers.volcengine_ark import check_configured_model
     return check_configured_model(provider,kind)
 
-class JobCreate(BaseModel):
+class JobCreate(StrictBody):
     node_id:str
     kind:str
     submission_id:str=Field(min_length=8,max_length=200)
     input:dict
 
-class PromptTemplateSave(BaseModel):
+class PromptTemplateSave(StrictBody):
     revision:int=Field(ge=0)
     name:str=Field(min_length=1,max_length=100)
     kind:str
@@ -958,12 +1361,14 @@ def create_job_record(c,pid,body):
         if selected and selected['type']=='minimax':
             from .minimax_video import first_frame
             first_frame(asset)
-    owner=c.execute('SELECT production_id FROM projects WHERE id=%s',(pid,)).fetchone()
+    owner=c.execute('''SELECT e.production_id,p.workspace_id FROM projects e
+        JOIN productions p ON p.id=e.production_id WHERE e.id=%s''',(pid,)).fetchone()
     if not owner:raise HTTPException(404,'制作集不存在')
     scope='production' if body.input.get('stage') in ('source_analysis','adaptation_generation') else 'episode'
     jid=s.uid('job-'); now=time.time()
-    c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id']))
+    actor=identity.current(False)
+    c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id if actor else None))
     if selected:
         c.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(selected)))
     return s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone())
@@ -1026,7 +1431,7 @@ def submit(pid:str,body:JobCreate):
     return result
 
 
-class SourceCreate(BaseModel):
+class SourceCreate(StrictBody):
     title:str=Field(min_length=1,max_length=200)
     type:str='manual'
     metadata:dict=Field(default_factory=dict)
@@ -1034,21 +1439,22 @@ class SourceCreate(BaseModel):
 class SourceImport(SourceCreate):
     content:str=Field(min_length=1,max_length=20_000_000)
 
-class ChapterCreate(BaseModel):
+class ChapterCreate(StrictBody):
     title:str=Field(min_length=1,max_length=300)
     content:str=Field(max_length=2_000_000)
 
 class ChapterSave(ChapterCreate):
     revision:int=Field(ge=1)
 
-class ChapterTrashCreate(BaseModel):
+class ChapterTrashCreate(StrictBody):
     chapter_ids:list[str]=Field(min_length=1,max_length=500)
 
-class SourceExtractionCreate(BaseModel):
+class SourceExtractionCreate(StrictBody):
     project_id:str
     chapter_ids:list[str]=Field(min_length=1,max_length=500)
     provider:str
     model:str
+    allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=80)
 
 def source_document_row(production_id,source_id):
@@ -1260,7 +1666,7 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
             chapter=chapter_map[chapter_id]
             job_body=JobCreate(node_id='source-chapter:'+chapter_id,kind='text',
                 submission_id=body.submission_id+':'+chapter_id[:24],input={
-                    'provider':body.provider,'model':body.model,
+                    'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
                     'stage':'source_analysis','prompt':f'章节标题：{chapter["title"]}\n\n原文：\n{chapter["content"]}',
                     'source_event_extraction':{'productionId':production_id,'chapterId':chapter_id,'chapterRevision':chapter['revision']},
             })
@@ -1270,22 +1676,23 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
     return {'jobs':created,'count':len(created)}
 
 
-class AdaptationSave(BaseModel):
+class AdaptationSave(StrictBody):
     revision:int=Field(ge=1)
     adaptationPlan:dict
     episodePlans:list[dict]=Field(max_length=500)
     monetizationPlan:dict
 
-class RevisionAction(BaseModel):
+class RevisionAction(StrictBody):
     revision:int=Field(ge=1)
 
-class TextGenerationCreate(BaseModel):
+class TextGenerationCreate(StrictBody):
     project_id:str
     provider:str
     model:str=''
+    allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=100)
 
-class ScriptSave(BaseModel):
+class ScriptSave(StrictBody):
     revision:int=Field(ge=0)
     title:str
     synopsis:str
@@ -1299,10 +1706,11 @@ class ScriptSave(BaseModel):
     props:list[str]
     canvasNodeId:str|None=Field(default=None,min_length=1,max_length=160)
 
-class ScriptGenerationCreate(BaseModel):
+class ScriptGenerationCreate(StrictBody):
     episode_nos:list[int]=Field(min_length=1,max_length=500)
     provider:str
     model:str=''
+    allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=100)
 
 def production_event_targets(connection,production_id):
@@ -1405,7 +1813,7 @@ def generate_adaptation(production_id:str,body:TextGenerationCreate):
 商业字段必须服从总集数：freeEpisodes 范围为 0–{count}；firstPaywallEpisode 范围为 1–{after}，其中 {after} 表示全剧不设付费集；每个付费卡点 episodeNo 范围为 1–{count}。
 目标规格：'''.format(count=episode_count, after=episode_count + 1)+s.dumps(format_value)+'\n原著事件：\n'+s.dumps(sources)
         job_body=JobCreate(node_id='adaptation:'+production_id,kind='text',submission_id=body.submission_id,input={
-            'provider':body.provider,'model':body.model,
+            'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
             'stage':'adaptation_generation','prompt':prompt,'max_tokens':12000,
             'adaptation_generation':{
                 'productionId':production_id,'adaptationFingerprint':adaptation_fingerprint(context),
@@ -1540,7 +1948,7 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
                 '\n原著章节：'+s.dumps(chapters)+'\n本集现有剧本（为空则首次生成）：'+s.dumps(script_to_api(script))
             job_body=JobCreate(node_id='episode-script:'+project_row['id'],kind='text',
                 submission_id=body.submission_id+f':{episode_no:03d}',input={
-                    'provider':body.provider,'model':body.model,
+                    'provider':body.provider,'model':body.model,'allow_cloud':body.allow_cloud,
                     'stage':'script_generation','prompt':prompt,'max_tokens':12000,
                     'episode_script_generation':{
                         'productionId':production_id,'episodeNo':episode_no,
@@ -1793,6 +2201,9 @@ def cancel(jid:str):
                     s.cancelled_phase(jid,'本地已取消；幻场 AI 远端任务可能继续生成并产生费用')
             elif provider.get('type')=='runninghub':
                 s.cancelled_phase(jid,'本地已取消；RunningHub 远端任务可能继续生成并产生费用')
+        with s.db() as c:
+            scope=c.execute('SELECT workspace_id,production_id FROM jobs WHERE id=%s',(jid,)).fetchone()
+            identity.audit(c,'job.cancel','job',jid,workspace_id=scope['workspace_id'],production_id=scope['production_id'])
     return read_job(jid)
 
 @app.post('/api/jobs/{jid}/resume')
@@ -1826,6 +2237,7 @@ def resume(jid:str):
             started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s AND status='interrupted'
             RETURNING *''',(phase,time.time(),jid)).fetchone()
         if not updated:raise HTTPException(409,'任务状态已变化，不能恢复查询')
+        identity.audit(c,'job.resume','job',jid,workspace_id=job['workspace_id'],production_id=job['production_id'])
         s.event(job['project_id'],{'type':'job','id':jid},connection=c)
     return read_job(jid)
 
@@ -1863,21 +2275,26 @@ def _event_cursor(
 
 @app.get('/api/events')
 async def events(request:Request,after:int|None=None):
+    endpoint_principal=identity.current(False)
     async def stream():
         requested = _requested_event_id(after, request.headers.get('last-event-id'))
         with s.db() as c:
+            allowed=identity.visible_production_ids(c,endpoint_principal) if endpoint_principal else None
+            scope_sql=' AND production_id=ANY(%s)' if allowed is not None else ''
+            scope_args=(allowed,) if allowed is not None else ()
             if requested is None:
-                latest = c.execute('SELECT COALESCE(MAX(id),0) latest FROM events').fetchone()['latest']
+                latest = c.execute('SELECT COALESCE(MAX(id),0) latest FROM events WHERE TRUE'+scope_sql,scope_args).fetchone()['latest']
                 cursor = latest
             else:
-                snapshot = c.execute('''SELECT
-                    COALESCE((SELECT MAX(id) FROM events),0) latest,
-                    (SELECT MIN(id) FROM events) oldest_retained,
-                    EXISTS(SELECT 1 FROM events WHERE id=%s) requested_retained,
+                snapshot = c.execute(f'''SELECT
+                    COALESCE((SELECT MAX(id) FROM events WHERE TRUE{scope_sql}),0) latest,
+                    (SELECT MIN(id) FROM events WHERE TRUE{scope_sql}) oldest_retained,
+                    EXISTS(SELECT 1 FROM events WHERE id=%s{scope_sql}) requested_retained,
                     (SELECT COUNT(*) FROM (
-                        SELECT id FROM events WHERE id>%s ORDER BY id LIMIT %s
+                        SELECT id FROM events WHERE id>%s{scope_sql} ORDER BY id LIMIT %s
                     ) visible) visible_backlog''',(
-                    requested,requested,EVENT_BACKLOG_LIMIT+1,
+                    *scope_args,*scope_args,requested,*scope_args,
+                    requested,*scope_args,EVENT_BACKLOG_LIMIT+1,
                 )).fetchone()
                 cursor = _event_cursor(
                     snapshot['latest'],after,request.headers.get('last-event-id'),
@@ -1886,8 +2303,15 @@ async def events(request:Request,after:int|None=None):
                     visible_backlog=snapshot['visible_backlog'],
                 )
         while not await request.is_disconnected():
+            if endpoint_principal and identity.resolve_session(request) is None:
+                break
             with s.db() as c:
-                rows=c.execute('SELECT * FROM events WHERE id>%s ORDER BY id LIMIT 100',(cursor,)).fetchall()
+                allowed=identity.visible_production_ids(c,endpoint_principal) if endpoint_principal else None
+                if allowed is not None:
+                    rows=c.execute('''SELECT * FROM events WHERE id>%s AND production_id=ANY(%s)
+                        ORDER BY id LIMIT 100''',(cursor,allowed)).fetchall()
+                else:
+                    rows=c.execute('SELECT * FROM events WHERE id>%s ORDER BY id LIMIT 100',(cursor,)).fetchall()
             for row in rows:
                 cursor=row['id']
                 yield f'id: {cursor}\ndata: {s.dumps({"project_id":row["project_id"],**json.loads(row["payload"])})}\n\n'
@@ -1896,4 +2320,12 @@ async def events(request:Request,after:int|None=None):
     return StreamingResponse(stream(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no'})
 
 if (s.ROOT/'dist').is_dir():
+    @app.get('/admin',include_in_schema=False)
+    def admin_page():
+        return FileResponse(s.ROOT/'dist'/'index.html')
+
+    @app.get('/members',include_in_schema=False)
+    def members_page():
+        return FileResponse(s.ROOT/'dist'/'index.html')
+
     app.mount('/',StaticFiles(directory=s.ROOT/'dist',html=True),name='web')

@@ -6,8 +6,8 @@
 |---|---|---|---|---|---|---|
 | P0 | P0-R1 已复验 | 通过 | `b957e39405522baf8ae7e3052b2938941e75b00b` | `evidence/P0-R1/REPORT.md` | 无；OVC-P0-01…05 全部关闭 | P1 |
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
-| P2 | P2-PG-01 READY_FOR_REVIEW | 未验收 | `a6820b045123ed73953cbe5667821225f8ceafb5` | `evidence/P2/REPORT.md` | 等待外部复核 | 否 |
-| P3 | 未提交 | 未验收 | | | | 否 |
+| P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
+| P3 | P3-ID-01 开发中 | 未验收 | | `evidence/P3/REPORT.md` | 待开发侧提交 | 否 |
 | P4 | 未提交 | 未验收 | | | | 否 |
 | P5 | 未提交 | 未验收 | | | | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
@@ -165,3 +165,15 @@ P0/P1 继续保持通过。P2 阻塞项：`OVC-P2-01` Worker 锁连接死亡后�
 报告：`evidence/P2-R2/REPORT.md`；修复前失败：`evidence/P2-R2/00-prefix-large-gap-failure.log`；修复后专项：`evidence/P2-R2/02-p2-r2-targeted.log`；正式全量：`evidence/P2-R2/03-pytest-full.log`。
 
 开发侧只处理 `OVC-P2-R1-01`：重连判断使用同一 SQL 快照中的实际可见积压行数和保留边界。正式结果为 P2-R2 定向 8/8、Python 全量 276/276、P2/进程回归 20/20、前端 126/126、构建通过。是否关闭剩余阻塞和 P2 是否通过由外部验收人复核；未开始 P3。
+
+## P2-R2 外部复验记录
+
+结论：**通过**（2026-09-16，主 ChatGPT 会话只审查协作版新仓库 `imherro/OurVideoCreator`）。
+
+通过 HEAD：`a70341bad5c0da23153ad6cd44b67f2cd863dde1`；被测试业务 SHA：`fc8feee3d9c3bfaffb39c55ab10d41e0fff7050f`。
+
+本次关闭：`OVC-P2-R1-01`，原 `OVC-P2-05` 整体关闭。保持关闭：`OVC-P2-01`、`OVC-P2-02`、`OVC-P2-03`、`OVC-P2-04`。新增阻塞：无。
+
+非阻塞观察：`OVC-P2-R2-N01`（S3），开发组合运行中一次 PostgreSQL connect timeout 仍未归因；不能写成根因已解决。历史 `OVC-P1-R3-N01` 继续保留。
+
+下一阶段授权：P3。下一单一任务：`P3-ID-01`（邀请制账号、团队/作品隔离与基础页面闭环）。P4 及后续实施、公网部署、真实付费 API 未授权。

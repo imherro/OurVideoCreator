@@ -51,9 +51,13 @@ def set_setting(key, value):
 
 def _event(connection, project_id, payload):
     connection.execute('SELECT pg_advisory_xact_lock(%s)', (EVENT_PUBLISH_LOCK_KEY,))
+    scope = connection.execute('''SELECT p.production_id,pr.workspace_id
+        FROM projects p LEFT JOIN productions pr ON pr.id=p.production_id WHERE p.id=%s''',(project_id,)).fetchone() if project_id else None
     inserted = connection.execute(
-        'INSERT INTO events(project_id,payload,created) VALUES(%s,%s,%s) RETURNING id',
-        (project_id,dumps(payload),time.time()),
+        '''INSERT INTO events(project_id,payload,created,workspace_id,production_id)
+           VALUES(%s,%s,%s,%s,%s) RETURNING id''',
+        (project_id,dumps(payload),time.time(),
+         scope['workspace_id'] if scope else None,scope['production_id'] if scope else None),
     ).fetchone()['id']
     connection.execute('''DELETE FROM events WHERE id < COALESCE((
         SELECT MIN(id) FROM (SELECT id FROM events ORDER BY id DESC LIMIT %s) retained

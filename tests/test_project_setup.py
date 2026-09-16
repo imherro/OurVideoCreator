@@ -5,14 +5,13 @@ from fastapi.testclient import TestClient
 
 from backend.app import app
 from backend import store as s
+from tests.auth_helpers import login_admin
 
 
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as value:
-        status = value.get("/api/auth/status").json()
-        endpoint = "/api/auth/login" if status["configured"] else "/api/auth/setup"
-        assert value.post(endpoint, json={"password": "integration-test-only"}).status_code == 200
+        login_admin(value)
         yield value
 
 

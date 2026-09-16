@@ -19,7 +19,7 @@ from sqlalchemy.engine import Engine, make_url
 
 
 DATABASE_ENV = 'OVC_DATABASE_URL'
-SCHEMA_REVISION = '0001_postgresql_baseline'
+SCHEMA_REVISION = '0002_identity_tenancy'
 
 
 class DatabaseConfigurationError(RuntimeError):

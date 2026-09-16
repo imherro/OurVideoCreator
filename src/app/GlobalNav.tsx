@@ -20,14 +20,16 @@ export function GlobalNav({
   active,
   taskCount,
   onChange,
+  isAdmin = false,
 }: {
   active: string | null;
   taskCount: number;
   onChange: (panel: GlobalPanel) => void;
+  isAdmin?: boolean;
 }) {
   return (
     <nav className="rail global-nav" aria-label="全局导航">
-      {items.map(({ id, label, icon: Icon }) => (
+      {items.filter(({id})=>id!=="settings"||isAdmin).map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           className={active === id ? "active" : ""}

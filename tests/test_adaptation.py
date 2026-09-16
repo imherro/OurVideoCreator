@@ -8,15 +8,13 @@ from backend import store as s
 from backend.app import app
 from backend.worker import Worker
 from backend.adaptation import validate_adaptation_bundle
+from tests.auth_helpers import login_admin
 
 
 @pytest.fixture(scope="module")
 def adaptation_client():
     with TestClient(app) as client:
-        status = client.get("/api/auth/status").json()
-        endpoint = "/api/auth/login" if status["configured"] else "/api/auth/setup"
-        response = client.post(endpoint, json={"password": "integration-test-only"})
-        assert response.status_code == 200, response.text
+        login_admin(client)
         response = client.put("/api/settings", json={"providers": [{
             "id": "p1-test-openai", "name": "P1 test gateway", "type": "openai",
             "kind": "text", "url": "http://127.0.0.1:1/v1", "local": False,

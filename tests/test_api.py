@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from backend.app import app
 from backend import store as s
 from backend.worker import Worker
+from tests.auth_helpers import login_admin
 
 @pytest.fixture(scope='module')
 def client():
@@ -17,9 +18,7 @@ def client():
 @pytest.fixture(scope='module')
 def authenticated(client):
     assert client.get('/api/projects').status_code==401
-    status=client.get('/api/auth/status').json()
-    endpoint='/api/auth/login' if status['configured'] else '/api/auth/setup'
-    assert client.post(endpoint,json={'password':'integration-test-only'}).status_code==200
+    login_admin(client)
     return client
 
 def project(c):
@@ -27,9 +26,10 @@ def project(c):
     assert response.status_code==200,response.text
     return response.json()
 
-def test_first_setup_is_available_to_remote_browsers(client):
+def test_public_setup_is_retired_for_remote_browsers(client):
     with TestClient(app,client=('192.0.2.10',43120)) as remote:
-        assert remote.get('/api/auth/status').json()['can_setup'] is True
+        assert remote.get('/api/auth/status').json()['can_setup'] is False
+        assert remote.post('/api/auth/setup').status_code == 410
 
 def test_production_can_own_multiple_episode_projects(authenticated):
     c=authenticated
@@ -159,8 +159,8 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
         f'/api/projects/{other["id"]}/assets/{reference["id"]}',
         json={'category':'reference'},
     )
-    assert rejected.status_code==400
-    assert '其他 Production' in rejected.json()['detail']
+    # Cross-production nested IDs are deliberately concealed by the P3 ACL.
+    assert rejected.status_code==404
 
     deleted=c.delete(f'/api/projects/{second["id"]}/assets/{reference["id"]}')
     assert deleted.status_code==200 and deleted.json()['soft'] is True

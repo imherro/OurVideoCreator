@@ -32,6 +32,7 @@ from backend.app import (
     save_prompt_template,
 )
 from backend.worker import Worker
+from tests.auth_helpers import login_admin
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,10 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def client():
     with TestClient(app) as value:
-        status = value.get('/api/auth/status').json()
-        endpoint = '/api/auth/login' if status['configured'] else '/api/auth/setup'
-        response = value.post(endpoint, json={'password': 'integration-test-only'})
-        assert response.status_code == 200, response.text
+        login_admin(value)
         yield value
 
 

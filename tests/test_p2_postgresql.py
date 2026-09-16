@@ -27,6 +27,7 @@ from backend.app import (
 )
 from backend.database import WorkerAdvisoryLock, check_ready
 from tests.postgres_test_db import _assert_safe_target
+from tests.auth_helpers import login_admin
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,10 +36,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def authenticated_client():
     client = TestClient(app)
     client.__enter__()
-    status = client.get('/api/auth/status').json()
-    endpoint = '/api/auth/login' if status['configured'] else '/api/auth/setup'
-    response = client.post(endpoint, json={'password': 'integration-test-only'})
-    assert response.status_code == 200, response.text
+    login_admin(client)
     return client
 
 

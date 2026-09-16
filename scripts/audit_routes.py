@@ -9,6 +9,31 @@ import tempfile
 from pathlib import Path
 
 
+def export_routes(app) -> list[dict]:
+    return [
+        {
+            "type": type(route).__name__,
+            "path": getattr(route, "path", None),
+            "name": getattr(route, "name", None),
+            "methods": sorted(getattr(route, "methods", None) or []),
+        }
+        for route in app.routes
+    ]
+
+
+def unclassified_api_routes(routes: list[dict], route_map: str) -> list[str]:
+    unclassified = []
+    for item in routes:
+        if not str(item.get("path") or "").startswith("/api/"):
+            continue
+        methods = [method for method in item.get("methods", []) if method not in {"HEAD", "OPTIONS"}]
+        for method in methods:
+            pattern = rf"{re.escape(method)}\s+`{re.escape(item['path'])}`"
+            if re.search(pattern, route_map) is None:
+                unclassified.append(f"{method} {item['path']}")
+    return unclassified
+
+
 def main() -> int:
     repo = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repo))
@@ -17,17 +42,7 @@ def main() -> int:
         from backend.app import app
         from starlette.routing import Mount
 
-        routes = []
-        for route in app.routes:
-            methods = sorted(getattr(route, "methods", None) or [])
-            routes.append(
-                {
-                    "type": type(route).__name__,
-                    "path": getattr(route, "path", None),
-                    "name": getattr(route, "name", None),
-                    "methods": methods,
-                }
-            )
+        routes = export_routes(app)
         mounts = [item for item in routes if item["type"] == Mount.__name__]
         route_map = (repo / "docs" / "multiuser-rollout" / "design" / "ROUTE_AUTH_MAP.md").read_text(
             encoding="utf-8"
@@ -35,15 +50,9 @@ def main() -> int:
         api_routes = [
             item for item in routes if str(item["path"] or "").startswith("/api/")
         ]
-        unclassified = []
-        for item in api_routes:
-            methods = [method for method in item["methods"] if method not in {"HEAD", "OPTIONS"}]
-            for method in methods:
-                pattern = rf"{re.escape(method)}\s+`{re.escape(item['path'])}`"
-                if re.search(pattern, route_map) is None:
-                    unclassified.append(f"{method} {item['path']}")
+        unclassified = unclassified_api_routes(routes, route_map)
         payload = {
-            "audit": "P1 read-only actual app.routes report (not an ACL CI guard)",
+            "audit": "P3 ACL-09 actual app.routes classification guard",
             "isolated_data_dir": True,
             "dist_exists": (repo / "dist").is_dir(),
             "route_count": len(routes),
@@ -52,9 +61,9 @@ def main() -> int:
             ),
             "classified_api_route_count": len(api_routes) - len(unclassified),
             "unclassified_api_routes": unclassified,
-            "enforcement": "report-only; P3 ACL-09 will make unclassified routes fail CI",
+            "enforcement": "fail-closed; any unclassified API route exits non-zero",
             "framework_entries_documented": {
-                "openapi": "/openapi.json" in route_map,
+                "openapi_disabled": "openapi_url=None" in route_map,
                 "static_mount": "StaticFiles" in route_map and "Mount" in route_map,
             },
             "openapi_route": next(
@@ -63,12 +72,12 @@ def main() -> int:
             "static_mounts": mounts,
             "without_dist_difference": (
                 "backend/app.py conditionally omits only the '/' StaticFiles Mount; "
-                "API routes and /openapi.json remain registered"
+                "API routes remain registered and OpenAPI stays disabled"
             ),
             "routes": routes,
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0
+    return 1 if unclassified else 0
 
 
 if __name__ == "__main__":

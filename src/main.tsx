@@ -306,8 +306,13 @@ const api = async (path: string, options: RequestInit = {}) => {
       ...options,
       headers:
         options.body instanceof FormData
-          ? options.headers
-          : { "Content-Type": "application/json", ...options.headers },
+          ? { ...options.headers, ...(document.cookie.match(/(?:^|; )ovc_csrf=([^;]+)/)?.[1]
+              ? { "X-CSRF-Token": decodeURIComponent(document.cookie.match(/(?:^|; )ovc_csrf=([^;]+)/)![1]) }
+              : {}) }
+          : { "Content-Type": "application/json", ...options.headers,
+              ...(document.cookie.match(/(?:^|; )ovc_csrf=([^;]+)/)?.[1]
+                ? { "X-CSRF-Token": decodeURIComponent(document.cookie.match(/(?:^|; )ovc_csrf=([^;]+)/)![1]) }
+                : {}) },
     });
     if (!r.ok) {
       let error;
@@ -486,8 +491,12 @@ function MediaNode({ data, selected }: { data: Any; selected?: boolean }) {
 }
 const nodeTypes = { media: MediaNode, visualAsset: VisualAssetNode };
 
-function Auth({ onLogin }: { onLogin: () => void }) {
+function Auth({ onLogin }: { onLogin: (status: Any) => void }) {
   const [status, setStatus] = useState<Any>();
+  const [mode, setMode] = useState<"login" | "register" | "reset">("login");
+  const [phone, setPhone] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [token, setToken] = useState(new URLSearchParams(window.location.search).get("invite") || new URLSearchParams(window.location.search).get("reset") || "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -501,11 +510,12 @@ function Auth({ onLogin }: { onLogin: () => void }) {
     setBusy(true);
     setError("");
     try {
-      await api(
-        status?.configured ? "/auth/login" : "/auth/setup",
-        send("POST", { password }),
-      );
-      onLogin();
+      const path = mode === "login" ? "/auth/login" : mode === "register" ? "/auth/register" : "/auth/password-reset";
+      const body = mode === "login" ? { phone, password }
+        : mode === "register" ? { invitation_token: token, phone, nickname, password }
+        : { token, password };
+      await api(path, send("POST", body));
+      onLogin(await api("/auth/status"));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -536,25 +546,30 @@ function Auth({ onLogin }: { onLogin: () => void }) {
       </div>
       <form onSubmit={submit} className="auth-form">
         <span className="eyebrow">YOUR CREATIVE SPACE</span>
-        <h2>{status?.configured ? "回到工作室" : "创建你的工作室"}</h2>
-        <p>
-          {status?.configured
-            ? "在任意电脑上使用同一个工作室密码登录。"
-            : "设置工作室密码后，即可从当前浏览器开始创作。"}
-        </p>
+        <h2>{mode === "login" ? "登录安影" : mode === "register" ? "接受邀请" : "设置新密码"}</h2>
+        <p>{mode === "login" ? "使用你的手机号和个人密码进入获权团队。" : mode === "register" ? "邀请码只提供注册资格，团队负责人确认后才能看到作品。" : "使用管理员线下核验后签发的一次性链接。"}</p>
+        {mode !== "reset" && <label>
+          手机号
+          <input autoFocus type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="例如 138 0000 0000" required />
+        </label>}
+        {mode === "register" && <label>
+          昵称
+          <input value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={80} required />
+        </label>}
+        {mode !== "login" && <label>
+          {mode === "register" ? "邀请码" : "重置令牌"}
+          <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" required />
+        </label>}
         <label>
-          工作室密码
+          个人密码
           <input
-            autoFocus
             type="password"
-            autoComplete={
-              status?.configured ? "current-password" : "new-password"
-            }
-            minLength={8}
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            minLength={mode === "login" ? 1 : 15}
             maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="至少 8 位"
+            placeholder={mode === "login" ? "输入密码" : "15–128 位口令"}
             required
           />
         </label>
@@ -568,38 +583,89 @@ function Auth({ onLogin }: { onLogin: () => void }) {
           ) : (
             <ArrowUpRight size={17} />
           )}{" "}
-          {status?.configured ? "进入工作室" : "设置并进入"}
+          {mode === "login" ? "进入工作室" : mode === "register" ? "注册并登录" : "重置并登录"}
         </button>
+        <div className="auth-switch">
+          <button type="button" className="quiet" onClick={() => setMode(mode === "login" ? "register" : "login")}>{mode === "login" ? "我有邀请码" : "返回登录"}</button>
+          {mode !== "reset" && <button type="button" className="quiet" onClick={() => setMode("reset")}>使用重置链接</button>}
+        </div>
       </form>
     </div>
   );
 }
 
+function WaitingForWorkspace({ session, onLogout }: { session: Any; onLogout: () => void }) {
+  return <div className="empty-workspace account-page">
+    <AnYingMark size={64}/><span className="eyebrow">ACCOUNT READY</span>
+    <h1>等待加入团队</h1>
+    <p>{session.user?.nickname}，你的个人账号已创建。邀请码不会自动授予团队权限，请将用户 ID <code>{session.user?.id}</code> 发给团队 owner 确认入组。</p>
+    <button className="quiet" onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出登录</button>
+  </div>;
+}
+
+function AdminConsole({ session, onLogout }: { session: Any; onLogout: () => void }) {
+  const [users,setUsers]=useState<Any[]>([]),[workspaces,setWorkspaces]=useState<Any[]>([]),[invitations,setInvitations]=useState<Any[]>([]);
+  const [notice,setNotice]=useState(''),[error,setError]=useState('');
+  const [inviteToken,setInviteToken]=useState(''),[workspaceName,setWorkspaceName]=useState(''),[ownerId,setOwnerId]=useState('');
+  const load=async()=>{try{const [u,w,i]=await Promise.all([api('/admin/users'),api('/admin/workspaces'),api('/admin/invitations')]);setUsers(u);setWorkspaces(w);setInvitations(i);}catch(e:any){setError(e.message);}};
+  useEffect(()=>{void load();},[]);
+  if(session.user?.platform_role!=='platform_admin') return <div className="empty-workspace"><h1>无权访问</h1><a href="/">返回工作室</a></div>;
+  return <div className="admin-page">
+    <header><div><span className="eyebrow">PLATFORM ADMIN</span><h1>平台管理</h1></div><div><a className="quiet" href="/">返回工作室</a><button onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出</button></div></header>
+    {error&&<div className="error">{error}</div>}{notice&&<div className="notice">{notice}</div>}
+    <section><h2>注册邀请</h2><p>原始令牌只显示一次，不写入日志。</p><button className="primary" onClick={async()=>{try{const item=await api('/admin/invitations',send('POST',{expires_hours:48}));setInviteToken(item.token);setNotice('已创建 48 小时一次性邀请');await load();}catch(e:any){setError(e.message);}}}>创建邀请</button>{inviteToken&&<code className="one-time-token">{inviteToken}</code>}
+      <div className="admin-list">{invitations.map(i=><div key={i.id}><code>{i.id}</code><span>{i.consumed_at?'已使用':i.revoked_at?'已撤销':'可用'}</span>{!i.consumed_at&&!i.revoked_at&&<button onClick={async()=>{await api(`/admin/invitations/${i.id}`,send('DELETE'));await load();}}>撤销</button>}</div>)}</div>
+    </section>
+    <section><h2>用户</h2><div className="admin-list">{users.map(u=><div key={u.id}><span><b>{u.nickname}</b><small>{u.phone} · {u.id}</small></span><em>{u.platform_role}</em><button disabled={u.id===session.user.id} onClick={async()=>{try{await api(`/admin/users/${u.id}`,send('PATCH',{is_active:!u.is_active}));await load();}catch(e:any){setError(e.message);}}}>{u.is_active?'停用':'启用'}</button></div>)}</div></section>
+    <section><h2>创建团队并指定 owner</h2><div className="inline-fields"><input placeholder="团队名称" value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)}/><input placeholder="Owner user_id" value={ownerId} onChange={e=>setOwnerId(e.target.value)}/><button onClick={async()=>{try{await api('/admin/workspaces',send('POST',{name:workspaceName,owner_user_id:ownerId}));setWorkspaceName('');setOwnerId('');await load();}catch(e:any){setError(e.message);}}}>创建</button></div><div className="admin-list">{workspaces.map(w=><div key={`${w.id}:${w.owner_user_id}`}><b>{w.name}</b><code>{w.id}</code><span>owner · {w.owner_nickname} · {w.owner_user_id}</span></div>)}</div></section>
+  </div>;
+}
+
+function MembershipConsole({ session, onLogout }: { session: Any; onLogout: () => void }) {
+  const [workspaceId,setWorkspaceId]=useState(session.workspaces?.[0]?.id||''),[members,setMembers]=useState<Any[]>([]),[productions,setProductions]=useState<Any[]>([]),[productionId,setProductionId]=useState(''),[productionMembers,setProductionMembers]=useState<Any[]>([]);
+  const [workspaceUserId,setWorkspaceUserId]=useState(''),[workspaceRole,setWorkspaceRole]=useState('member');
+  const [productionUserId,setProductionUserId]=useState(''),[productionRole,setProductionRole]=useState('viewer'),[error,setError]=useState('');
+  const load=async()=>{try{const [m,p]=await Promise.all([api(`/workspaces/${workspaceId}/members`),api(`/productions?workspace_id=${encodeURIComponent(workspaceId)}`)]);setMembers(m);setProductions(p);setProductionId(p[0]?.id||'');setProductionMembers([]);}catch(e:any){setError(e.message);}};
+  useEffect(()=>{if(workspaceId)void load();},[workspaceId]);
+  useEffect(()=>{if(productionId)api(`/productions/${productionId}/members`).then(setProductionMembers).catch((e:any)=>setError(e.message));},[productionId]);
+  const canManageWorkspace=session.workspaces.some((workspace:Any)=>workspace.id===workspaceId&&workspace.role==='owner');
+  const selectedProduction=productions.find((production:Any)=>production.id===productionId);
+  const canManageProduction=selectedProduction?.role==='owner'||selectedProduction?.role==='manager';
+  return <div className="admin-page"><header><div><span className="eyebrow">TEAM ACCESS</span><h1>团队与作品成员</h1></div><div><a href="/">返回工作室</a>{session.user?.platform_role==='platform_admin'&&<a href="/admin">平台管理</a>}<button onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出</button></div></header>{error&&<div className="error">{error}</div>}
+    <label>团队<select value={workspaceId} onChange={e=>setWorkspaceId(e.target.value)}>{session.workspaces.map((w:Any)=><option key={w.id} value={w.id}>{w.name} · {w.role}</option>)}</select></label>
+    <section><h2>团队成员</h2>{canManageWorkspace?<div className="inline-fields"><input placeholder="已注册用户 ID" value={workspaceUserId} onChange={e=>setWorkspaceUserId(e.target.value)}/><select value={workspaceRole} onChange={e=>setWorkspaceRole(e.target.value)}><option value="member">member</option><option value="owner">owner</option></select><button onClick={async()=>{try{await api(`/workspaces/${workspaceId}/members/${workspaceUserId}`,send('PUT',{role:workspaceRole}));setWorkspaceUserId('');await load();}catch(e:any){setError(e.message);}}}>确认入组</button></div>:<p className="muted">只有团队 owner 可以确认入组或调整团队角色。</p>}<div className="admin-list">{members.map(m=><div key={m.id}><span><b>{m.nickname}</b><small>{m.id} · {m.phone}</small></span><em>{m.role}</em></div>)}</div></section>
+    <section><h2>作品成员</h2>{productions.length?<select value={productionId} onChange={e=>setProductionId(e.target.value)}>{productions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>:<p className="muted">当前团队没有你可见的作品。</p>}{canManageProduction&&<div className="inline-fields"><input placeholder="团队成员 user_id" value={productionUserId} onChange={e=>setProductionUserId(e.target.value)}/><select value={productionRole} onChange={e=>setProductionRole(e.target.value)}><option value="viewer">viewer</option><option value="editor">editor</option><option value="manager">manager</option></select><button disabled={!productionId} onClick={async()=>{try{await api(`/productions/${productionId}/members/${productionUserId}`,send('PUT',{role:productionRole}));setProductionUserId('');setProductionMembers(await api(`/productions/${productionId}/members`));}catch(e:any){setError(e.message);}}}>授权作品</button></div>}{productionId&&!canManageProduction&&<p className="muted">只有作品 manager 或团队 owner 可以调整作品成员。</p>}<div className="admin-list">{productionMembers.map(m=><div key={m.id}><b>{m.nickname}</b><code>{m.id}</code><em>{m.role}</em></div>)}</div></section>
+  </div>;
+}
+
 function Studio() {
-  const [logged, setLogged] = useState<boolean | null>(null);
+  const [session, setSession] = useState<Any | null | undefined>(undefined);
   useEffect(() => {
     api("/auth/status")
-      .then((s) => setLogged(s.authenticated))
-      .catch(() => setLogged(false));
+      .then((s) => setSession(s.authenticated ? s : null))
+      .catch(() => setSession(null));
   }, []);
-  if (logged === null)
+  if (session === undefined)
     return (
       <div className="loading">
         <LoaderCircle className="spin" />
         正在连接工作室
       </div>
     );
-  if (!logged) return <Auth onLogin={() => setLogged(true)} />;
+  if (!session) return <Auth onLogin={(value) => setSession(value)} />;
+  if (window.location.pathname === "/admin") return <AdminConsole session={session} onLogout={() => setSession(null)} />;
+  if (window.location.pathname === "/members") return <MembershipConsole session={session} onLogout={() => setSession(null)} />;
+  if (!session.workspaces?.length) return <WaitingForWorkspace session={session} onLogout={() => setSession(null)} />;
   const taskId = new URLSearchParams(window.location.search).get("task");
   if (taskId) return <TaskDetailPage jobId={taskId} request={api} />;
   return (
     <ReactFlowProvider>
-      <Workspace onLogout={() => setLogged(false)} />
+      <Workspace session={session} onLogout={() => setSession(null)} />
     </ReactFlowProvider>
   );
 }
 
-function Workspace({ onLogout }: { onLogout: () => void }) {
+function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }) {
   const initialWorkflowStage = parseWorkflowStage(window.location.search);
   const [productions, setProductions] = useState<ProductionSummary[]>([]),
     [projects, setProjects] = useState<EpisodeSummary[]>([]),
@@ -616,6 +682,10 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
     [config, setConfig] = useState<Any>({
       providers: [],
     });
+  const [activeWorkspaceId,setActiveWorkspaceId]=useState<string>(session.workspaces[0].id);
+  const canCreateProduction = session.workspaces.some(
+    (workspace: Any) => workspace.id === activeWorkspaceId && workspace.role === "owner",
+  );
   const [workflowStage, setWorkflowStage] = useState<WorkflowStage>(initialWorkflowStage);
   const [selected, setSelected] = useState<string | null>(null),
     [view, setView] = useState(defaultViewForStage(initialWorkflowStage)),
@@ -717,6 +787,10 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
   const update = useCallback((fn: (d: Doc) => Doc) => {
     const base = current.current.doc;
     if (!base) return;
+    if ((current.current.project as Any)?.permissions?.legacy_document_write === false) {
+      setError("当前角色不能修改整份作品文档；P3 仅作品 manager 或团队 owner 可使用旧编辑入口。");
+      return;
+    }
     const next = deriveManagedGraph(fn(base));
     current.current = { ...current.current, doc: next };
     setDoc(next);
@@ -824,8 +898,8 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
   async function boot() {
     try {
       const [productionList, list, sys, settings] = await Promise.all([
-        api("/productions"),
-        api("/projects"),
+        api(`/productions?workspace_id=${encodeURIComponent(activeWorkspaceId)}`),
+        api(`/projects?workspace_id=${encodeURIComponent(activeWorkspaceId)}`),
         api("/system"),
         api("/settings"),
       ]);
@@ -834,9 +908,7 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
       setSystem(sys);
       setConfig(settings);
       if (list.length) await openProject(list[0].id);
-      else {
-        setProjectSetupOpen(true);
-      }
+      else setProjectSetupOpen(false);
     } catch (e) {
       report(e);
     } finally {
@@ -1467,21 +1539,39 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
   }
   async function refreshProductionHierarchy() {
     const [productionList, episodeList] = await Promise.all([
-      api("/productions"),
-      api("/projects"),
+      api(`/productions?workspace_id=${encodeURIComponent(activeWorkspaceId)}`),
+      api(`/projects?workspace_id=${encodeURIComponent(activeWorkspaceId)}`),
     ]);
     setProductions(productionList);
     setProjects(episodeList);
     return { productions: productionList, projects: episodeList };
   }
+  async function switchWorkspace(workspaceId:string) {
+    if(workspaceId===activeWorkspaceId)return;
+    await prepareProjectSwitch();
+    const [productionList,episodeList]=await Promise.all([
+      api(`/productions?workspace_id=${encodeURIComponent(workspaceId)}`),
+      api(`/projects?workspace_id=${encodeURIComponent(workspaceId)}`),
+    ]);
+    setActiveWorkspaceId(workspaceId);setProductions(productionList);setProjects(episodeList);
+    if(episodeList.length) await openProject(episodeList[0].id);
+    else {
+      current.current={project:null,doc:null};setProject(null);setDoc(null);setAssets([]);setJobs([]);
+      setProjectSetupOpen(false);
+    }
+  }
   function openProjectSetup() {
+    if (!canCreateProduction) {
+      setError("只有团队 owner 可以创建作品。");
+      return;
+    }
     setProjectSetupKey((value) => value + 1);
     setProjectSetupOpen(true);
   }
   async function createProduction(draft: ProjectSetupDraft) {
     const preservedDraft = await prepareProjectSwitch();
     const productionName = draft.name.trim();
-    const episode = await api("/projects", send("POST", projectSetupPayload(draft)));
+    const episode = await api("/projects", send("POST", {...projectSetupPayload(draft),workspace_id:activeWorkspaceId}));
     await refreshProductionHierarchy();
     activateWorkflowStage("overview", "replace");
     await openProject(episode.id);
@@ -2267,12 +2357,16 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
         {!booted ? <><LoaderCircle className="spin" />{error || "正在打开工作室"}</> : <>
           <AnYingMark size={64}/>
           <span className="eyebrow">ANYING STUDIO</span>
-          <h1>创建第一部作品</h1>
-          <p>先确认视觉风格、画幅、目标时长、默认模型与 Project Bible，再进入 EP01。</p>
-          <button className="primary" onClick={openProjectSetup}><Plus size={17}/>创建第一部作品</button>
+          <select className="team-switcher" aria-label="切换团队" value={activeWorkspaceId} onChange={(e)=>void switchWorkspace(e.target.value).catch(report)}>
+            {session.workspaces.map((workspace:Any)=><option key={workspace.id} value={workspace.id}>{workspace.name} · {workspace.role}</option>)}
+          </select>
+          <h1>{canCreateProduction ? "创建第一部作品" : "尚未加入作品"}</h1>
+          <p>{canCreateProduction ? "先确认视觉风格、画幅、目标时长、默认模型与 Project Bible，再进入 EP01。" : "你已加入团队，但还没有获权作品。请联系团队 owner 将你加入作品。"}</p>
+          {canCreateProduction && <button className="primary" onClick={openProjectSetup}><Plus size={17}/>创建第一部作品</button>}
+          <div className="account-actions"><a href="/members">成员管理</a>{session.user?.platform_role==='platform_admin'&&<a href="/admin">平台管理</a>}<button className="quiet" onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出登录</button></div>
           {error && <div className="error">{error}</div>}
         </>}
-        {projectSetupOpen && <ProjectSetupDialog
+        {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
           key={projectSetupKey}
           providers={config.providers}
           localModels={system.models}
@@ -2540,7 +2634,7 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
   };
   return (
     <div className="studio-shell">
-      {projectSetupOpen && <ProjectSetupDialog
+      {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
         key={projectSetupKey}
         providers={config.providers}
         localModels={system.models}
@@ -2572,6 +2666,9 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
           <span>STUDIO</span>
         </button>
         <span className="divider" />
+        <select className="team-switcher" aria-label="切换团队" value={activeWorkspaceId} onChange={(e)=>void switchWorkspace(e.target.value).catch(report)}>
+          {session.workspaces.map((workspace:Any)=><option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+        </select>
         <button
           className={panel === "projectInfo" ? "project-menu active" : "project-menu"}
           onClick={() => { setProjectSettingsTab("production"); setPanel(panel === "projectInfo" ? null : "projectInfo"); }}
@@ -2607,21 +2704,24 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
           aria-label="保存项目"
           title="保存 Ctrl+S"
           onClick={() => save()}
+          disabled={(project as Any).permissions?.legacy_document_write===false}
         >
           <Save size={18} />
         </button>
         <button
           className="avatar"
-          onClick={() => setPanel("settings")}
-          title="工作室设置"
+          onClick={() => { window.location.href='/members'; }}
+          title="团队与账号"
         >
-          我
+          {session.user?.nickname?.slice(0,1)||'我'}
         </button>
       </header>
+      {(project as Any).permissions?.legacy_document_write===false&&<div className="permission-banner">当前为 {(project as Any).permissions?.role||'只读'} 视图。整份作品写入在 P3 仅开放给 manager / owner。</div>}
       <GlobalNav
         active={panel}
         taskCount={activeCount}
         onChange={activateGlobalPanel}
+        isAdmin={session.user?.platform_role==='platform_admin'}
       />
       <main className="work-area">
         <div className="viewbar">

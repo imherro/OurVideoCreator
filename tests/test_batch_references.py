@@ -10,14 +10,13 @@ from backend import store as s
 from backend.providers import common, volcengine_ark as ark
 from backend.worker import Worker
 from test_api import project
+from tests.auth_helpers import login_admin
 
 
 @pytest.fixture
 def batch_authenticated():
     with TestClient(app) as client:
-        status=client.get('/api/auth/status').json()
-        endpoint='/api/auth/login' if status['configured'] else '/api/auth/setup'
-        assert client.post(endpoint,json={'password':'integration-test-only'}).status_code==200
+        login_admin(client)
         yield client
 
 

@@ -36,9 +36,11 @@ def wait_json(url, opener=None, timeout=15):
     raise AssertionError(f'timed out waiting for {url}: {last}')
 
 
-def json_request(opener, url, method='GET', body=None):
+def json_request(opener, url, method='GET', body=None, csrf_token=None):
     payload = None if body is None else json.dumps(body).encode()
-    request = Request(url, data=payload, method=method, headers={'Content-Type':'application/json'})
+    headers={'Content-Type':'application/json'}
+    if csrf_token:headers['X-CSRF-Token']=csrf_token
+    request = Request(url, data=payload, method=method, headers=headers)
     with opener.open(request, timeout=5) as response:
         return json.loads(response.read())
 
@@ -77,12 +79,13 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
     job_id = None
     phase = 'initializing'
     last_request = None
+    csrf_token = None
 
     def request_json(opener, url, method='GET', body=None):
         nonlocal last_request
         request_started = time.monotonic()
         try:
-            return json_request(opener, url, method, body)
+            return json_request(opener, url, method, body, csrf_token)
         finally:
             last_request = {
                 'url': url,
@@ -138,6 +141,8 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         return process
 
     try:
+        from tests.auth_helpers import ADMIN_PASSWORD, ADMIN_PHONE, ensure_test_admin
+        ensure_test_admin()
         phase = 'starting fake provider'
         fake = spawn('fake-provider', [
             sys.executable, str(ROOT/'tests'/'fake_provider_server.py'),
@@ -158,14 +163,15 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         assert web_one.poll() is None and web_two.poll() is None
         assert not (data/'worker.lock').exists(), 'Web must not acquire the Worker lock'
 
-        opener = build_opener(HTTPCookieProcessor(CookieJar()))
+        cookie_jar = CookieJar()
+        opener = build_opener(HTTPCookieProcessor(cookie_jar))
         base_one = f'http://127.0.0.1:{web_one_port}'
         base_two = f'http://127.0.0.1:{web_two_port}'
         phase = 'authenticating and enqueueing'
-        auth_status=request_json(opener, base_one+'/api/auth/status')
-        auth_path='/api/auth/login' if auth_status['configured'] else '/api/auth/setup'
-        auth_password='integration-test-only' if auth_status['configured'] else 'p1-process-test'
-        assert request_json(opener, base_one+auth_path, 'POST', {'password':auth_password})['ok']
+        assert request_json(opener, base_one+'/api/auth/login', 'POST', {
+            'phone':ADMIN_PHONE,'password':ADMIN_PASSWORD,
+        })['ok']
+        csrf_token=next(cookie.value for cookie in cookie_jar if cookie.name=='ovc_csrf')
         provider = {'id':'p1-fake','name':'P1 Fake','type':'openai','kind':'text','url':f'http://127.0.0.1:{fake_port}/v1','local':True,'model':'p1-fake-model'}
         request_json(opener, base_one+'/api/settings', 'PUT', {'providers':[provider]})
         project = request_json(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
