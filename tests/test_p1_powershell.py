@@ -178,6 +178,65 @@ def test_powershell_scripts_own_only_their_instance(tmp_path):
                 )
 
 
+@pytest.mark.skipif(
+    os.name != 'nt' or shutil.which('pwsh') is None,
+    reason='PowerShell 7 lifecycle is Windows-only and requires pwsh',
+)
+def test_pwsh_stop_keeps_json_datetime_precision(tmp_path):
+    """PowerShell 7 converts ISO JSON dates to DateTime; ownership must stay exact."""
+    if not (ROOT/'dist'/'index.html').exists():
+        pytest.skip('front-end dist is required by the real Start-Studio script')
+    data_dir = tmp_path/'pwsh-instance'
+    data_dir.mkdir()
+    port = free_port()
+    env = {
+        **os.environ,
+        'MVC_DATA_DIR': str(data_dir),
+        'PYTHONUTF8': '1',
+        'NO_PROXY': '127.0.0.1,localhost',
+    }
+    pwsh = shutil.which('pwsh')
+    base = [pwsh, '-NoLogo', '-NoProfile', '-File']
+    pid = None
+    transcript = {}
+
+    def run_pwsh(name, script, *arguments):
+        stdout_path = tmp_path/f'{name}.stdout.log'
+        stderr_path = tmp_path/f'{name}.stderr.log'
+        with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
+            result = subprocess.run(
+                [*base, str(ROOT/script), *map(str, arguments)],
+                cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+                creationflags=CREATE_FLAGS, timeout=30,
+            )
+        return result, {
+            'returncode': result.returncode,
+            'stdout': decode_output(stdout_path.read_bytes()),
+            'stderr': decode_output(stderr_path.read_bytes()),
+        }
+
+    try:
+        start, transcript['start'] = run_pwsh(
+            'start', 'Start-Studio.ps1', '-Port', port, '-NoBrowser', '-WebOnly',
+        )
+        assert start.returncode == 0, json.dumps(transcript, ensure_ascii=False)
+        record = read_record(data_dir, 'web')
+        pid = record['pid']
+        assert '.' in record['creation_utc'], record['creation_utc']
+
+        stop, transcript['stop'] = run_pwsh('stop', 'Stop-Studio.ps1', '-WebOnly')
+        assert stop.returncode == 0, json.dumps(transcript, ensure_ascii=False)
+        assert wait_stopped(pid)
+        assert not (data_dir/'web.process.json').exists()
+        print(json.dumps({'pid': pid, 'transcript': transcript}, ensure_ascii=False))
+    finally:
+        if pid and process_alive(pid):
+            subprocess.run(
+                ['taskkill.exe', '/PID', str(pid), '/T', '/F'],
+                capture_output=True, creationflags=CREATE_FLAGS,
+            )
+
+
 def copy_script_project(destination):
     destination.mkdir()
     shutil.copytree(

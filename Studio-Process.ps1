@@ -123,8 +123,21 @@ function Resolve-StudioProcessRecord($Identity,[string]$Role,[string]$ExpectedMa
     if($null -eq $processInfo){
         return [pscustomobject]@{State='stale';Reason='recorded process is no longer running';Path=$path;Process=$null;Record=$record}
     }
-    $actualCreation=Get-StudioCreationUtc $processInfo
-    if(-not [string]::Equals($actualCreation,[string]$record.creation_utc,[StringComparison]::OrdinalIgnoreCase)){
+    try{
+        $recordCreation=if($record.creation_utc -is [DateTime]){
+            ([DateTime]$record.creation_utc).ToUniversalTime()
+        }else{
+            [DateTime]::Parse(
+                [string]$record.creation_utc,
+                [Globalization.CultureInfo]::InvariantCulture,
+                [Globalization.DateTimeStyles]::RoundtripKind
+            ).ToUniversalTime()
+        }
+    }catch{
+        return [pscustomobject]@{State='invalid';Reason='creation time is invalid';Path=$path;Process=$processInfo;Record=$record}
+    }
+    $actualCreation=([DateTime]$processInfo.CreationDate).ToUniversalTime()
+    if($actualCreation.Ticks -ne $recordCreation.Ticks){
         return [pscustomobject]@{State='invalid';Reason='PID creation time does not match the recorded lifecycle';Path=$path;Process=$processInfo;Record=$record}
     }
     if(-not [string]::Equals([string]$processInfo.ExecutablePath,[string]$record.executable_path,[StringComparison]::OrdinalIgnoreCase)){
