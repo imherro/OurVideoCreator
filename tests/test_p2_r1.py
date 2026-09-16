@@ -414,7 +414,10 @@ def test_p2_r1_sse_event_ids_follow_commit_order_and_rollback_gaps_reconnect_saf
         from backend.app import _event_cursor
         last_seen = rows[1]['id']
         latest = rows[-1]['id']
-        assert _event_cursor(latest,last_event_id=str(last_seen)) == last_seen
+        assert _event_cursor(
+            latest,last_event_id=str(last_seen),oldest_retained=rows[0]['id'],
+            requested_retained=True,visible_backlog=1,
+        ) == last_seen
         assert [json.loads(row['payload'])['revision'] for row in rows if row['id'] > last_seen] == [4]
 
         s.event('cursor-project',{'type':'project','revision':5})

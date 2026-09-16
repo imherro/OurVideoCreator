@@ -1829,8 +1829,10 @@ def resume(jid:str):
         s.event(job['project_id'],{'type':'job','id':jid},connection=c)
     return read_job(jid)
 
-def _event_cursor(latest, after=None, last_event_id=None, backlog_limit=500):
-    """Start live clients near the head instead of replaying an unbounded log."""
+EVENT_BACKLOG_LIMIT=500
+
+
+def _requested_event_id(after=None, last_event_id=None):
     candidates = []
     for value in (after, last_event_id):
         try:
@@ -1838,16 +1840,51 @@ def _event_cursor(latest, after=None, last_event_id=None, backlog_limit=500):
                 candidates.append(max(0, int(value)))
         except (TypeError, ValueError):
             pass
-    requested = max(candidates, default=latest)
-    return latest if latest - requested > backlog_limit else min(requested, latest)
+    return max(candidates) if candidates else None
+
+
+def _event_cursor(
+    latest, after=None, last_event_id=None, backlog_limit=EVENT_BACKLOG_LIMIT, *,
+    oldest_retained=None, requested_retained=False, visible_backlog=None,
+):
+    """Choose an SSE cursor from retained rows, never from identity arithmetic."""
+    requested = _requested_event_id(after, last_event_id)
+    if requested is None or requested >= latest:
+        return latest
+    if visible_backlog is None:
+        raise ValueError('visible_backlog is required for a reconnect cursor')
+    # A missing cursor below the oldest retained row is genuinely outside the
+    # retention window. A missing id within the window may only be a sequence
+    # gap, so its actual visible backlog still decides the replay policy.
+    if oldest_retained is not None and requested < oldest_retained and not requested_retained:
+        return latest
+    return latest if visible_backlog > backlog_limit else requested
 
 
 @app.get('/api/events')
 async def events(request:Request,after:int|None=None):
     async def stream():
+        requested = _requested_event_id(after, request.headers.get('last-event-id'))
         with s.db() as c:
-            latest = c.execute('SELECT COALESCE(MAX(id),0) latest FROM events').fetchone()['latest']
-        cursor = _event_cursor(latest, after, request.headers.get('last-event-id'))
+            if requested is None:
+                latest = c.execute('SELECT COALESCE(MAX(id),0) latest FROM events').fetchone()['latest']
+                cursor = latest
+            else:
+                snapshot = c.execute('''SELECT
+                    COALESCE((SELECT MAX(id) FROM events),0) latest,
+                    (SELECT MIN(id) FROM events) oldest_retained,
+                    EXISTS(SELECT 1 FROM events WHERE id=%s) requested_retained,
+                    (SELECT COUNT(*) FROM (
+                        SELECT id FROM events WHERE id>%s ORDER BY id LIMIT %s
+                    ) visible) visible_backlog''',(
+                    requested,requested,EVENT_BACKLOG_LIMIT+1,
+                )).fetchone()
+                cursor = _event_cursor(
+                    snapshot['latest'],after,request.headers.get('last-event-id'),
+                    oldest_retained=snapshot['oldest_retained'],
+                    requested_retained=snapshot['requested_retained'],
+                    visible_backlog=snapshot['visible_backlog'],
+                )
         while not await request.is_disconnected():
             with s.db() as c:
                 rows=c.execute('SELECT * FROM events WHERE id>%s ORDER BY id LIMIT 100',(cursor,)).fetchall()
