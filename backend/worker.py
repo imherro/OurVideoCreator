@@ -471,7 +471,7 @@ class Worker:
     def video_api(self,job,p):
         """Configurable async JSON video gateway. Explicit routes avoid false universal compatibility."""
         inp=job['input']; url=p['url'].rstrip('/')
-        if inp.get('end_asset_id'):raise ValueError('当前视频网关未配置尾帧协议，请清除尾帧或使用内置引擎')
+        if inp.get('end_asset_id'):raise ValueError('当前视频网关未配置尾帧协议，请清除尾帧或选择支持尾帧的外部 Provider')
         headers={'Authorization':'Bearer '+p['api_key']} if p.get('api_key') else {}
         body={**p.get('request_defaults',{}),**inp.get('parameters',{}),'model':inp.get('model') or p.get('model'),'prompt':inp['prompt']}
         if assets_for(job): raise ValueError('此视频网关尚未配置媒体上传协议，请使用文生视频或本地参考图适配器')

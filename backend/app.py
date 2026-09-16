@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from . import store as s
+from .instance_identity import describe as describe_instance
 from .prompts import TEMPLATES
 from .generation_policy import default_ark_policy, validate_generation_policy
 from .project_schema import empty_film_bible, migrate_document, new_document
@@ -61,7 +62,10 @@ async def value_error(request, exc):
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','app':'安影','version':'0.1.0'}
+    return {
+        'status':'ok','app':'安影','version':'0.1.0','role':'web',
+        'instance_id':describe_instance()['instance_id'],
+    }
 
 @app.get('/api/auth/status')
 def auth_status(request: Request):

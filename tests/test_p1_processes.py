@@ -53,30 +53,57 @@ def stop(process):
             process.wait(timeout=5)
 
 
+def wait_until(predicate, message, timeout=15):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        value = predicate()
+        if value:
+            return value
+        time.sleep(0.05)
+    raise AssertionError(message)
+
+
 def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
     data = tmp_path / 'p1-data'
     data.mkdir()
     env = {**os.environ, 'MVC_DATA_DIR':str(data), 'PYTHONUTF8':'1', 'NO_PROXY':'127.0.0.1,localhost'}
     fake_port, web_one_port, web_two_port = free_port(), free_port(), free_port()
     count_file = tmp_path / 'fake-count.txt'
+    received_file = tmp_path / 'fake-received.json'
+    release_file = tmp_path / 'fake-release'
     processes = []
-    try:
-        fake = subprocess.Popen(
-            [sys.executable, str(ROOT/'tests'/'fake_provider_server.py'), '--port', str(fake_port), '--count-file', str(count_file), '--delay', '1.2'],
-            cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_FLAGS,
-        )
-        processes.append(fake)
+    log_paths = {}
 
-        def web(port):
-            process = subprocess.Popen(
-                [sys.executable, '-m', 'uvicorn', 'backend.app:app', '--host', '127.0.0.1', '--port', str(port)],
-                cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_FLAGS,
-            )
-            processes.append(process)
+    def spawn(name, command):
+        stdout_path, stderr_path = tmp_path/f'{name}.stdout.log', tmp_path/f'{name}.stderr.log'
+        stdout = stdout_path.open('w', encoding='utf-8')
+        stderr = stderr_path.open('w', encoding='utf-8')
+        process = subprocess.Popen(
+            command, cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+            creationflags=CREATE_FLAGS,
+        )
+        stdout.close()
+        stderr.close()
+        processes.append(process)
+        log_paths[name] = (stdout_path, stderr_path)
+        return process
+
+    try:
+        fake = spawn('fake-provider', [
+            sys.executable, str(ROOT/'tests'/'fake_provider_server.py'),
+            '--port', str(fake_port), '--count-file', str(count_file),
+            '--received-file', str(received_file), '--release-file', str(release_file),
+        ])
+
+        def web(port, name):
+            process = spawn(name, [
+                sys.executable, '-m', 'uvicorn', 'backend.app:app',
+                '--host', '127.0.0.1', '--port', str(port),
+            ])
             wait_json(f'http://127.0.0.1:{port}/api/health')
             return process
 
-        web_one, web_two = web(web_one_port), web(web_two_port)
+        web_one, web_two = web(web_one_port, 'web-one'), web(web_two_port, 'web-two')
         assert web_one.poll() is None and web_two.poll() is None
         assert not (data/'worker.lock').exists(), 'Web must not acquire the Worker lock'
 
@@ -93,20 +120,33 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         })
         assert job['status'] == 'queued'
 
-        worker = subprocess.Popen(
-            [sys.executable, '-m', 'backend.worker_cli', '--concurrency', '1'],
-            cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_FLAGS,
+        worker = spawn('worker', [sys.executable, '-m', 'backend.worker_cli', '--concurrency', '1'])
+        wait_until(lambda: received_file.exists(), 'Worker never reached the fake Provider')
+
+        def running_job():
+            value = json_request(opener, base_two+f'/api/jobs/{job["id"]}')
+            return value if value['status'] == 'running' else None
+
+        running_before = wait_until(
+            running_job,
+            'Job never entered running state',
         )
-        processes.append(worker)
-        deadline = time.time()+10
-        while time.time()<deadline and not (data/'worker.lock').exists():
-            time.sleep(.05)
-        assert worker.poll() is None and (data/'worker.lock').exists()
+        assert running_before['started'] is not None
+        assert count_file.read_text(encoding='utf-8') == '1'
+        worker_pid = worker.pid
 
         stop(web_one)
         assert worker.poll() is None, 'stopping Web must not stop Worker'
-        restarted_web = web(web_one_port)
+        restarted_web = web(web_one_port, 'web-one-restarted')
         assert restarted_web.pid != web_one.pid
+
+        running_after = json_request(opener, base_one+f'/api/jobs/{job["id"]}')
+        assert running_after['status'] == 'running'
+        assert running_after['started'] == running_before['started']
+        assert worker.poll() is None and worker.pid == worker_pid
+        assert count_file.read_text(encoding='utf-8') == '1'
+
+        release_file.write_text('release', encoding='utf-8')
 
         deadline = time.time()+15
         current = None
@@ -116,6 +156,7 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
                 break
             time.sleep(.1)
         assert current['status'] == 'succeeded'
+        assert current['started'] == running_before['started']
         assert current['result']['text'] == 'P1 fake response'
         assert count_file.read_text(encoding='utf-8') == '1'
 
@@ -125,10 +166,21 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
         )
         assert contender.returncode == 2
         assert 'refused to start' in contender.stderr and '已有任务进程' in contender.stderr
+        log_snapshot = {
+            name: {
+                'stdout': stdout.read_text(encoding='utf-8', errors='replace'),
+                'stderr': stderr.read_text(encoding='utf-8', errors='replace'),
+            }
+            for name, (stdout, stderr) in log_paths.items()
+        }
         print(json.dumps({
             'web_pids':[web_one.pid,web_two.pid,restarted_web.pid],
-            'worker_pid':worker.pid,'job_id':job['id'],'job_status':current['status'],
+            'worker_pid':worker_pid,'job_id':job['id'],
+            'running_before_web_restart':running_before,
+            'running_after_web_restart':running_after,
+            'final_job':current,
             'fake_request_count':1,'second_worker_exit':contender.returncode,
+            'child_logs':log_snapshot,
         }, ensure_ascii=False))
     finally:
         for process in reversed(processes):

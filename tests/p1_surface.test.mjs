@@ -21,3 +21,9 @@ test('default UI exposes external providers without legacy local-model controls'
  assert.doesNotMatch(ui,/model_directories|llama_context|额外模型目录|卸载空闲文本模型/);
  assert.doesNotMatch(ui,/\/runtime\/unload|\/runtime\/maestro\/start/);
 });
+
+test('video gateway errors describe external Provider behavior',()=>{
+ const worker=read('backend/worker.py');
+ assert.doesNotMatch(worker,/使用内置引擎/);
+ assert.match(worker,/外部 Provider/);
+});

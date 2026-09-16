@@ -11,56 +11,108 @@ if($WebOnly -and $WorkerOnly){throw 'WebOnly and WorkerOnly cannot be used toget
 $studioRoot=$PSScriptRoot
 $studioPython=Join-Path $studioRoot '.venv\Scripts\python.exe'
 if(-not (Test-Path -LiteralPath $studioPython)){ $studioPython=(Get-Command python).Source }
-$studioLogs=Join-Path $studioRoot 'data\logs'
+$env:PYTHONUTF8='1'
+. (Join-Path $studioRoot 'Studio-Process.ps1')
+$studioIdentity=Get-StudioIdentity $studioPython $studioRoot
+$studioData=[string]$studioIdentity.data_dir
+$studioLogs=Join-Path $studioData 'logs'
 New-Item -ItemType Directory -Path $studioLogs -Force | Out-Null
 $studioUrl="http://127.0.0.1:$Port"
-$env:PYTHONUTF8='1'
 if(-not $WorkerOnly -and -not (Test-Path -LiteralPath (Join-Path $studioRoot 'dist\index.html'))){
     throw 'Run Install-Studio.ps1 first to build the web interface.'
 }
 
-if(-not $WebOnly){
-    $workerPidPath=Join-Path $studioRoot 'data\worker.pid'
-    $workerRunning=$false
-    if(Test-Path -LiteralPath $workerPidPath){
-        $savedWorkerPid=[int](Get-Content -LiteralPath $workerPidPath -Raw)
-        $savedWorker=Get-CimInstance Win32_Process -Filter "ProcessId = $savedWorkerPid" -ErrorAction SilentlyContinue
-        $workerRunning=$null -ne $savedWorker -and $savedWorker.CommandLine -match 'backend\.worker_cli'
-    }
-    if($workerRunning){
-        Write-Host "Worker is already running: PID $savedWorkerPid"
+$webCreated=$false
+$webReady=$false
+if(-not $WorkerOnly){
+    $existingHealth=$null
+    try{$existingHealth=Invoke-RestMethod "$studioUrl/api/health" -TimeoutSec 2}catch{}
+    if($null -ne $existingHealth){
+        if($existingHealth.instance_id -ne $studioIdentity.instance_id){
+            throw "Port $Port is occupied by a different studio instance. Stop that instance or choose another port."
+        }
+        $webResolution=Resolve-StudioProcessRecord $studioIdentity 'web' 'backend.app:app'
+        if($webResolution.State -ne 'owned'){
+            Remove-StudioRecordIfNotOwned $webResolution
+            throw 'A matching Web responded, but its local process lifecycle cannot be proven. It was not reused or stopped.'
+        }
+        Write-Host "Web is already running: $studioUrl (PID $($webResolution.Record.pid))"
+        $webReady=$true
     }else{
-        $workerProcess=Start-Process -FilePath $studioPython -ArgumentList '-m','backend.worker_cli','--concurrency',"$WorkerConcurrency" -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $studioLogs 'worker.stdout.log') -RedirectStandardError (Join-Path $studioLogs 'worker.stderr.log') -PassThru
-        $workerProcess.Id | Set-Content -LiteralPath $workerPidPath
-        Start-Sleep -Milliseconds 500
-        if($workerProcess.HasExited){throw 'Worker exited. Check data/logs/worker.stderr.log.'}
-        Write-Host "Worker: PID $($workerProcess.Id)"
+        $webResolution=Resolve-StudioProcessRecord $studioIdentity 'web' 'backend.app:app'
+        if($webResolution.State -eq 'owned'){
+            throw "Recorded Web PID $($webResolution.Record.pid) is running but its health endpoint is unavailable. It was not replaced."
+        }
+        Remove-StudioRecordIfNotOwned $webResolution
+        $serverOut=Join-Path $studioLogs 'server.stdout.log'
+        $serverErr=Join-Path $studioLogs 'server.stderr.log'
+        Remove-Item -LiteralPath $serverOut,$serverErr -Force -ErrorAction SilentlyContinue
+        $studioProcess=Start-Process -FilePath $studioPython -ArgumentList '-m','uvicorn','backend.app:app','--host',$BindAddress,'--port',"$Port" -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru
+        try{
+            Write-StudioProcessRecord $studioIdentity 'web' $studioProcess.Id 'backend.app:app' | Out-Null
+            $webCreated=$true
+            for($studioAttempt=0;$studioAttempt -lt 30;$studioAttempt++){
+                Start-Sleep -Milliseconds 250
+                if($studioProcess.HasExited){throw 'Web exited. Check the isolated data logs/server.stderr.log.'}
+                try{$studioHealth=Invoke-RestMethod "$studioUrl/api/health" -TimeoutSec 2}catch{$studioHealth=$null}
+                if($null -ne $studioHealth){
+                    if($studioHealth.instance_id -ne $studioIdentity.instance_id){
+                        throw "Port $Port answered for a different studio instance."
+                    }
+                    if($studioHealth.status -eq 'ok'){$webReady=$true;break}
+                }
+            }
+            if(-not $webReady){throw 'Web did not become ready. Check the isolated data logs.'}
+            Write-Host "Web: $studioUrl (PID $($studioProcess.Id), instance $($studioIdentity.instance_id))"
+        }catch{
+            if($webCreated){Stop-OwnedStudioProcess $studioIdentity 'web' 'backend.app:app' | Out-Null}
+            elseif($null -ne $studioProcess -and -not $studioProcess.HasExited){Stop-Process -Id $studioProcess.Id}
+            throw
+        }
     }
 }
 
-if(-not $WorkerOnly){
-    try {
-        $studioHealth=Invoke-RestMethod "$studioUrl/api/health" -TimeoutSec 2
-        if($studioHealth.app -eq '安影'){
-            if(-not $NoBrowser){Start-Process $studioUrl}
-            Write-Host "Web is already running: $studioUrl"
-            exit 0
-        }
-    }catch{}
-    $studioProcess=Start-Process -FilePath $studioPython -ArgumentList '-m','uvicorn','backend.app:app','--host',$BindAddress,'--port',"$Port" -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $studioLogs 'server.stdout.log') -RedirectStandardError (Join-Path $studioLogs 'server.stderr.log') -PassThru
-    $studioProcess.Id | Set-Content -LiteralPath (Join-Path $studioRoot 'data\server.pid')
-    for($studioAttempt=0;$studioAttempt -lt 30;$studioAttempt++){
-        Start-Sleep -Seconds 1
-        if($studioProcess.HasExited){throw 'Web exited. Check data/logs/server.stderr.log.'}
-        try{
-            $studioHealth=Invoke-RestMethod "$studioUrl/api/health" -TimeoutSec 2
-            if($studioHealth.status -eq 'ok'){
-                if(-not $NoBrowser){Start-Process $studioUrl}
-                Write-Host "Web: $studioUrl (PID $($studioProcess.Id))"
-                Write-Host 'Web and Worker are independent processes. Other computers use this host LAN IP and port.'
-                exit 0
+try{
+    if(-not $WebOnly){
+        $workerResolution=Resolve-StudioProcessRecord $studioIdentity 'worker' 'backend.worker_cli'
+        if($workerResolution.State -eq 'owned'){
+            Write-Host "Worker is already running: PID $($workerResolution.Record.pid)"
+        }else{
+            Remove-StudioRecordIfNotOwned $workerResolution
+            $workerOut=Join-Path $studioLogs 'worker.stdout.log'
+            $workerErr=Join-Path $studioLogs 'worker.stderr.log'
+            Remove-Item -LiteralPath $workerOut,$workerErr -Force -ErrorAction SilentlyContinue
+            $workerProcess=Start-Process -FilePath $studioPython -ArgumentList '-m','backend.worker_cli','--concurrency',"$WorkerConcurrency" -WorkingDirectory $studioRoot -WindowStyle Hidden -RedirectStandardOutput $workerOut -RedirectStandardError $workerErr -PassThru
+            $workerRecorded=$false
+            try{
+                Write-StudioProcessRecord $studioIdentity 'worker' $workerProcess.Id 'backend.worker_cli' | Out-Null
+                $workerRecorded=$true
+                $workerReady=$false
+                for($workerAttempt=0;$workerAttempt -lt 50;$workerAttempt++){
+                    Start-Sleep -Milliseconds 100
+                    if($workerProcess.HasExited){
+                        $details=if(Test-Path -LiteralPath $workerErr){Get-Content -LiteralPath $workerErr -Raw}else{''}
+                        throw "Worker exited: $details"
+                    }
+                    if((Test-Path -LiteralPath $workerOut) -and (Get-Content -LiteralPath $workerOut -Raw) -match 'Worker started:'){
+                        $workerReady=$true;break
+                    }
+                }
+                if(-not $workerReady){throw 'Worker did not report ready within five seconds.'}
+                Write-Host "Worker: PID $($workerProcess.Id), instance $($studioIdentity.instance_id)"
+            }catch{
+                if($workerRecorded){Stop-OwnedStudioProcess $studioIdentity 'worker' 'backend.worker_cli' | Out-Null}
+                elseif(-not $workerProcess.HasExited){Stop-Process -Id $workerProcess.Id}
+                throw
             }
-        }catch{}
+        }
     }
-    throw 'Web did not become ready. Check data/logs.'
+}catch{
+    if($webCreated){Stop-OwnedStudioProcess $studioIdentity 'web' 'backend.app:app' | Out-Null}
+    throw
+}
+
+if(-not $WorkerOnly){
+    if(-not $NoBrowser){Start-Process $studioUrl}
+    Write-Host 'Web and Worker have separate lifecycle records. Other computers use this host LAN IP and port.'
 }

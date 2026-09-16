@@ -26,7 +26,20 @@ class Handler(BaseHTTPRequestHandler):
         count_path: Path = self.server.count_path
         count = int(count_path.read_text(encoding='utf-8') or '0') if count_path.exists() else 0
         count_path.write_text(str(count + 1), encoding='utf-8')
-        time.sleep(self.server.delay)
+        if self.server.received_path:
+            self.server.received_path.write_text(json.dumps({
+                'request_count': count + 1,
+                'received_at': time.time(),
+            }), encoding='utf-8')
+        if self.server.release_path:
+            deadline = time.time() + self.server.release_timeout
+            while not self.server.release_path.exists() and time.time() < deadline:
+                time.sleep(0.05)
+            if not self.server.release_path.exists():
+                self.send_error(504, 'test release barrier timed out')
+                return
+        elif self.server.delay:
+            time.sleep(self.server.delay)
         content = (
             'data: '+json.dumps({'choices':[{'delta':{'content':'P1 fake response'}}]})+
             '\n\ndata: [DONE]\n\n'
@@ -43,10 +56,16 @@ def main():
     parser.add_argument('--port', type=int, required=True)
     parser.add_argument('--count-file', type=Path, required=True)
     parser.add_argument('--delay', type=float, default=1.0)
+    parser.add_argument('--received-file', type=Path)
+    parser.add_argument('--release-file', type=Path)
+    parser.add_argument('--release-timeout', type=float, default=30.0)
     args = parser.parse_args()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     server.count_path = args.count_file
     server.delay = args.delay
+    server.received_path = args.received_file
+    server.release_path = args.release_file
+    server.release_timeout = args.release_timeout
     server.serve_forever()
 
 

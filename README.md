@@ -11,7 +11,7 @@ Windows，Python 3.11+ 与 Node.js 20+：
 .\Start-Studio.cmd
 ```
 
-`Start-Studio` 会启动两个独立进程：Web 和单实例 Worker。也可以分别执行：
+`Start-Studio` 会启动两个独立进程：Web 和单实例 Worker。每个进程在实际数据目录写入带实例 ID、PID、创建时间、可执行文件和完整命令行的生命周期记录；实例 ID 同时绑定当前工程根目录与实际数据目录。脚本只会复用或停止能够完整证明属于当前实例的进程，端口上若是另一个数据目录的同名工作室会明确拒绝启动。也可以分别执行：
 
 ```powershell
 .\Start-Studio.ps1 -WebOnly
@@ -19,7 +19,7 @@ Windows，Python 3.11+ 与 Node.js 20+：
 .\Stop-Studio.ps1
 ```
 
-开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。第二个 Worker 会因 `data/worker.lock` 明确拒绝启动；多 Worker 要等 P6。
+开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因实际数据目录中的 `worker.lock` 明确拒绝启动；多 Worker 要等 P6。
 
 首次部署后，可从能够访问工作室地址的浏览器设置工作室密码。P3 完成前只能在受控开发网络使用，不得公网部署。
 

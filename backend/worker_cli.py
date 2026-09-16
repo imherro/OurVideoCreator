@@ -7,6 +7,7 @@ import sys
 import threading
 
 from . import store
+from .instance_identity import describe as describe_instance
 from .worker import Worker
 
 
@@ -35,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f'Worker refused to start: {exc}', file=sys.stderr, flush=True)
         return 2
     print(
-        f'Worker started: data={store.DATA} concurrency={worker.concurrency} mode=single-process',
+        f'Worker started: instance={describe_instance()["instance_id"]} data={store.DATA} '
+        f'concurrency={worker.concurrency} mode=single-process',
         flush=True,
     )
     try:
