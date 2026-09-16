@@ -9,7 +9,7 @@
 | 镜头稳定 uid 与视觉版本绑定 | `project_schema.py`、`reference_compiler.py`、`filmBible/versioning.py` | 保留 | P5 镜头对象；REG-02/03 |
 | Generation Fingerprint/过期判断 | `generation_fingerprint.py`、`generation_staleness.py` 及对应测试 | 保留 | P5 对象版本，P6 任务回写；COLLAB-09 |
 | 首帧、尾帧、多参考素材 | `reference_compiler.py`、`visual_references.py`、`test_end_frame.py`、`test_batch_references.py` | 保留 | P4 能力目录；REG-03 |
-| 角色固定音色、对白音频 | `video_dialogue.py`、`volcengine_speech.py`、`src/filmBible/voices.ts` | 保留 | P4 平台模型；P5 对象；REG-04 |
+| 角色固定音色、对白音频 | `video_dialogue.py`、`volcengine_speech.py`、`src/filmBible/voices.ts` | 保留；音色归 Visual card 子内容 | P4 平台模型；P5 card revision；REG-04 |
 | 素材库分类、Production 共享 | `assets` 表、`app.py:512-665`、`ProductionAssetCenter.tsx` | 保留并加租户/作品归属 | P2/P3/P7；MEDIA-* |
 | 幻场素材组/素材登记 | `providers/hc_atom.py`、`provider_asset_groups`、`provider_asset_mappings`、`test_hc_atom.py` | 必须保留 | P2 关系化；P4 凭证作用域；P6 并发去重；JOB-12 |
 | 方舟 Seedream/Seedance | `providers/volcengine_ark.py`、`test_volcengine_ark.py` | 保留 | P4/P6；REG-03 |
@@ -21,11 +21,12 @@
 | 内置 Maestro/WanGP 启动 | `runtime.py::start_maestro`、`inference/`、runtime API | 移除本仓库运行依赖 | P1；未来作为受控外部 API |
 | GPU/CUDA/权重发现和模型安装 | `runtime.py`、`inference/`、`scripts/import_local_engine.py` | 移除 | P1；CLOUD-01/04 |
 | FFmpeg/ffprobe/缩略图 | `media.py`、`editor_renderer.py`、`worker.py::export*` | 保留 | P1 不误删；P7 加固；CLOUD-05、MEDIA-06 |
-| Twick 多轨剪辑/字幕/初剪 | `src/editor/`、`initialTimeline.ts`、`test_export.py` | 保留并改为 timeline 对象 | P5 租约；P7 E2E；REG-05 |
+| 旧 `timeline: Clip[]` 与 Twick 多轨剪辑/字幕/初剪 | `src/timeline.ts`、`src/editor/`、`initialTimeline.ts`、`test_export.py` | 保留；旧简剪一次性导入同一 `editor_timelines` 主源，禁止双写 | P5 revision+租约；P7 E2E；REG-05 |
 | 画布/节点/连线 | `src/main.tsx`、`graph.ts`、`shotNodes.ts` | 保留并拆主源 | P5 graph revision；COLLAB-11 |
 | 宫格图板 | `contact_sheet.py`、`StoryboardGrid.tsx` | 保留 | P3 文件授权；REG-06 |
 | 全景浏览/视角保存 | `panorama.ts`、`PanoramaViewer.tsx` | 保留 | P5 对象映射；REG-06 |
-| 3D 导演台 | `directorScene.ts`、`DirectorStage.tsx` | 保留 | P5 对象映射；REG-06 |
+| 3D 导演台 | `document.director`、`directorScene.ts`、`DirectorStage.tsx` | 保留为 Episode director-stage 对象；capture 同时受素材/节点权限约束 | P5 revision；COLLAB-12、REG-06 |
+| 提示词库与模板历史 | `app.py::save_prompt_template`、`settings.prompt_library` | 保留为平台级 PA 管理目录，普通用户只读启用模板 | P4 关系化+revision；MODEL-07 |
 | 当前共享密码/setup | `app.py:73-123` | 移除 | P3 CLI 初始管理员和个人会话；AUTH-01 |
 | 当前全局 Provider settings | `settings` 表、`app.py:673-727`、`SettingsPanel` | 移除普通入口，迁为后台 | P4；MODEL/SECRET |
 | 当前 SQLite 与启动迁移 | `store.py` | 完整替换，不保留运行兼容 | P2；DB-* |

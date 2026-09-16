@@ -1,0 +1,110 @@
+{
+  "evidence_kind": "P0-R1 supplemental rerun; not the original P0 stdout",
+  "business_code_sha": "ade703cf20b66cfccc4520730747c0abf07c2158",
+  "capture_start_head": "3c0e5ca1269d25b2d8db2323b057ac4d05ea00e2",
+  "git_status_before": "## master...origin/master\n M docs/multiuser-rollout/GATE_LOG.md\n M docs/multiuser-rollout/design/API_CONTRACT.md\n M docs/multiuser-rollout/design/CODE_MAP.md\n M docs/multiuser-rollout/design/DATA_OWNERSHIP.md\n M docs/multiuser-rollout/design/FEATURE_MATRIX.md\n M docs/multiuser-rollout/design/PERMISSIONS.md\n M docs/multiuser-rollout/design/PROVIDER_CAPABILITIES.md\n M docs/multiuser-rollout/design/ROUTE_AUTH_MAP.md\n?? scripts/audit_routes.py\n?? scripts/capture_p0_evidence.py\n",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.2 (tags/v3.14.2:df79316, Dec  5 2025, 17:18:21) [MSC v.1944 64 bit (AMD64)]",
+    "node": "v24.13.0",
+    "npm": "11.8.0"
+  },
+  "test_isolation": "tests/conftest.py creates a fresh temporary MVC_DATA_DIR",
+  "paid_egress_guard": "tests use MockTransport/monkeypatch/local test endpoints; no real credentials supplied",
+  "runs": [
+    {
+      "name": "01-npm-ci",
+      "command": "npm.cmd ci",
+      "started_utc": "2026-09-16T04:35:49.650351+00:00",
+      "duration_seconds": 39.644,
+      "exit_code": 0,
+      "retry": false,
+      "log": "01-npm-ci.log"
+    },
+    {
+      "name": "02-npm-test",
+      "command": "npm.cmd test",
+      "started_utc": "2026-09-16T04:36:29.294604+00:00",
+      "duration_seconds": 1.369,
+      "exit_code": 0,
+      "retry": false,
+      "log": "02-npm-test.log"
+    },
+    {
+      "name": "03-npm-build",
+      "command": "npm.cmd run build",
+      "started_utc": "2026-09-16T04:36:30.664345+00:00",
+      "duration_seconds": 13.741,
+      "exit_code": 0,
+      "retry": false,
+      "log": "03-npm-build.log"
+    },
+    {
+      "name": "04-pytest-collect",
+      "command": "C:\\Python314\\python.exe -m pytest --collect-only -q",
+      "started_utc": "2026-09-16T04:36:44.405878+00:00",
+      "duration_seconds": 1.54,
+      "exit_code": 0,
+      "retry": false,
+      "log": "04-pytest-collect.log"
+    },
+    {
+      "name": "05-pytest",
+      "command": "C:\\Python314\\python.exe -m pytest -q",
+      "started_utc": "2026-09-16T04:36:45.947152+00:00",
+      "duration_seconds": 25.778,
+      "exit_code": 0,
+      "retry": false,
+      "log": "05-pytest.log"
+    },
+    {
+      "name": "06-route-audit",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "started_utc": "2026-09-16T04:37:11.725661+00:00",
+      "duration_seconds": 0.082,
+      "exit_code": 1,
+      "retry": false,
+      "log": "06-route-audit.log"
+    },
+    {
+      "name": "07-route-audit-retry",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "started_utc": "2026-09-16T04:37:38.261185+00:00",
+      "duration_seconds": 0.742,
+      "exit_code": 0,
+      "retry": true,
+      "log": "07-route-audit-retry.log",
+      "retry_of": "06-route-audit"
+    },
+    {
+      "name": "08-python-dependencies",
+      "command": "C:\\Python314\\python.exe -m pip freeze",
+      "started_utc": "2026-09-16T04:38:39.090433+00:00",
+      "duration_seconds": 1.691,
+      "exit_code": 0,
+      "retry": false,
+      "log": "08-python-dependencies.log"
+    },
+    {
+      "name": "09-node-dependencies",
+      "command": "npm.cmd ls --depth=0",
+      "started_utc": "2026-09-16T04:38:40.782280+00:00",
+      "duration_seconds": 2.505,
+      "exit_code": 0,
+      "retry": false,
+      "log": "09-node-dependencies.log"
+    },
+    {
+      "name": "11-route-audit-classification",
+      "command": "C:\\Python314\\python.exe scripts/audit_routes.py",
+      "started_utc": "2026-09-16T04:40:28.125403+00:00",
+      "duration_seconds": 0.813,
+      "exit_code": 0,
+      "retry": true,
+      "log": "11-route-audit-classification.log",
+      "supersedes": "07-route-audit-retry"
+    }
+  ],
+  "git_snapshot_log": "10-git-snapshot.log",
+  "git_snapshot_exit_code": 0
+}

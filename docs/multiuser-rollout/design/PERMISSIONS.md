@@ -16,7 +16,8 @@
 | 创建 Workspace/指定 owner | 是 | 否 | 否 | 否 | 否 |
 | 管理平台 Provider/Key/模型/全局额度 | 是 | 否 | 否 | 否 | 否 |
 | 将已有用户加入/移出本 Workspace | 后台显式 | 是 | 否 | 否 | 否 |
-| 创建 Production/指定 manager | 后台显式 | 是 | 否 | 否 | 否 |
+| 创建 Production/指定 manager | 后台显式、审计 | 是 | 否 | 否 | 否 |
+| 在已有 Production 中创建 Episode | 后台显式 | 是 | 是（仅有管理权的 Production） | 否 | 否 |
 | 管理 Production 成员 | 后台显式 | 是 | 是 | 否 | 否 |
 | 查看参与 Production 内容 | 后台显式审计 | 是 | 是 | 是 | 是 |
 | 查看同 Workspace 未参与 Production | 后台显式审计 | 是 | 否 | 否 | 否 |
@@ -42,6 +43,7 @@
 6. viewer 只读但可以评论；不能生成、删除、取得编辑租约或调用隐藏写 API。
 7. 所有列表、详情、历史、回收站、素材、任务、事件、批量入口和导出都执行相同租户/作品边界。
 8. 管理员跨租户内容访问必须使用显式后台入口并产生审计，不能在普通查询中设置万能 bypass。
+9. `POST /api/projects` 当前会同时创建 Production 和首集，因此迁移期间必须与“创建 Production”同权（WO；PA 仅后台显式审计），不得作为 manager 越权兼容入口；manager 创建分集只能使用已有 Production 下的 Episode 命令。
 
 ## 当前差距
 

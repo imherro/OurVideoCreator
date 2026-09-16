@@ -5,7 +5,7 @@
 | 路径 | 实际职责 | 多用户改造阶段 |
 |---|---|---|
 | `backend/app.py:30` `lifespan` | 调用 `store.init()`、`runtime.bootstrap()`，创建并启动 `Worker`，关闭时卸载 runtime | P1 拆分 Web/Worker 与本地推理 |
-| `backend/worker.py:19` `Worker` | 单线程轮询 SQLite 队列；执行文本、图片、视频、语音、导出及恢复 | P1 独立入口；P6 多 Worker 状态机 |
+| `backend/worker.py:19` `Worker` | 单 Worker 进程默认创建 4 个领取线程；Ark/豆包语音可并发，其他路径受 `local_execution_lock` 串行；进程级锁禁止第二 Worker 进程 | P1 独立入口；P6 多 Worker 进程 lease/fencing |
 | `backend/runtime.py` | 发现/启动 llama 与 Maestro、GPU/权重环境、空闲卸载 | P1 移除运行依赖 |
 | `backend/process_lock.py` | 单机进程锁 | P1 保留为过渡或移除；不能作为 P6 正确性依据 |
 | `Start-Studio.ps1` | 启动单机 Web 与相关本地服务 | P1/P7 更新部署方式 |

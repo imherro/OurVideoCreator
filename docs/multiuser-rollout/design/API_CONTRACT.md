@@ -24,6 +24,10 @@
 | `POST /api/admin/workspaces` | 创建 Workspace 并指定 owner |
 | `PUT /api/workspaces/{wid}/members/{uid}` | owner 管理已有账号成员关系 |
 | `PUT /api/productions/{pid}/members/{uid}` | owner/manager 管理作品成员，目标必须先属于 Workspace |
+| `POST /api/workspaces/{wid}/productions` | workspace owner 创建 Production 并指定 manager；平台管理员只走显式审计后台 |
+| `POST /api/productions/{pid}/episodes` | owner 或该 Production manager 创建 Episode |
+
+当前 `POST /api/projects` 会在同一事务创建 Production 与首个 Episode，不是 Episode-only 命令。P3 兼容期它必须等同“创建 Production”仅允许 workspace owner，随后由上述两个显式命令替代并退役；不得赋权给仅管理其他 Production 的 manager。
 
 ## 对象保存
 
@@ -36,6 +40,10 @@
 | Source/chapter | scoped list/detail | create/patch/trash/restore | revision |
 | Graph structure | scoped read | 小范围 node/edge 命令或 structure patch | structure revision |
 | Comment | scoped list | append；有限删除策略 | append-only |
+| Director stage | `GET .../episodes/{id}/director-stage` | `PATCH` stage；capture 命令另校验素材上传与图像节点创建权限 | episode revision（不需独占 lease） |
+| Voice profile | 随 Visual card 读取 | card assignee `PATCH` profile；lock/accept-result 命令 | visual card revision + 结果基线 revision |
+| Prompt template | scoped platform catalog | 第一版仅 PA create/update/archive | template revision + append-only history |
+| Legacy simple timeline | 作为 Timeline v1 投影读取 | 不再独立写；一次性转换为 editor timeline command | editor timeline revision + lease |
 
 审核状态为 `in_progress -> pending_review -> completed`。审核绑定具体 revision；已完成对象再次编辑产生新 revision 并回到 `in_progress`。版本恢复创建新 revision，不把计数倒退。
 
@@ -45,6 +53,7 @@
 2. P3 期间现有 `PUT /api/projects/{pid}` 仅允许 owner/manager，且不得被 editor 用作协作旁路。
 3. P5 完成时前端所有编辑入口改用对象 API；旧 PUT 对协作字段返回 `410 Gone` 或明确的版本化错误。
 4. 禁止把对象表写入后再异步回写 document，或同时接受两套主源。
+5. 3D 导演台、固定音色、提示词库、旧简剪与 Twick 的字段级迁移和旧入口退役细节以 `DATA_OWNERSHIP.md` 的“旧可写载体闭合映射”为准。
 
 ## 任务提交
 

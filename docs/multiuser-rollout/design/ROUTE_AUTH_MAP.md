@@ -14,7 +14,7 @@
 | POST `/api/auth/login` | Public | 个人账号登录、共享限速 | P3 |
 | POST `/api/auth/logout` | Session | 当前个人 session 注销 | P3 |
 
-## Production、Episode 与项目文档（14）
+## Production、Episode 与项目文档（15）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
@@ -26,7 +26,7 @@
 | GET `/api/productions/{production_id}/episodes` | Session | Production 成员 | P3 |
 | GET `/api/productions/{production_id}/visual-usage` | Session | Production 成员 | P3 |
 | POST `/api/productions/{production_id}/episodes` | Session | WO/PM | P3 |
-| POST `/api/projects` | Session | 兼容创建入口收敛到 WO/PM | P3 |
+| POST `/api/projects` | Session | 当前同时创建 Production+首集；兼容期仅 WO，之后退役；PA 只走审计后台 | P3 |
 | GET `/api/projects/{pid}` | Session | 参与者只读聚合 | P3/P5 |
 | DELETE `/api/projects/{pid}` | Session | WO/PM；软删除审计 | P3 |
 | GET `/api/projects/{pid}/storyboard-sheet` | Session | Production 成员；文件读取 | P3/P7 |
@@ -34,9 +34,9 @@
 | GET `/api/projects/{pid}/revisions` | Session | Production 成员；对象化后按权限 | P3/P5 |
 | GET `/api/projects/{pid}/revisions/{rid}` | Session | 同上，不得跨作品读 | P3/P5 |
 
-说明：本组实际为 15 条，计数包含兼容 `POST /api/projects`。
+`POST /api/projects` 不是“在已有作品加一集”；代码会新建 Production。PM 只能调用 `POST /api/productions/{production_id}/episodes` 在其管理的既有作品内新增分集。
 
-## 素材、文件与回收站（10）
+## 素材、文件与回收站（9 个唯一入口，另列 1 个交叉索引）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
@@ -53,7 +53,7 @@
 
 `visual-usage` 只在总路由计数中计算一次；本表为安全域交叉索引。
 
-## 系统、Provider 与提示词（9）
+## 系统、Provider 与提示词（10）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
@@ -65,12 +65,10 @@
 | GET `/api/providers/{provider_id}/models` | Session | PA 管理目录或普通安全 catalog；无 Key | P4 |
 | POST `/api/providers/{provider_id}/verify` | Session | PA；只做无生成验证 | P4 |
 | POST `/api/providers/{provider_id}/test` | Session | PA；当前只检测配置模型，不得付费生成 | P4 |
-| GET `/api/prompt-library` | Session | 按平台/作品定义作用域 | P3/P5 |
-| PUT `/api/prompt-library/{tid}` | Session | PA 或明确模板 owner + revision | P3/P5 |
+| GET `/api/prompt-library` | Session | 普通用户只读平台已启用模板 | P4 |
+| PUT `/api/prompt-library/{tid}` | Session | 退役；仅 PA 使用后台模板 revision 命令 | P4 |
 
-说明：本组实际为 10 条。
-
-## 原著、章节、事件与改编（20）
+## 原著、章节、事件与改编（23）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
@@ -98,9 +96,7 @@
 | POST `/api/productions/{production_id}/episode-scripts/{episode_no}/needs-changes` | Session | PM/WO | P3/P5 |
 | POST `/api/productions/{production_id}/script-generations` | Session | 有权对象 + model/quota；批量付费 | P3/P4/P6 |
 
-说明：本组实际为 23 条。
-
-## 任务、批量运行与事件（8）
+## 任务、批量运行与事件（7 个唯一入口，另列 1 个交叉索引）
 
 | 方法与路径 | 当前 | 目标/副作用 | 阶段 |
 |---|---|---|---|
@@ -115,9 +111,18 @@
 
 `source-extractions` 只在总路由计数中计算一次。
 
+## FastAPI 框架与前端入口
+
+| 实际注册项 | 当前 | 目标/副作用 | 阶段 |
+|---|---|---|---|
+| GET `/openapi.json` | Public（FastAPI 默认） | 开发环境受限；生产默认关闭或仅 PA 可访问，不得泄露管理面 | P3/P7 |
+| Mount `/` -> `dist` | 仅 build 后注册，Public | SPA 静态文件公开；API/素材仍由前述服务端授权，不得把私有素材放入 dist | P1/P7 |
+
+`docs_url=None` 与 `redoc_url=None` 不会关闭默认 `/openapi.json`。`dist` 不存在时只缺少根 `StaticFiles` Mount；69 个 `/api` 入口与 OpenAPI 路由仍注册。build 完成后实际 `app.routes` 多一个根 Mount，且因为它最后注册，不覆盖前面的 API 匹配。
+
 ## 覆盖核对
 
-去重后与 `rg "@app\.(get|post|put|patch|delete)" backend/app.py` 的 69 条注册路由一致。交叉索引项不重复计数。P3 应增加自动测试：枚举 FastAPI 实际注册的 `/api` 路由，与机器可读授权登记比较；任何新增未分类资源路由使测试失败（ACL-09）。
+业务表去重后覆盖 69 个 `/api` 装饰器入口：5+15+9+10+23+7=69。`scripts/audit_routes.py` 在临时 `MVC_DATA_DIR` 中导入应用并导出实际 `app.routes`，并逐个核对本文中的方法+路径分类，额外捕获 `/openapi.json` 与可选静态 Mount；首次模块路径失败保留在 `evidence/P0-R1/06-route-audit.log`，最终完整输出见 `11-route-audit-classification.log`。成功输出为 71 个注册项：69 API + 1 OpenAPI + 1 build 后静态 Mount，69 个 API 全部已分类且框架入口已登记。P3 应把同一枚举升级为 CI 授权登记守卫；任何新增未分类资源路由使测试失败（ACL-09）。
 
 ## 当前最高风险缺口
 

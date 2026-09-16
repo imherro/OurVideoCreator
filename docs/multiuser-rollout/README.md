@@ -22,9 +22,10 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`design/JOB_STATE_MACHINE.md`](design/JOB_STATE_MACHINE.md)
 - [`design/PROVIDER_CAPABILITIES.md`](design/PROVIDER_CAPABILITIES.md)
 - [`evidence/P0/REPORT.md`](evidence/P0/REPORT.md)
+- [`evidence/P0-R1/REPORT.md`](evidence/P0-R1/REPORT.md)（外部不通过后的逐项修正与原始补跑证据）
 
 ## 阶段边界
 
 本轮只产出代码/路由/数据/权限/任务/Provider 地图和真实基线测试证据。没有修改业务代码、数据库结构或运行数据；没有开始 P1；没有调用真实付费 API。
 
-P0 只有外部验收通过后才能进入 P1。后续阶段仍以总册中的总控提示词、冻结契约、当前阶段提示词和相关验收矩阵为准。
+P0 首次外部验收在 `3c0e5ca` 给出 OVC-P0-01 至 OVC-P0-05；当前为 P0-R1 `READY_FOR_REVIEW`，P1 仍未授权。P0 只有外部复验通过后才能进入 P1。后续阶段仍以总册中的总控提示词、冻结契约、当前阶段提示词和相关验收矩阵为准。

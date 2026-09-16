@@ -7,10 +7,10 @@
 | 本地 llama/openai bridge | 是 | 否 | 否 | 否 | 同步 | 否 | 本地进程 | `runtime.py`、`worker.py::local_text`；P1 移除 |
 | Maestro/WanGP | 否 | 是 | 是 | 否 | provider_job_id 查询 | 首帧/尾帧按能力 | `/cancel` | `worker.py::maestro`；P1 移除内嵌启动，未来外部 API 另登记 |
 | OpenAI-compatible | 是 | 可配置 | 否 | 否 | 多为同步 | 图片 data | 无统一协议 | `worker.py` |
-| ComfyUI | 否 | 是 | 是 | 可由工作流 | prompt_id | 工作流上传；当前尾帧不支持 | queue delete | `worker.py::comfy` |
+| ComfyUI | 否 | 是 | 是 | **否（项目未接通）** | prompt_id | 工作流上传；当前尾帧不支持 | queue delete | `worker.py::comfy`；上游工作流潜力不等于当前能力 |
 | JSON video gateway | 否 | 否 | 是 | 否 | task id 查询 | 当前不支持 | 未统一 | `worker.py::video_api` |
 | MiniMax Hailuo | 否 | 否 | 是 | 否 | task id 查询 | 单首帧；尾帧不支持 | 依供应商 | `minimax_video.py`、`test_minimax_video.py` |
-| Replicate | 依模型 | 依模型 | 依模型 | 依模型 | prediction id | 模板映射 data URI | 支持 prediction cancel | `replicate_api.py`、`test_replicate_api.py` |
+| Replicate | 依模板/模型 | 依模板/模型 | 依模板/模型 | **否（项目未接通）** | prediction id | 模板映射 data URI | 支持 prediction cancel | `replicate_api.py`、`test_replicate_api.py` |
 | 火山方舟 | 是 | Seedream | Seedance 2.5 | 否 | 视频 task id | 图片多参考；视频首/尾帧及固定对白音频 | 视频远端取消 | `providers/volcengine_ark.py`、`test_volcengine_ark.py` |
 | RunningHub | 是 | Seedream v5 Pro | Seedance 2.5 token | 否 | taskId + query | 图片最多 10；视频模式化多参考/音频 | 当前无统一取消，远端可能继续 | `providers/runninghub.py`、`test_runninghub.py` |
 | 幻场 HC-ATOM | 是 | 异步图片 | 异步视频 | 否 | task id 查询 | 视频单图；图片最多 10；素材组/审核/映射 | 协议支持时请求取消 | `providers/hc_atom.py`、`test_hc_atom.py` |
@@ -24,6 +24,7 @@
 - URL 由全局设置直接提供，缺少统一 SSRF/重定向/下载大小策略。
 - 部分能力由运行时目录或供应商目录动态发现；部分来自配置 flags。P4 需收敛为平台 model/version 能力目录。
 - 当前 `/verify` 读取模型/账号信息，不应生成付费内容；`/test` 只检查所选模型是否在目录。无免费验证接口时目标行为应是“配置已保存，未验证”。
+- `create_job_record()` 当前对 `audio` 明确只允许 `volcengine_speech`。表中“是/依模型”表示本项目已接通能力；ComfyUI 或 Replicate 上游可能支持但未接通的能力只记为未来扩展，不能展示给用户。
 
 ## 目标平台目录
 
