@@ -1,0 +1,63 @@
+{
+  "repository": "imherro/OurVideoCreator",
+  "stage": "P4-R1",
+  "decision": "PASS",
+  "overall_P4": "PASSED",
+  "review_date": "2026-09-17",
+  "base": "c7d6a88a06a01035fd44e45309414c05e061ab64",
+  "tested_business_sha": "e6c3edd95830d4c778fee357b8807d1443920a04",
+  "evidence_head": "c0152ffcfb5623fcc0b723dbdf450acec9f17f73",
+  "closed": [
+    {
+      "id": "OVC-P4-01",
+      "former_severity": "S2"
+    },
+    {
+      "id": "OVC-P4-02",
+      "former_severity": "S2"
+    },
+    {
+      "id": "OVC-P4-03",
+      "former_severity": "S2"
+    }
+  ],
+  "new_blockers": [],
+  "next_authorized_stage": "P5",
+  "next_single_task": "P5-COLLAB-01",
+  "not_authorized": [
+    "P6",
+    "real_paid_provider_calls",
+    "public_deployment"
+  ],
+  "verification": {
+    "connector_code_and_diff_review": true,
+    "git_tree_binding_verified": true,
+    "implementation_logs_reviewed": true,
+    "reviewer_full_pg_pytest_rerun": false,
+    "reviewer_browser_rerun": false,
+    "reviewer_powershell_rerun": false,
+    "reviewer_local_excerpt_probe_run": false,
+    "read_only_environment_probe": "checks/environment.json"
+  },
+  "reported_and_checked_results": {
+    "targeted_passed": 17,
+    "backend_passed": 368,
+    "frontend_passed": 128,
+    "build_modules": 1827,
+    "api_classified": 96
+  },
+  "scan_limits": {
+    "checked_json": 99,
+    "unreadable_json": 9,
+    "sse_responses_not_body_scanned_this_round": 2,
+    "db_tables": 37,
+    "db_rows": 49,
+    "process_logs": 4
+  },
+  "historical_stages_unchanged": [
+    "P0",
+    "P1",
+    "P2",
+    "P3"
+  ]
+}

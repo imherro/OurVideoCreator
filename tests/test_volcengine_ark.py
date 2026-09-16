@@ -7,7 +7,11 @@ import wave
 import httpx
 import pytest
 from PIL import Image
+from fastapi.testclient import TestClient
 
+from backend.app import app
+from tests.auth_helpers import login_admin
+from tests.collaboration_helpers import create_node
 from tests.platform_model_helpers import bind_adapter_job
 from tests.egress_helpers import mock_egress
 from backend import store as s
@@ -19,12 +23,16 @@ s.init()
 
 
 def stored_job(kind, provider, provider_job_id=None):
-    pid='ark-project-'+uuid.uuid4().hex
+    with TestClient(app) as client:
+        login_admin(client)
+        response = client.post('/api/projects', json={'name': 'Ark test'})
+        assert response.status_code == 200, response.text
+        pid = response.json()['id']
+        create_node(client, pid, 'node', kind)
     jid='ark-job-'+uuid.uuid4().hex
     now=time.time()
     inp={'provider':provider['id'],'allow_cloud':True,'prompt':'电影感机器人走向窗前'}
     with s.db() as db:
-        db.execute('INSERT INTO projects(id,name,revision,document,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(pid,'Ark test','{}',now,now))
         db.execute('INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,provider_job_id,created,updated) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                    (jid,'ark-submit-'+uuid.uuid4().hex,pid,'node',kind,'running',s.dumps(inp),provider_job_id,now,now))
         bind_adapter_job(db,jid,kind,provider,inp)

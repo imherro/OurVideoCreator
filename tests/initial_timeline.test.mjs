@@ -101,13 +101,14 @@ test("initial edit rejects missing, stale, and overlong shot media", () => {
 test("fixed character dialogue becomes an audio track and replaces generated video audio", () => {
   const plan = planInitialTimeline(
     {
-      shots: [{ id: "shot-1", uid: "shot-uid-1", videoNode: "video-node", duration: 5 }],
+      shots: [{ id: "shot-1", uid: "shot-uid-1", videoNode: "video-node", duration: 5,
+        dialogues:[{id:"dialogue-1",text:"hello",audioAssetId:"voice",audioVoiceVersion:2}] }],
       nodes: [{ id: "video-node", data: { assetId: "video" } }],
       assets: [
         { id: "video", name: "镜头", kind: "video", url: "/video", metadata: { duration: 5 } },
         { id: "voice", name: "角色对白", kind: "audio", url: "/voice", metadata: {
           duration: 2.4,
-          input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid-1", characterCardId: "card-1", voiceVersion: 2 } },
+          input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid-1", characterCardId: "card-1", voiceVersion: 2, text:"hello" } },
         } },
       ],
       resolution: { width: 1280, height: 720 },
@@ -122,15 +123,17 @@ test("fixed character dialogue becomes an audio track and replaces generated vid
   assert.equal(plan.timeline.tracks[1].elements[0].e, 2.4);
 });
 
-test("initial edit uses only the latest take when dialogue is regenerated", () => {
+test("initial edit uses only the explicitly adopted take when dialogue is regenerated", () => {
   const plan = planInitialTimeline(
     {
-      shots: [{ id: "shot-1", uid: "shot-uid", videoNode: "video-node", duration: 5, dialogues: [{ id: "dialogue-1" }] }],
+      shots: [{ id: "shot-1", uid: "shot-uid", videoNode: "video-node", duration: 5,
+        dialogues: [{ id: "dialogue-1",text:"hello",audioAssetId:"new-take",audioVoiceVersion:2 }] }],
       nodes: [{ id: "video-node", data: { assetId: "video" } }],
       assets: [
         { id: "video", name: "镜头", kind: "video", url: "/video", created: 1, metadata: { duration: 5 } },
         { id: "old-take", name: "旧对白", kind: "audio", url: "/old", created: 2, metadata: { duration: 1, input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid" } } } },
-        { id: "new-take", name: "新对白", kind: "audio", url: "/new", created: 3, metadata: { duration: 1.2, input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid" } } } },
+        { id: "new-take", name: "新对白", kind: "audio", url: "/new", created: 3, metadata: { duration: 1.2, input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid",text:"hello",voiceVersion:2 } } } },
+        { id: "unadopted", name: "更新候选", kind: "audio", url: "/candidate", created: 4, metadata: { duration: 1.2, input: { dialogue: { id: "dialogue-1", shotUid: "shot-uid",text:"hello",voiceVersion:2 } } } },
       ],
       resolution: { width: 1280, height: 720 },
     },
@@ -138,4 +141,15 @@ test("initial edit uses only the latest take when dialogue is regenerated", () =
   );
   assert.equal(plan.timeline.tracks[1].elements.length, 1);
   assert.equal(plan.timeline.tracks[1].elements[0].metadata.assetId, "new-take");
+});
+
+test("initial edit neither inserts unadopted dialogue nor mutes the original video", () => {
+  const plan=planInitialTimeline({
+    shots:[{id:"s",uid:"s",videoNode:"v",duration:3,dialogues:[{id:"d",text:"hello"}]}],
+    nodes:[{id:"v",data:{assetId:"clip"}}],
+    assets:[{id:"clip",kind:"video",name:"clip",url:"/clip",metadata:{duration:3}},
+      {id:"candidate",kind:"audio",name:"candidate",url:"/candidate",metadata:{duration:1,input:{dialogue:{id:"d",shotUid:"s",voiceVersion:1,text:"hello"}}}}],
+    resolution:{width:1280,height:720}},()=>"id");
+  assert.equal(plan.timeline.tracks.length,1);
+  assert.equal(plan.timeline.tracks[0].elements[0].props.volume,1);
 });

@@ -1,0 +1,24 @@
+{
+  "checked_utc": "2026-09-16T18:04:18.173607+00:00",
+  "repository": "imherro/OurVideoCreator",
+  "tools": {
+    "git": "/usr/bin/git",
+    "psql": null,
+    "postgres": null,
+    "pwsh": null,
+    "powershell": null,
+    "node": "/opt/nvm/versions/node/v22.16.0/bin/node",
+    "npm": "/opt/nvm/versions/node/v22.16.0/bin/npm"
+  },
+  "git_read_only_probe": {
+    "command": [
+      "git",
+      "ls-remote",
+      "https://github.com/imherro/OurVideoCreator.git",
+      "refs/heads/master"
+    ],
+    "exit_code": 128,
+    "stdout": "",
+    "stderr": "fatal: unable to access 'https://github.com/imherro/OurVideoCreator.git/': Could not resolve host: github.com\n"
+  }
+}

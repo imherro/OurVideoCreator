@@ -2,6 +2,28 @@
 
 本文件冻结行为，不在 P0 实现路由。最终命名可在保持语义和验收能力的前提下调整。
 
+## P5 实际接口补充（优先于下方 P0 路径草案）
+
+下方保留原冻结语义；实际命名和当前阶段边界如下。P5 尚待外部验收，不能将未来 quota/多 Worker 契约读成已实现。
+
+| 实际命令 | 请求与边界 |
+|---|---|
+| `GET /api/projects/{pid}/objects`、`GET .../objects/{oid}` | 本作品/分集的已授权对象集合与详情；对象 kind 为 shot/node/visual_card/graph/timeline/director；不泄漏 lease token 摘要 |
+| `POST .../objects` | `{kind, content}`，服务端确定作者、归属和初始负责人；创建 node/shot 同时核 graph 结构版本 |
+| `PATCH .../objects/{oid}` | `{expected_revision, assignment_epoch, content}`；timeline 另需 `lease_token, lease_epoch`；严格 envelope，拒绝伪造身份及跨作品嵌套引用 |
+| `POST .../objects/commands` | `{creates, updates, deletes}`，更新/删除逐项携带版本和代际；单事务全成或全败，不能夹带无权对象 |
+| `POST .../objects/{oid}/assign` | manager/owner 明确分配或接管；携带当前 revision/epoch 和 assignee_id；递增代际并撤销旧 lease，不授予隐式内容编辑权 |
+| `POST .../objects/{oid}/lease` | acquire/renew/release；renew/release 带 token/lease_epoch；仅 timeline。强制接管通过明确 assign（含接管给自己）使旧租约失效，再 acquire |
+| `POST .../objects/{oid}/review`、`.../restore` | 审核 action 为 submit/approve/return；恢复携带目标历史 revision；两者仍需当前 expected_revision/assignment_epoch，恢复新增 revision |
+| `GET .../objects/{oid}/history`、`GET/POST .../comments` | 同作品授权；viewer 可 append 评论但不能夹带内容/审核字段 |
+| `.../productions/{production_id}/owned-content/{chapter\|script}/{target_id}` | 复用原章节/正式剧本主源；提供详情、assign、history、restore、comments；正文沿用既有 scoped 小接口并补 expected revision/epoch。正式剧本沿用 readiness-aware 审核接口 |
+| `PATCH /api/projects/{pid}/metadata`、`PATCH /api/productions/{production_id}/context` | manager/owner 受限字段 PATCH + expected_revision，不能夹带对象、视觉卡、音色或整份 document |
+| `POST .../projects/{pid}/script-promotion`、`.../director-captures` | 原子校验相关对象/结构及真实素材；不把上传或图片渲染放入数据库事务 |
+| `GET .../projects/{pid}/candidates/{jid}`、`POST .../adopt` | GET 只读比较；POST 明确采纳，当前权限和 expected revision/epoch 再核验，必要时显式 accept_stale；来源依赖不一致仍拒绝，收据/对象/历史/事件同事务 |
+| `PUT /api/projects/{pid}` | 权限层先检查；有权 manager/owner 也收到 410，editor 不能借此取得协作写入权；聚合 GET 保留 |
+
+前端 SSE 获取当前已授权 objects 快照后逐对象核 revision/草稿并一次合并投影，避免同一结构事务中的节点与 graph 事件先后到达制造本地修改。不会用整份读取结果写回数据库。当前仍为单 Worker；P5 只落实协作目标/候选版本边界，额度预占与多 Worker fencing 属 P6。
+
 ## 通用规则
 
 - 身份来自服务端 session cookie；客户端不能提交 `user_id`、角色、workspace 归属、作者或 assignee 作为权威值。

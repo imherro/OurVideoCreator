@@ -85,6 +85,13 @@ def test_locked_voice_dialogue_assets_are_frozen_into_video_input():
         {'id': 'robot-audio', 'kind': 'audio', 'created': 2, 'metadata': {'duration': 1.4, 'input': {'dialogue': {'id': 'd1', 'voiceVersion': 2}}}},
         {'id': 'human-audio', 'kind': 'audio', 'created': 3, 'metadata': {'duration': 1.1, 'input': {'dialogue': {'id': 'd2', 'voiceVersion': 4}}}},
     ]
+    with pytest.raises(ValueError,match='明确采纳'):
+        bind_fixed_dialogue_audio(document, 'video-node', 'video', {'prompt': '基础动作'}, assets)
+    for dialogue,asset in zip(value['dialogues'],assets[1:]):
+        dialogue.update(audioAssetId=asset['id'],audioVoiceVersion=asset['metadata']['input']['dialogue']['voiceVersion'])
+        asset['metadata']['input']['dialogue']['text']=dialogue['text']
+    # A newer successful candidate is not the selected take.
+    assets.append({**assets[1],'id':'new-unadopted','created':999})
     result = bind_fixed_dialogue_audio(document, 'video-node', 'video', {'prompt': '基础动作'}, assets)
     assert result['dialogue_audio_asset_ids'] == ['robot-audio', 'human-audio']
     assert result['dialogue_audio'][0]['voiceType'] == 'robot-speaker'
@@ -107,6 +114,9 @@ def test_dialogue_longer_than_planned_shot_extends_generation_to_next_second():
         {'id': 'robot-audio', 'kind': 'audio', 'created': 2, 'metadata': {'duration': 1.4, 'input': {'dialogue': {'id': 'd1', 'voiceVersion': 2}}}},
         {'id': 'human-audio', 'kind': 'audio', 'created': 3, 'metadata': {'duration': 1.1, 'input': {'dialogue': {'id': 'd2', 'voiceVersion': 4}}}},
     ]
+    for dialogue,asset in zip(current_shot['dialogues'],assets):
+        dialogue.update(audioAssetId=asset['id'],audioVoiceVersion=asset['metadata']['input']['dialogue']['voiceVersion'])
+        asset['metadata']['input']['dialogue']['text']=dialogue['text']
     result = bind_fixed_dialogue_audio(document, 'video-node', 'video', {'prompt': '基础动作'}, assets)
     assert result['parameters']['duration'] == 3
     assert result['shot_duration'] == 3

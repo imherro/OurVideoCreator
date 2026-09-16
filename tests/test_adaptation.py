@@ -12,6 +12,10 @@ from tests.auth_helpers import login_admin
 from tests.platform_model_helpers import publish_test_model
 
 
+def owned_revision(row):
+    return {'revision': row['revision'], 'assignment_epoch': row['assignment_epoch']}
+
+
 @pytest.fixture(scope="module")
 def adaptation_client():
     with TestClient(app) as client:
@@ -191,8 +195,19 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
     for job in first.json()["jobs"]:
         s.job_update(job["id"],status="running")
         result = worker.text({**job,"status":"running"},{"url":"http://unused","local":True})
-        assert result["script"]["status"] == "review"
+        assert result['script']['body'] == generated['body']
+        no = job['input']['episode_script_generation']['episodeNo']
+        script_path = f'/api/productions/{production["id"]}/episode-scripts/{no}'
+        before = client.get(script_path).json()
+        assert before['body'] == ''  # Completing AI work must not publish it.
         s.job_update(job["id"],status="succeeded",result=result)
+        adopted = client.post(f'/api/projects/{job["project_id"]}/candidates/{job["id"]}/adopt', json={
+            'expected_revision': before['revision'], 'assignment_epoch': before['assignment_epoch']})
+        assert adopted.status_code == 200, adopted.text
+        assert adopted.json()['target']['status'] == 'draft'
+        reviewed = client.post(script_path+'/review', json=owned_revision(adopted.json()['target']))
+        assert reviewed.status_code == 200, reviewed.text
+        assert reviewed.json()['status'] == 'review'
 
     scripts = client.get(f'/api/productions/{production["id"]}/scripts').json()
     changed = {item["episodeNo"] for item in scripts if item["script"] and item["script"]["body"]}
@@ -208,15 +223,14 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
 def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(adaptation_client):
     client = adaptation_client
     production, _, _, adaptation = setup_production(client, count=2)
-    with s.db() as connection:
-        row = connection.execute("SELECT shared_context FROM productions WHERE id=%s", (production["id"],)).fetchone()
-        context = json.loads(row["shared_context"])
-        context["generationPolicy"]["text"] = {"model_id": "p1-test-openai"}
-        connection.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), production["id"]))
+    policy = client.patch(f'/api/productions/{production["id"]}/context', json={
+        'expected_revision': adaptation['revision'], 'patch': {'generationPolicy': {'text': {'model_id': 'p1-test-openai'}}}})
+    assert policy.status_code == 200, policy.text
+    adaptation['revision'] = policy.json()['revision']
     approved = save_and_approve(client, production, adaptation)
     virtual = client.get(f'/api/productions/{production["id"]}/episode-scripts/2').json()
     payload = {
-        "revision": virtual["revision"], "title": "第二集", "synopsis": "追查仓库",
+        **owned_revision(virtual), "title": "第二集", "synopsis": "追查仓库",
         "body": "外景 日\n阿青推开仓库大门。", "estimatedDuration": 60,
         "sourceChapterRefs": approved["episodePlans"][1]["sourceChapterRefs"],
         "storyGoal": approved["episodePlans"][1]["coreConflict"],
@@ -237,7 +251,7 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
         "name": projected["name"], "revision": projected["revision"],
         "production_revision": projected["production_revision"], "document": projected["document"],
     })
-    assert put.status_code == 200, put.text
+    assert put.status_code == 410, put.text
     reopened = client.get(f'/api/projects/{project_id}').json()
     projection = next(item for item in reopened["document"]["nodes"] if item["data"].get("canonicalScriptProjection"))
     assert projection["data"]["text"] == payload["body"]
@@ -245,7 +259,7 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
 
     current_script = client.get(f'/api/productions/{production["id"]}/episode-scripts/2').json()
     cleared = client.put(f'/api/productions/{production["id"]}/episode-scripts/2',json={
-        **payload, "revision": current_script["revision"], "body": "",
+        **payload, **owned_revision(current_script), "body": "",
     })
     assert cleared.status_code == 200, cleared.text
     cleared_project = client.get(f'/api/projects/{project_id}').json()
@@ -261,7 +275,7 @@ def test_canonical_script_projects_to_canvas_and_canvas_edit_cannot_replace_it(a
         "name": cleared_project["name"], "revision": cleared_project["revision"],
         "production_revision": cleared_project["production_revision"], "document": stale_canvas,
     })
-    assert stale_put.status_code == 200, stale_put.text
+    assert stale_put.status_code == 410, stale_put.text
     assert client.get(f'/api/productions/{production["id"]}/episode-scripts/2').json()["body"] == ""
     after_stale_put = client.get(f'/api/projects/{project_id}').json()
     assert not any(item["data"].get("text") == payload["body"] for item in after_stale_put["document"]["nodes"])
@@ -271,30 +285,30 @@ def test_canvas_script_becomes_the_canonical_episode_script_and_can_bypass_plann
     client = adaptation_client
     project = client.post('/api/projects',json={'name':'画布快速创作','duration':15}).json()
     node_id='canvas-script-draft'
-    project['document']['nodes'].append({
-        'id':node_id,'type':'media','position':{'x':80,'y':80},
+    node = {
+        'id':node_id,'type':'media',
         'data':{'kind':'text','label':'画布剧本','text':'内景 日\n女孩推开门。'},
-    })
-    stored=client.put(f'/api/projects/{project["id"]}',json={
-        'name':project['name'],'revision':project['revision'],
-        'production_revision':project['production_revision'],'document':project['document'],
-    })
-    assert stored.status_code==200,stored.text
+    }
+    stored=client.post(f'/api/projects/{project["id"]}/objects',json={'kind':'node','content':{'node':node}})
+    assert stored.status_code==201,stored.text
     script=client.get(f'/api/productions/{project["production_id"]}/episode-scripts/1').json()
-    saved=client.put(f'/api/productions/{project["production_id"]}/episode-scripts/1',json={
-        'revision':script['revision'],'title':'第一集','synopsis':'','body':'内景 日\n女孩推开门。',
-        'estimatedDuration':15,'sourceChapterRefs':[],'storyGoal':'','paywallBeat':{},
-        'characters':[],'scenes':[],'props':[],'canvasNodeId':node_id,
+    graph=next(row for row in client.get(f'/api/projects/{project["id"]}/objects').json() if row['kind']=='graph')
+    def ticket(row):return {'id':row['id'],'expected_revision':row['revision'],'assignment_epoch':row['assignment_epoch']}
+    saved=client.post(f'/api/projects/{project["id"]}/script-promotion',json={
+        'node':ticket(stored.json()),'graph':ticket(graph),
+        'script_revision':script['revision'],'script_assignment_epoch':script['assignment_epoch'],
     })
     assert saved.status_code==200,saved.text
-    assert saved.json()['metadata']['origin']=='canvas'
+    promoted=saved.json()['script']
+    assert promoted['metadata']['origin']=='canvas'
+    assert promoted['body']==node['data']['text']
     projected=client.get(f'/api/projects/{project["id"]}').json()
     projection=next(node for node in projected['document']['nodes'] if node['id']==node_id)
     assert projection['data']['canonicalScriptProjection'] is True
     assert projection['data']['scriptOrigin']=='canvas'
-    reviewed=client.post(f'/api/productions/{project["production_id"]}/episode-scripts/1/review',json={'revision':saved.json()['revision']})
+    reviewed=client.post(f'/api/productions/{project["production_id"]}/episode-scripts/1/review',json=owned_revision(promoted))
     assert reviewed.status_code==200,reviewed.text
-    approved=client.post(f'/api/productions/{project["production_id"]}/episode-scripts/1/approve',json={'revision':reviewed.json()['revision']})
+    approved=client.post(f'/api/productions/{project["production_id"]}/episode-scripts/1/approve',json=owned_revision(reviewed.json()))
     assert approved.status_code==200,approved.text
     assert approved.json()['status']=='approved'
 
@@ -311,7 +325,7 @@ def test_project_put_cannot_persist_a_second_copy_of_production_adaptation(adapt
         "name": project["name"], "revision": project["revision"],
         "production_revision": project["production_revision"], "document": project["document"],
     })
-    assert saved.status_code == 200, saved.text
+    assert saved.status_code == 410, saved.text
     reopened = client.get(f'/api/projects/{episode["id"]}').json()
     assert all(key not in reopened["document"] for key in ("adaptationPlan", "episodePlans", "monetizationPlan"))
     with s.db() as connection:
@@ -329,16 +343,16 @@ def test_source_edit_marks_approved_plan_and_derived_script_stale_without_ai_cal
     approved = save_and_approve(client, production, adaptation)
     virtual = client.get(f'/api/productions/{production["id"]}/episode-scripts/1').json()
     script = client.put(f'/api/productions/{production["id"]}/episode-scripts/1',json={
-        "revision": virtual["revision"], "title": "第一集", "synopsis": "密信出现", "body": "阿青读信。",
+        **owned_revision(virtual), "title": "第一集", "synopsis": "密信出现", "body": "阿青读信。",
         "estimatedDuration": 60, "sourceChapterRefs": [chapter["id"]], "storyGoal": "查明真相",
         "paywallBeat": {}, "characters": ["阿青"], "scenes": ["旧屋"], "props": ["密信"],
     }).json()
-    reviewed = client.post(f'/api/productions/{production["id"]}/episode-scripts/1/review',json={"revision": script["revision"]}).json()
-    approved_script = client.post(f'/api/productions/{production["id"]}/episode-scripts/1/approve',json={"revision": reviewed["revision"]})
+    reviewed = client.post(f'/api/productions/{production["id"]}/episode-scripts/1/review',json=owned_revision(script)).json()
+    approved_script = client.post(f'/api/productions/{production["id"]}/episode-scripts/1/approve',json=owned_revision(reviewed))
     assert approved_script.status_code == 200, approved_script.text
     before_jobs = sum(len(item["jobs"]) if isinstance(item,dict) and "jobs" in item else 0 for item in [])
     edited = client.put(f'/api/productions/{production["id"]}/chapters/{chapter["id"]}',json={
-        "title": chapter["title"], "content": chapter["content"] + "\n密信被烧毁。", "revision": chapter["revision"],
+        "title": chapter["title"], "content": chapter["content"] + "\n密信被烧毁。", **owned_revision(chapter),
     })
     assert edited.status_code == 200, edited.text
     stale = client.get(f'/api/productions/{production["id"]}/adaptation').json()

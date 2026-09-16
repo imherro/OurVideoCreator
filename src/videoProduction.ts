@@ -80,10 +80,10 @@ export function deriveVideoProductionRows(
           break;
         }
         const match = assets
-          .filter((asset) => asset.kind === "audio" && asset.metadata?.input?.dialogue?.id === dialogue.id && Number(asset.metadata?.input?.dialogue?.voiceVersion) === Number(profile.version || 1))
+          .filter((asset) => asset.kind === "audio" && asset.id === dialogue.audioAssetId && dialogue.audioVoiceVersion === Number(profile.version || 1) && asset.metadata?.input?.dialogue?.text === dialogue.text && asset.metadata?.input?.dialogue?.id === dialogue.id && Number(asset.metadata?.input?.dialogue?.voiceVersion) === Number(profile.version || 1))
           .sort((left, right) => Number(right.created || 0) - Number(left.created || 0))[0];
         if (!match) {
-          dialogueReadinessReason = `${dialogue.characterName || "角色"}的本镜对白尚未使用当前固定音色生成`;
+          dialogueReadinessReason = `${dialogue.characterName || "角色"}的本镜对白尚未使用当前固定音色生成并明确采纳`;
           break;
         }
         dialogueAudioAssets.push(match);

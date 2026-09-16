@@ -19,7 +19,7 @@ from sqlalchemy.engine import Engine, make_url
 
 
 DATABASE_ENV = 'OVC_DATABASE_URL'
-SCHEMA_REVISION = '0003_platform_models'
+SCHEMA_REVISION = '0006_job_candidate_targets'
 
 
 class DatabaseConfigurationError(RuntimeError):

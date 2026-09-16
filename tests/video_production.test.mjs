@@ -90,7 +90,10 @@ test("Seedance dialogue requires the current locked voice take before paid submi
   document.filmBible = { voices: { profiles: { robot: { status: "locked", voiceType: "robot-speaker", version: 2 } } } };
   let rows = deriveVideoProductionRows(document, assets, jobs, providers, capabilities);
   assert.match(rows[0].readinessReason, /尚未使用当前固定音色生成/);
-  const voiceAsset = { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.5, input: { dialogue: { id: "dialogue-1", voiceVersion: 2 } } } };
+  const voiceAsset = { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.5, input: { dialogue: { id: "dialogue-1", voiceVersion: 2, text: "你好" } } } };
+  rows = deriveVideoProductionRows(document, [...assets, voiceAsset], jobs, providers, capabilities);
+  assert.match(rows[0].readinessReason, /明确采纳/);
+  Object.assign(document.shots[0].dialogues[0],{audioAssetId:"voice-1",audioVoiceVersion:2});
   rows = deriveVideoProductionRows(document, [...assets, voiceAsset], jobs, providers, capabilities);
   assert.equal(rows[0].readinessReason, "");
   assert.deepEqual(rows[0].dialogueAudioAssets.map((asset) => asset.id), ["voice-1"]);
@@ -100,13 +103,13 @@ test("Seedance dialogue extends a short shot instead of blocking submission", ()
   const { document, jobs } = fixture();
   document.shots[0].duration = 2;
   document.shots[0].dialogues = [
-    { id: "dialogue-1", characterCardId: "robot", characterName: "球球", text: "第一句" },
-    { id: "dialogue-2", characterCardId: "robot", characterName: "球球", text: "第二句" },
+    { id: "dialogue-1", characterCardId: "robot", characterName: "球球", text: "第一句", audioAssetId:"voice-1",audioVoiceVersion:2 },
+    { id: "dialogue-2", characterCardId: "robot", characterName: "球球", text: "第二句", audioAssetId:"voice-2",audioVoiceVersion:2 },
   ];
   document.filmBible = { voices: { profiles: { robot: { status: "locked", voiceType: "robot-speaker", version: 2 } } } };
   const voiceAssets = [
-    { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.4, input: { dialogue: { id: "dialogue-1", voiceVersion: 2 } } } },
-    { id: "voice-2", kind: "audio", created: 6, metadata: { duration: 1.1, input: { dialogue: { id: "dialogue-2", voiceVersion: 2 } } } },
+    { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.4, input: { dialogue: { id: "dialogue-1", voiceVersion: 2, text:"第一句" } } } },
+    { id: "voice-2", kind: "audio", created: 6, metadata: { duration: 1.1, input: { dialogue: { id: "dialogue-2", voiceVersion: 2, text:"第二句" } } } },
   ];
   const rows = deriveVideoProductionRows(document, [...assets, ...voiceAssets], jobs, providers, capabilities);
   assert.equal(rows[0].readinessReason, "");
@@ -122,7 +125,8 @@ test("locked dialogue never shortens the fixed project video duration", () => {
   document.shots[0].duration = 3;
   document.shots[0].dialogues = [{ id: "dialogue-1", characterCardId: "robot", characterName: "球球", text: "你好" }];
   document.filmBible = { voices: { profiles: { robot: { status: "locked", voiceType: "robot-speaker", version: 2 } } } };
-  const voiceAsset = { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.5, input: { dialogue: { id: "dialogue-1", voiceVersion: 2 } } } };
+  const voiceAsset = { id: "voice-1", kind: "audio", created: 5, metadata: { duration: 1.5, input: { dialogue: { id: "dialogue-1", voiceVersion: 2, text:"你好" } } } };
+  Object.assign(document.shots[0].dialogues[0],{audioAssetId:"voice-1",audioVoiceVersion:2});
   const rows = deriveVideoProductionRows(document, [...assets, voiceAsset], jobs, providers, capabilities);
   assert.equal(rows[0].effectiveDuration, 12);
   assert.equal(rows[0].submissionDuration, 12);

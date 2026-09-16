@@ -11,6 +11,7 @@ from backend.worker import Worker
 from tests.auth_helpers import login_admin
 from tests.platform_model_helpers import publish_test_model, bind_adapter_job, CANARY
 from tests.egress_helpers import mock_egress, public_test_dns
+from tests.collaboration_helpers import create_object, patch_object, create_visual_cards, object_version, create_node, set_edges
 
 @pytest.fixture(scope='module')
 def client():
@@ -76,24 +77,22 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     version_id=ids['hero'][1]
     visual['versions'][version_id]['status']='locked'
     visual['versions'][version_id]['references']=[{'role':'primary','assetId':reference['id']}]
-    first['document']['filmBible']['visual']=visual
-    saved=c.put(f'/api/projects/{first["id"]}',json={
-        'name':first['name'],'revision':first['revision'],
-        'production_revision':first['production_revision'],'document':first['document'],
-    })
+    card_id=ids['hero'][0]
+    card=c.post(f'/api/projects/{first["id"]}/objects',json={'kind':'visual_card','content':{
+        'card':visual['cards'][card_id],'versions':visual['versions'],'voice_profile':None}})
+    assert card.status_code==201,card.text
+    saved=c.patch(f'/api/productions/{production["id"]}/context',json={
+        'expected_revision':first['production_revision'],'patch':{'style':'shared updated style'}})
     assert saved.status_code==200,saved.text
-    assert saved.json()['production_revision']==first['production_revision']+1
+    assert saved.json()['revision']==first['production_revision']+1
 
     inherited=c.get(f'/api/projects/{second["id"]}').json()
-    assert inherited['production_revision']==saved.json()['production_revision']
+    assert inherited['production_revision']==saved.json()['revision']
     assert inherited['document']['filmBible']['visual']['versions'][version_id]['references'][0]['assetId']==reference['id']
     assert reference_asset(second['id'],reference['id'])['id']==reference['id']
 
-    stale_second['document']['style']='冲突风格'
-    conflict=c.put(f'/api/projects/{second["id"]}',json={
-        'name':stale_second['name'],'revision':stale_second['revision'],
-        'production_revision':stale_second['production_revision'],'document':stale_second['document'],
-    })
+    conflict=c.patch(f'/api/productions/{production["id"]}/context',json={
+        'expected_revision':stale_second['production_revision'],'patch':{'style':'冲突风格'}})
     assert conflict.status_code==409
 
     inherited['document']['shots']=[{
@@ -101,12 +100,10 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
         'assetBindings':{'characters':[{'role':'主角','versionId':version_id}],'scene':None,'props':[]},
         'pipeline':{},
     }]
-    episode_save=c.put(f'/api/projects/{second["id"]}',json={
-        'name':inherited['name'],'revision':inherited['revision'],
-        'production_revision':inherited['production_revision'],'document':inherited['document'],
-    })
-    assert episode_save.status_code==200,episode_save.text
-    assert episode_save.json()['production_revision']==inherited['production_revision']
+    episode_save=c.post(f'/api/projects/{second["id"]}/objects',json={'kind':'shot',
+        'content':{'shot':inherited['document']['shots'][0],'nodes':[]}})
+    assert episode_save.status_code==201,episode_save.text
+    assert c.get(f'/api/projects/{second["id"]}').json()['production_revision']==inherited['production_revision']
     production_assets=c.get(f'/api/productions/{production["id"]}/assets').json()
     inherited_assets=c.get(f'/api/projects/{second["id"]}/assets?scope=production').json()
     assert [item['id'] for item in production_assets]==[reference['id']]
@@ -144,6 +141,10 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     other=c.post('/api/projects',json={'name':'另一个 Production'}).json()
     reference_provider=publish_test_model(c,'reference-test-api',kind='image',provider_type='volcengine_ark',
         capabilities={'image_reference':True,'max_references':10})
+    for target,nid in [(second,'same-production-reference'),(other,'cross-production-reference')]:
+        created=c.post(f'/api/projects/{target["id"]}/objects',json={'kind':'node',
+            'content':{'node':{'id':nid,'type':'media','data':{'kind':'image'}}}})
+        assert created.status_code==201,created.text
     accepted_job=c.post(f'/api/projects/{second["id"]}/jobs',json={
         'node_id':'same-production-reference','kind':'image','submission_id':'same-production-reference-1',
         'input':{'prompt':'只验证引用边界','model_id':reference_provider['id'],'asset_ids':[reference['id']]},
@@ -195,8 +196,9 @@ def test_project_schema_revision_and_generation_policy_roundtrip(authenticated):
     from backend.project_schema import CURRENT_SCHEMA_VERSION
     assert created['document']['schemaVersion']==CURRENT_SCHEMA_VERSION
     assert created['document']['generationPolicy']['image']=={'model_id':'phase0-image'}
-    document=created['document'];document['generationPolicy']['video']={'model_id':'seedance-custom'}
-    saved=c.put('/api/projects/'+created['id'],json={'name':created['name'],'revision':created['revision'],'document':document})
+    policy={**created['document']['generationPolicy'],'video':{'model_id':'seedance-custom'}}
+    saved=c.patch('/api/productions/'+created['production_id']+'/context',json={
+        'expected_revision':created['production_revision'],'patch':{'generationPolicy':policy}})
     assert saved.status_code==200,saved.text
     reopened=c.get('/api/projects/'+created['id']).json()['document']
     assert reopened['generationPolicy']['video']['model_id']=='seedance-custom'
@@ -204,6 +206,8 @@ def test_project_schema_revision_and_generation_policy_roundtrip(authenticated):
 
 
 def test_film_bible_and_shot_bindings_round_trip_through_project_document(authenticated):
+    import io
+    from PIL import Image
     c=authenticated;p=project(c);doc=p['document']
     from backend.film_bible import normalize_visual_bible
     visual,key_ids=normalize_visual_bible({'cards':[{
@@ -214,19 +218,21 @@ def test_film_bible_and_shot_bindings_round_trip_through_project_document(authen
     card_id=key_ids['hero'][0]
     visual['cards'][card_id]['generation']={'image':{'mode':'override','model_id':'seedream-custom'}}
     visual['versions'][version_id]['status']='locked'
+    stream=io.BytesIO();Image.new('RGB',(8,8),'#334455').save(stream,format='PNG')
+    reference=c.post(f'/api/projects/{p["id"]}/assets',files={'file':('reference.png',stream.getvalue(),'image/png')}).json()
     visual['versions'][version_id]['references']=[{
-      'role':'primary','assetId':'asset-reference','source':'generated','createdAt':123,
+      'role':'primary','assetId':reference['id'],'source':'generated','createdAt':123,
       'provenance':{'jobId':'job-reference','model_id':'seedream-custom','targetSource':'override'},
     }]
     visual['versions'][version_id]['provenance']={'lockedAt':124}
     doc['shots']=[{'id':'shot-001','uid':'shot-stable-1','order':1,'assetBindings':{
       'characters':[{'role':'林岚','versionId':version_id}],'scene':None,'props':[]},'pipeline':{}}]
-    saved=c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':p['revision'],'document':doc})
-    assert saved.status_code==200,saved.text
+    create_visual_cards(c,p['id'],visual)
+    create_object(c,p['id'],'shot',{'shot':doc['shots'][0],'nodes':[]})
     restored=c.get('/api/projects/'+p['id']).json()['document']
     assert restored['filmBible']['visual']==doc['filmBible']['visual']
     assert restored['filmBible']['visual']['cards'][card_id]['generation']['image']['mode']=='override'
-    assert restored['filmBible']['visual']['versions'][version_id]['references'][0]['assetId']=='asset-reference'
+    assert restored['filmBible']['visual']['versions'][version_id]['references'][0]['assetId']==reference['id']
     assert restored['shots']==doc['shots']
     assert all(card['source']=={'type':'script_extraction'} for card in restored['filmBible']['visual']['cards'].values())
 
@@ -261,8 +267,9 @@ def test_phase5_roundtrip_preserves_versions_binding_fingerprint_stale_and_media
             'generationFingerprint':fingerprint,
         }})
     before_jobs=len(c.get(f'/api/projects/{p["id"]}/jobs').json())
-    first=c.put(f'/api/projects/{p["id"]}',json={'name':p['name'],'revision':p['revision'],'document':doc})
-    assert first.status_code==200,first.text
+    card=create_visual_cards(c,p['id'],doc['filmBible']['visual'])['hero']
+    shots={shot['id']:create_object(c,p['id'],'shot',{'shot':shot,
+        'nodes':[node for node in doc['nodes'] if node['id']==shot['imageNode']]}) for shot in doc['shots']}
 
     # Fork v1 -> draft v2. Merely moving currentVersionId must not upgrade a Shot.
     doc=c.get(f'/api/projects/{p["id"]}').json()['document']
@@ -272,11 +279,10 @@ def test_phase5_roundtrip_preserves_versions_binding_fingerprint_stale_and_media
         'provenance':{'forkedFromVersionId':'hero-v1'},
     }
     doc['filmBible']['visual']['cards']['hero']['currentVersionId']='hero-v2'
-    second=c.put(f'/api/projects/{p["id"]}',json={
-        'name':p['name'],'revision':first.json()['revision'],
-        'production_revision':first.json()['production_revision'],'document':doc,
-    })
+    second=patch_object(c,p['id'],card,{'card':doc['filmBible']['visual']['cards']['hero'],
+        'versions':doc['filmBible']['visual']['versions'],'voice_profile':None})
     assert second.status_code==200,second.text
+    card=second.json()
     after_fork=c.get(f'/api/projects/{p["id"]}').json()['document']
     assert [shot['assetBindings']['characters'][0]['versionId'] for shot in after_fork['shots']]==['hero-v1','hero-v1']
     assert after_fork['filmBible']['visual']['versions']['hero-v1']==v1
@@ -284,17 +290,14 @@ def test_phase5_roundtrip_preserves_versions_binding_fingerprint_stale_and_media
     # Confirm v2, then explicitly upgrade only Shot A and mark its old result stale.
     doc=copy.deepcopy(after_fork);v2=doc['filmBible']['visual']['versions']['hero-v2']
     v2['status']='locked';v2['references']=[{'role':'primary','assetId':media['id']}];v2['provenance']['lockedAt']=3
-    third=c.put(f'/api/projects/{p["id"]}',json={
-        'name':p['name'],'revision':second.json()['revision'],
-        'production_revision':second.json()['production_revision'],'document':doc,
-    })
+    third=patch_object(c,p['id'],card,{'card':doc['filmBible']['visual']['cards']['hero'],
+        'versions':doc['filmBible']['visual']['versions'],'voice_profile':None})
     assert third.status_code==200,third.text
+    card=third.json()
     doc=c.get(f'/api/projects/{p["id"]}').json()['document']
-    doc['shots'][0]['assetBindings']['characters'][0]['versionId']='hero-v2'
-    fourth=c.put(f'/api/projects/{p["id"]}',json={
-        'name':p['name'],'revision':third.json()['revision'],
-        'production_revision':third.json()['production_revision'],'document':doc,
-    })
+    upgraded=copy.deepcopy(shots['A']['content'])
+    upgraded['shot']['assetBindings']['characters'][0]['versionId']='hero-v2'
+    fourth=patch_object(c,p['id'],shots['A'],upgraded)
     assert fourth.status_code==200,fourth.text
     restored=c.get(f'/api/projects/{p["id"]}').json()['document']
     assert restored['filmBible']['visual']['versions']['hero-v1']['spec']['description']=='灰色风衣'
@@ -308,18 +311,18 @@ def test_phase5_roundtrip_preserves_versions_binding_fingerprint_stale_and_media
     assert restored['nodes'][1]['data'].get('stale') is not True
 
     # The HTTP save boundary blocks direct tampering and hard deletion.
-    mutation=copy.deepcopy(restored);mutation['filmBible']['visual']['versions']['hero-v1']['spec']['description']='覆盖历史'
-    assert c.put(f'/api/projects/{p["id"]}',json={'name':p['name'],'revision':fourth.json()['revision'],'production_revision':fourth.json()['production_revision'],'document':mutation}).status_code==400
-    deletion=copy.deepcopy(restored);del deletion['filmBible']['visual']['versions']['hero-v1']
-    assert c.put(f'/api/projects/{p["id"]}',json={'name':p['name'],'revision':fourth.json()['revision'],'production_revision':fourth.json()['production_revision'],'document':deletion}).status_code==400
-    deprecated=copy.deepcopy(restored);deprecated['filmBible']['visual']['versions']['hero-v1']['status']='deprecated'
-    archived=c.put(f'/api/projects/{p["id"]}',json={'name':p['name'],'revision':fourth.json()['revision'],'production_revision':fourth.json()['production_revision'],'document':deprecated})
+    mutation=copy.deepcopy(card['content']);mutation['versions']['hero-v1']['spec']['description']='覆盖历史'
+    assert patch_object(c,p['id'],card,mutation).status_code==400
+    deletion=copy.deepcopy(card['content']);del deletion['versions']['hero-v1']
+    assert patch_object(c,p['id'],card,deletion).status_code==400
+    deprecated=copy.deepcopy(card['content']);deprecated['versions']['hero-v1']['status']='deprecated'
+    archived=patch_object(c,p['id'],card,deprecated)
     assert archived.status_code==200,archived.text
     assert c.get(f'/api/projects/{p["id"]}').json()['document']['shots'][1]['assetBindings']['characters'][0]['versionId']=='hero-v1'
     assert len(c.get(f'/api/projects/{p["id"]}/jobs').json())==before_jobs
     assert c.get(f'/api/assets/{media["id"]}/file').status_code==200
 
-def test_visual_reference_queue_validates_server_capability_and_persists_ownership(authenticated,monkeypatch):
+def test_visual_reference_queue_validates_server_capability_and_persists_ownership(authenticated,monkeypatch,tmp_path):
     import copy
     import io
     from PIL import Image
@@ -374,11 +377,12 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
         visual['versions'][hero_version]['references']=[{'role':'primary','assetId':parent['id']}]
         doc['filmBible']['visual']=visual
         doc['generationPolicy']['image']={'model_id':'phase3-image'}
-        saved=c.put(f'/api/projects/{p["id"]}',json={
-            'name':p['name'],'revision':p['revision'],
-            'production_revision':p['production_revision'],'document':doc,
-        })
+        cards=create_visual_cards(c,p['id'],visual)
+        state_card=cards[keys['wet'][0]]
+        saved=c.patch(f'/api/productions/{p["production_id"]}/context',json={
+            'expected_revision':p['production_revision'],'patch':{'generationPolicy':doc['generationPolicy']}})
         assert saved.status_code==200,saved.text
+        prepared=c.get(f'/api/projects/{p["id"]}').json()
         payload={
             'node_id':f'visual-version:{state_version}','kind':'image','submission_id':'phase3-state-reference',
             'input':{
@@ -410,29 +414,42 @@ def test_visual_reference_queue_validates_server_capability_and_persists_ownersh
         duplicate=c.post(f'/api/projects/{p["id"]}/jobs',json=duplicate_payload)
         assert duplicate.status_code==409
         assert '已有任务' in duplicate.text
-        job=accepted.json();generation=(
-            job['project_document']['filmBible']['visual']['versions'][state_version]
-            ['provenance']['referenceGeneration']
-        )
-        assert job['project_revision']==saved.json()['revision']
-        assert job['production_revision']==saved.json()['production_revision']+1
+        job=accepted.json()
+        assert 'project_document' not in job
+        assert job['collaboration']['target']=={'kind':'visual_card','id':state_card['id'],
+            'revision':state_card['revision'],'assignment_epoch':state_card['assignment_epoch']}
+        queued=c.get(f'/api/projects/{p["id"]}').json()
+        assert queued['revision']==prepared['revision'] and queued['production_revision']==prepared['production_revision']
+        assert queued['document']['filmBible']['visual']==prepared['document']['filmBible']['visual']
+        # Register a synthetic local result; no provider HTTP is made here.
+        from backend.providers.common import register
+        image_path=tmp_path/'visual-candidate.png';Image.new('RGB',(24,24),'#445566').save(image_path)
+        assert s.job_update(job['id'],status='running')
+        asset=register(job,image_path)
+        assert s.job_update(job['id'],status='succeeded',result={'assets':[asset]})
+        assert c.get(f'/api/projects/{p["id"]}').json()['document']['filmBible']['visual']==visual
+        adopted=c.post(f'/api/projects/{p["id"]}/candidates/{job["id"]}/adopt',json=object_version(state_card))
+        assert adopted.status_code==200,adopted.text
+        current=adopted.json()['target'];generation=current['content']['versions'][state_version]['provenance']['referenceGeneration']
         assert generation['submissionId']==payload['submission_id']
         assert generation['jobId']==job['id']
-        assert job['project_document']['filmBible']['visual']['versions'][state_version]['status']=='pending_reference'
+        assert current['content']['versions'][state_version]['status']=='pending_reference'
+        assert current['content']['versions'][state_version]['references'][0]['assetId']==asset['id']
         restored=c.get(f'/api/projects/{p["id"]}').json()
-        assert restored['revision']==job['project_revision']
+        assert restored['revision']==prepared['revision']
+        assert restored['production_revision']==prepared['production_revision']
         assert restored['document']['filmBible']['visual']['versions'][state_version]['provenance']['referenceGeneration']==generation
         after_adaptation=c.get(f'/api/productions/{p["production_id"]}/adaptation').json()
         assert {key:after_adaptation[key] for key in before_adaptation}==before_adaptation
         stale_without_production_token=copy.deepcopy(doc)
         stale_without_production_token['style']='不应覆盖的新风格'
         bypass=c.put(f'/api/projects/{p["id"]}',json={
-            'name':p['name'],'revision':job['project_revision'],
+            'name':p['name'],'revision':restored['revision'],
             'document':stale_without_production_token,
         })
-        assert bypass.status_code==409
+        assert bypass.status_code==410
         assert c.get('/api/jobs/'+job['id']).json()['input']['asset_ids']==[parent['id']]
-        c.post('/api/jobs/'+job['id']+'/cancel')
+        assert c.post(f'/api/projects/{p["id"]}/candidates/{job["id"]}/adopt',json=object_version(current)).status_code==409
     finally:
         pass
 
@@ -484,7 +501,14 @@ def test_shot_reference_compiler_is_identical_for_single_and_batch_submission(au
                 'scene':{'versionId':keys['alley'][1]},'props':[],
             },
         }]
-        saved=c.put(f'/api/projects/{p["id"]}',json={'name':p['name'],'revision':p['revision'],'document':doc})
+        create_visual_cards(c,p['id'],visual)
+        create_object(c,p['id'],'node',{'node':{key:value for key,value in manual_node.items() if key!='position'}})
+        create_object(c,p['id'],'shot',{'shot':doc['shots'][0],
+            'nodes':[{key:value for key,value in image_node.items() if key!='position'}]})
+        graph=next(row for row in c.get(f'/api/projects/{p["id"]}/objects').json() if row['kind']=='graph')
+        structure={**graph['content'],'edges':doc['edges'],
+            'positions':{node['id']:node['position'] for node in doc['nodes']}}
+        saved=patch_object(c,p['id'],graph,structure)
         assert saved.status_code==200,saved.text
 
         maximum={'value':1}
@@ -589,6 +613,12 @@ def test_volcengine_ark_unified_settings_and_connection(authenticated,monkeypatc
     from PIL import Image
     stream=io.BytesIO();Image.new('RGB',(32,24),'#445566').save(stream,format='PNG')
     reference=c.post('/api/projects/'+p['id']+'/assets',files={'file':('ark-reference.png',stream.getvalue(),'image/png')}).json()
+    for nid,kind in [('ark-image-reference','image'),('ark-video-reference','video'),
+                     ('ark-video-transition','video'),('ark-video-tail-only','video'),
+                     ('ark-video-many-references','video'),('ark-image','image'),('ark-video','video')]:
+        target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
+            'content':{'node':{'id':nid,'type':'media','data':{'kind':kind}}}})
+        assert target.status_code==201,target.text
     accepted=c.post('/api/projects/'+p['id']+'/jobs',json={
         'node_id':'ark-image-reference','kind':'image','submission_id':'ark-image-reference-job',
         'input':{'model_id':'ark-image','prompt':'参考图一的人物生成新场景','asset_ids':[reference['id']],'allow_cloud':True},
@@ -683,9 +713,9 @@ def test_ark_cancel_rereads_handle_attached_after_initial_snapshot(authenticated
 def test_revision_conflict_and_restore(authenticated):
     c=authenticated;p=project(c)
     doc=p['document'];doc['brief']='中文故事，严格保存。'
-    payload={'name':p['name'],'revision':p['revision'],'document':doc}
-    assert c.put('/api/projects/'+p['id'],json=payload).json()['revision']==2
-    assert c.put('/api/projects/'+p['id'],json=payload).status_code==409
+    payload={'expected_revision':p['revision'],'patch':{'brief':doc['brief']}}
+    assert c.patch('/api/projects/'+p['id']+'/metadata',json=payload).json()['revision']==2
+    assert c.patch('/api/projects/'+p['id']+'/metadata',json=payload).status_code==409
     assert c.get('/api/projects/'+p['id']).json()['document']['brief']==doc['brief']
     revisions=c.get('/api/projects/'+p['id']+'/revisions').json()
     assert len(revisions)==1
@@ -693,20 +723,36 @@ def test_revision_conflict_and_restore(authenticated):
     assert old['document']['brief']==''
 
 
-def test_editor_timeline_round_trips_through_project_persistence(authenticated):
+def test_editor_timeline_round_trips_through_project_persistence(authenticated,tmp_path):
+    import subprocess
+    from backend.media import ffmpeg_executable
     c=authenticated;p=project(c);doc=p['document']
+    source=tmp_path/'timeline.mp4'
+    made=subprocess.run([ffmpeg_executable(),'-v','error','-f','lavfi','-i',
+        'color=c=blue:s=64x64:r=24:d=5','-c:v','libx264','-pix_fmt','yuv420p',str(source)],
+        capture_output=True,timeout=30)
+    assert made.returncode==0,made.stderr
+    with source.open('rb') as stream:
+        uploaded=c.post(f'/api/projects/{p["id"]}/assets',files={'file':('timeline.mp4',stream,'video/mp4')})
+    assert uploaded.status_code==200,uploaded.text
+    aid=uploaded.json()['id']
     timeline={
         'version':2,
         'tracks':[{'id':'v1','name':'V1','type':'video','elements':[{
             'id':'clip-1','type':'video','s':1.25,'e':4.5,
-            'props':{'src':'/api/assets/a1/file','srcAssetId':'a1','time':.5,'volume':.7,'playbackRate':1.25,'opacity':.8,'mediaFilter':'cinematic','transition':{'toElementId':'clip-2','kind':'crossfade','duration':.4}},
-            'metadata':{'assetId':'a1','mvc':{'fade':{'videoIn':.2,'videoOut':.4,'audioIn':.1,'audioOut':.3},'volumeKeyframes':[{'time':0,'value':.5},{'time':3.25,'value':1}]}},
+            'props':{'src':f'/api/assets/{aid}/file','srcAssetId':aid,'time':.5,'volume':.7,'playbackRate':1.25,'opacity':.8,'mediaFilter':'cinematic','transition':{'toElementId':'clip-2','kind':'crossfade','duration':.4}},
+            'metadata':{'assetId':aid,'mvc':{'fade':{'videoIn':.2,'videoOut':.4,'audioIn':.1,'audioOut':.3},'volumeKeyframes':[{'time':0,'value':.5},{'time':3.25,'value':1}]}},
             'frame':{'x':20,'y':30,'size':[640,360],'rotation':5},
         }]}],
-        'assets':{'a1':{'id':'a1','type':'video','url':'/api/assets/a1/file'}},
+        'assets':{aid:{'id':aid,'type':'video','url':f'/api/assets/{aid}/file'}},
     }
-    doc['editor']={'version':1,'timeline':timeline}
-    saved=c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':p['revision'],'document':doc})
+    row=next(row for row in c.get(f'/api/projects/{p["id"]}/objects').json() if row['kind']=='timeline')
+    lease=c.post(f'/api/projects/{p["id"]}/objects/{row["id"]}/lease',json={
+        'action':'acquire','assignment_epoch':row['assignment_epoch']})
+    assert lease.status_code==200,lease.text
+    saved=c.patch(f'/api/projects/{p["id"]}/objects/{row["id"]}',json={
+        **object_version(row),'lease_token':lease.json()['token'],'lease_epoch':lease.json()['lease_epoch'],
+        'content':{'timeline':timeline}})
     assert saved.status_code==200,saved.text
     restored=c.get('/api/projects/'+p['id']).json()['document']['editor']
     assert restored=={'version':1,'timeline':timeline}
@@ -715,7 +761,7 @@ def test_blank_project_name_uses_default(authenticated):
     c=authenticated
     item=c.post('/api/projects',json={'name':''}).json()
     assert item['name']=='未命名短片'
-    saved=c.put('/api/projects/'+item['id'],json={'name':'   ','revision':item['revision'],'document':item['document']})
+    saved=c.patch('/api/projects/'+item['id']+'/metadata',json={'expected_revision':item['revision'],'patch':{'name':'   '}})
     assert saved.status_code==200
     assert c.get('/api/projects/'+item['id']).json()['name']=='未命名短片'
 
@@ -724,8 +770,9 @@ def test_projects_and_assets_move_to_trash_and_restore(authenticated):
     from PIL import Image
     c=authenticated
     occupied=project(c)
-    occupied['document']['nodes']=[{'id':'n1','data':{'kind':'text'}}]
-    assert c.put('/api/projects/'+occupied['id'],json={'name':occupied['name'],'revision':occupied['revision'],'document':occupied['document']}).status_code==200
+    created=c.post('/api/projects/'+occupied['id']+'/objects',json={'kind':'node',
+        'content':{'node':{'id':'n1','type':'media','data':{'kind':'text'}}}})
+    assert created.status_code==201,created.text
     deleted=c.delete('/api/projects/'+occupied['id'])
     assert deleted.status_code==200 and deleted.json()=={'deleted':occupied['id'],'soft':True}
     assert c.get('/api/projects/'+occupied['id']).status_code==404
@@ -733,6 +780,9 @@ def test_projects_and_assets_move_to_trash_and_restore(authenticated):
     assert occupied['id'] in [item['id'] for item in c.get('/api/trash').json()['projects']]
     assert c.post(f'/api/trash/project/{occupied["id"]}/restore').status_code==200
     assert c.get('/api/projects/'+occupied['id']).status_code==200
+    retained=c.get('/api/projects/'+occupied['id']+'/objects/'+created.json()['id']).json()
+    assert retained['content']==created.json()['content']
+    assert retained['assignment_epoch']>created.json()['assignment_epoch']
 
     stream=io.BytesIO();Image.new('RGB',(8,8),'#223344').save(stream,format='PNG')
     asset=c.post(f'/api/projects/{occupied["id"]}/assets',files={'file':('trash.png',stream.getvalue(),'image/png')}).json()
@@ -745,6 +795,7 @@ def test_projects_and_assets_move_to_trash_and_restore(authenticated):
 
 def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(authenticated):
     c=authenticated;p=project(c)
+    create_node(c,p['id'],'n1')
     payload={'node_id':'n1','kind':'text','submission_id':'stable-submission-001','input':{'model_id':'cloud','prompt':'编写短片'}}
     first=c.post('/api/projects/'+p['id']+'/jobs',json=payload).json()
     second=c.post('/api/projects/'+p['id']+'/jobs',json=payload).json()
@@ -761,6 +812,8 @@ def test_cloud_submission_needs_no_extra_authorization_and_freezes_provider(auth
 def test_missing_or_removed_local_provider_fails_before_any_upstream_request(authenticated,monkeypatch):
     import httpx
     c=authenticated;p=project(c)
+    create_node(c,p['id'],'missing-provider')
+    create_node(c,p['id'],'legacy-local')
     previous=s.get_setting('providers',[])
     s.set_setting('providers',[])
     calls=[]
@@ -780,6 +833,7 @@ def test_missing_or_removed_local_provider_fails_before_any_upstream_request(aut
 
 def test_cancel_wins_late_completion(authenticated):
     c=authenticated;p=project(c)
+    create_node(c,p['id'],'n')
     old=s.get_setting('providers',[])
     provider=publish_test_model(c,'cancel-test-api')
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'cancel-submission-001','input':{'model_id':provider['id'],'prompt':'你好'}}).json()
@@ -800,7 +854,11 @@ def test_media_upload_range_and_project_boundary(authenticated):
     assert result.status_code==206
     assert len(result.content)==10
     request={'node_id':'n','kind':'image','submission_id':'wrong-project-ref-001','input':{'prompt':'reference','asset_ids':[asset['id']]}}
-    assert c.post('/api/projects/'+other['id']+'/jobs',json=request).status_code==400
+    publish_test_model(c,'boundary-image',kind='image',provider_type='volcengine_ark',capabilities={'image_reference':True,'max_references':10})
+    create_node(c,other['id'],'n',kind='image')
+    request['input']['model_id']='boundary-image'
+    rejected=c.post('/api/projects/'+other['id']+'/jobs',json=request)
+    assert rejected.status_code==400 and '其他 Production' in rejected.text
     assert c.post('/api/projects/'+p['id']+'/assets',files={'file':('bad.html',b'<script>x</script>','text/html')}).status_code==400
 
 def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticated,monkeypatch):
@@ -819,6 +877,7 @@ def test_provider_asset_url_is_signed_expiring_and_needs_no_session(authenticate
 
 def test_restart_marks_ambiguous_running_job(authenticated):
     c=authenticated;p=project(c)
+    create_node(c,p['id'],'n')
     provider=publish_test_model(c,'restart-test-api')
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'interrupted-job-001','input':{'model_id':provider['id'],'prompt':'test'}}).json()
     with s.db() as db:
@@ -832,8 +891,9 @@ def test_restart_marks_ambiguous_running_job(authenticated):
 def test_graph_cycle_rejected_without_submitting(authenticated):
     c=authenticated;p=project(c);doc=p['document']
     doc['nodes']=[{'id':n,'data':{'kind':'text','prompt':'test'}} for n in ('a','b')]
-    doc['edges']=[{'source':'a','target':'b'},{'source':'b','target':'a'}]
-    assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
+    doc['edges']=[{'id':'ab','source':'a','target':'b'},{'id':'ba','source':'b','target':'a'}]
+    for node in doc['nodes']:create_node(c,p['id'],node['id'],**node['data'])
+    set_edges(c,p['id'],doc['edges'])
     response=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'graph-cycle-test'})
     assert response.status_code==400
     assert c.get('/api/projects/'+p['id']+'/jobs').json()==[]
@@ -842,7 +902,7 @@ def test_graph_storyboard_defaults_to_two_pass_film_bible(authenticated):
     c=authenticated;p=project(c);doc=p['document']
     publish_test_model(c,'local-test')
     doc['nodes']=[{'id':'plan','data':{'kind':'storyboard','model_id':'local-test','prompt':'雨夜故事'}}]
-    assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
+    for node in doc['nodes']:create_node(c,p['id'],node['id'],**node['data'])
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'film-bible-graph-001'})
     assert result.status_code==200,result.text
     jobs=c.get('/api/projects/'+p['id']+'/jobs').json()
@@ -859,8 +919,9 @@ def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     c=authenticated;p=project(c);doc=p['document']
     publish_test_model(c,'local-test')
     doc['nodes']=[{'id':n,'data':{'kind':'text','model_id':'local-test','prompt':prompt}} for n,prompt in [('a','故事'),('b','分镜')]]
-    doc['edges']=[{'source':'a','target':'b'}]
-    assert c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc}).status_code==200
+    doc['edges']=[{'id':'ab','source':'a','target':'b'}]
+    for node in doc['nodes']:create_node(c,p['id'],node['id'],**node['data'])
+    set_edges(c,p['id'],doc['edges'])
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'graph-run-test-001'}).json()
     assert result['count']==2
     with s.db() as db:
@@ -891,6 +952,9 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
     c=authenticated;p=project(c)
     provider={'id':'recover-'+provider_type,'type':provider_type,'url':'http://engine.test','local':True,'model':'test','workflow':{}}
     kind='video' if provider_type=='video_api' else 'image'
+    target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
+        'content':{'node':{'id':'n','type':'media','data':{'kind':kind,'prompt':'test'}}}})
+    assert target.status_code==201,target.text
     publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url=provider['url'],options={'workflow':{}})
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':kind,'submission_id':'resume-'+provider_type,'input':{'model_id':provider['id'],'prompt':'test'}}).json()
     s.job_update(job['id'],status='interrupted',provider_job_id='original-handle')
@@ -923,6 +987,9 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
 
 def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(authenticated):
     c=authenticated;p=project(c)
+    target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
+        'content':{'node':{'id':'n','type':'media','data':{'kind':'text','prompt':'test'}}}})
+    assert target.status_code==201,target.text
     provider=publish_test_model(c,'resume-test-api')
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'model_id':provider['id'],'prompt':'test'}}).json()
     s.job_update(job['id'],status='interrupted',error='restart',phase='old phase',progress=42,telemetry={'old':True})
@@ -938,6 +1005,9 @@ def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(auth
 def test_replicate_resume_uses_frozen_service_and_cancel_requests_remote_stop(authenticated,monkeypatch):
     from backend import replicate_api
     c=authenticated;p=project(c)
+    target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
+        'content':{'node':{'id':'n','type':'media','data':{'kind':'video','prompt':'镜头推进'}}}})
+    assert target.status_code==201,target.text
     provider={'id':'replicate-video','name':'Replicate','type':'replicate','kind':'video','url':'https://api.replicate.com/v1','model':'bytedance/seedance-1-pro','api_key':'test-key','local':False}
     publish_test_model(c,provider['id'],kind='video',provider_type='replicate',url=provider['url'],upstream_model=provider['model'])
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'video','submission_id':'replicate-resume-001','input':{'model_id':'replicate-video','allow_cloud':True,'prompt':'镜头推进'}}).json()
@@ -970,7 +1040,8 @@ def test_batch_late_validation_failure_rolls_back_all_jobs(authenticated):
     publish_test_model(c,'text-only')
     doc['nodes']=[{'id':'a','data':{'kind':'text','prompt':'story','model_id':'text-only'}},{'id':'b','data':{'kind':'image','prompt':'frame','model_id':'text-only'}}]
     doc['edges']=[{'id':'ab','source':'a','target':'b'}]
-    c.put('/api/projects/'+p['id'],json={'name':p['name'],'revision':1,'document':doc})
+    for node in doc['nodes']:create_node(c,p['id'],node['id'],**node['data'])
+    set_edges(c,p['id'],doc['edges'])
     result=c.post('/api/projects/'+p['id']+'/run',json={'submission_id':'atomic-batch-validation'})
     assert result.status_code==400
     assert c.get('/api/projects/'+p['id']+'/jobs').json()==[]

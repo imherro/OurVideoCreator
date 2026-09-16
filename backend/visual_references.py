@@ -1,13 +1,7 @@
 """Server-side contract for Visual Bible primary-reference jobs."""
 from __future__ import annotations
 
-import time
-
-import httpx
-
-from . import store as s
 from .generation_policy import resolve_generation_target
-from .production_context import read_project_state
 
 STATE_KINDS = {'character_state', 'scene_state'}
 
@@ -88,52 +82,5 @@ def validate_visual_reference_job(
 
 
 def record_visual_reference_submission(c, pid, body, job):
-    """Persist pending ownership in the same transaction as the durable job."""
-    state = read_project_state(c, pid)
-    if not state:
-        raise ValueError('项目不存在')
-    row = state['project']
-    production = state['production']
-    document = state['document']
-    marker = body.input['visual_reference']
-    version_id = marker['versionId']
-    version = document['filmBible']['visual']['versions'][version_id]
-    previous = (version.get('provenance') or {}).get('referenceGeneration') or {}
-    if previous.get('submissionId') == body.submission_id and previous.get('jobId') == job['id']:
-        return {
-            'revision': row['revision'],
-            'production_revision': production['revision'],
-            'document': document,
-        }
-    generation = {
-        'submissionId': body.submission_id,
-        'jobId': job['id'],
-        'createdAt': int(time.time() * 1000),
-        'model_id': body.input.get('model_id'),
-        'targetSource': marker.get('targetSource'),
-        'prompt': body.input.get('prompt'),
-    }
-    for key in ('parentVersionId', 'parentReferenceAssetId'):
-        if marker.get(key):
-            generation[key] = marker[key]
-    version['status'] = 'pending_reference'
-    version['provenance'] = {**(version.get('provenance') or {}), 'referenceGeneration': generation}
-    now = time.time()
-    c.execute(
-        'INSERT INTO production_revisions(id,production_id,revision,shared_context,created) VALUES(%s,%s,%s,%s,%s)',
-        (s.uid(), production['id'], production['revision'], production['shared_context'], now),
-    )
-    production_revision = production['revision'] + 1
-    production_context = {
-        **state['production_context'],
-        'filmBible': document['filmBible'],
-    }
-    c.execute(
-        'UPDATE productions SET revision=%s,shared_context=%s,updated=%s WHERE id=%s',
-        (production_revision, s.dumps(production_context), now, production['id']),
-    )
-    return {
-        'revision': row['revision'],
-        'production_revision': production_revision,
-        'document': document,
-    }
+    """Retired: queue submission must never change canonical visual content."""
+    raise ValueError('视觉生成仅登记候选，请通过候选采纳命令写入视觉版本')

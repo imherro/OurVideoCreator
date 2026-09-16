@@ -80,39 +80,23 @@ def validate_events(value):
 
 
 def replace_events(job, rows):
-    marker = job['input'].get('source_event_extraction') or {}
-    chapter_id = marker.get('chapterId'); production_id = marker.get('productionId')
-    expected_revision = marker.get('chapterRevision')
-    validated = validate_events({'events': rows})
-    now = time.time()
-    with s.db() as connection:
-        active = connection.execute(
-            "SELECT status FROM jobs WHERE id=%s", (job['id'],)
-        ).fetchone()
-        if not active or active['status'] != 'running':
-            raise ValueError('事件提取任务已失效，未写入提取结果')
-        chapter = connection.execute('''SELECT c.id,c.revision,d.production_id FROM source_chapters c
-            JOIN source_documents d ON d.id=c.source_id WHERE c.id=%s
-            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
-            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)''',(chapter_id,)).fetchone()
-        if not chapter or chapter['production_id'] != production_id:
-            raise ValueError('事件提取任务的章节归属已失效')
-        if chapter['revision'] != expected_revision:
-            raise ValueError('章节已在提取期间更新，旧结果未写入；请重新提取')
-        previous_ids = [row['id'] for row in connection.execute(
-            'SELECT id FROM source_events WHERE chapter_id=%s', (chapter_id,)
-        ).fetchall()]
-        connection.execute('DELETE FROM source_events WHERE chapter_id=%s',(chapter_id,))
-        for order, row in enumerate(validated, 1):
-            connection.execute('INSERT INTO source_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
-                s.uid('source-event-'),production_id,chapter_id,order,s.dumps(row['characters']),
-                row['summary'],row['importance'],row['emotion'],s.dumps(row['continuity']),
-                job['id'],now,now,
-            ))
-        from .adaptation import mark_adaptation_stale
-        production_revision = mark_adaptation_stale(
-            connection, production_id, chapter_ids=[chapter_id], event_ids=previous_ids,
-        )
-        if production_revision is not None:
-            s.event(job['project_id'], {'type': 'production', 'revision': production_revision}, connection=connection)
+    raise ValueError('Worker 自动回写原著事件已退役；请通过候选采纳命令写入')
+
+
+def write_candidate_events(connection,job,rows):
+    """Only called inside the candidate command after chapter ACL/version lock."""
+    marker=job['input']['source_event_extraction']
+    chapter_id=marker['chapterId'];production_id=marker['productionId']
+    validated=validate_events({'events':rows});now=time.time()
+    previous_ids=[row['id'] for row in connection.execute('SELECT id FROM source_events WHERE chapter_id=%s',(chapter_id,))]
+    connection.execute('DELETE FROM source_events WHERE chapter_id=%s',(chapter_id,))
+    for order,row in enumerate(validated,1):
+        connection.execute('INSERT INTO source_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
+            s.uid('source-event-'),production_id,chapter_id,order,s.dumps(row['characters']),row['summary'],
+            row['importance'],row['emotion'],s.dumps(row['continuity']),job['id'],now,now))
+    from .adaptation import mark_adaptation_stale
+    revision=mark_adaptation_stale(connection,production_id,chapter_ids=[chapter_id],event_ids=previous_ids)
+    if revision is not None:
+        for project in connection.execute('SELECT id FROM projects WHERE production_id=%s',(production_id,)):
+            s.event(project['id'],{'type':'production','revision':revision},connection=connection)
     return validated

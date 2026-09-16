@@ -88,7 +88,7 @@ def unpack(row):
     if row is None:
         return None
     data = dict(row)
-    for key in ('document','input','result','metadata','payload','telemetry'):
+    for key in ('document','input','result','metadata','payload','telemetry','collaboration'):
         if key in data and data[key] is not None:
             data[key] = json.loads(data[key])
     return data

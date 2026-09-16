@@ -763,9 +763,22 @@ def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(
         f"/api/productions/{a1['production_id']}/chapters/trash",
         json={"chapter_ids": [chapter["id"]]},
     ).status_code == 403
+    chapter_ticket = {'revision':chapter['revision'], 'assignment_epoch':chapter['assignment_epoch']}
     assert manager.post(
         f"/api/productions/{a1['production_id']}/chapters/trash",
-        json={"chapter_ids": [chapter["id"]]},
+        json={"chapter_ids": [chapter["id"]], 'versions':{chapter['id']:chapter_ticket}},
+    ).status_code == 403
+    takeover = manager.post(
+        f"/api/productions/{a1['production_id']}/owned-content/chapter/{chapter['id']}/assign",
+        json={'expected_revision':chapter['revision'], 'assignment_epoch':chapter['assignment_epoch'],
+              'assignee_id':manager_user['id']},
+    )
+    assert takeover.status_code == 200, takeover.text
+    chapter = takeover.json()
+    assert manager.post(
+        f"/api/productions/{a1['production_id']}/chapters/trash",
+        json={"chapter_ids": [chapter["id"]], 'versions':{chapter['id']:{
+            'revision':chapter['revision'], 'assignment_epoch':chapter['assignment_epoch']}}},
     ).status_code == 200
     assert editor.delete(
         f"/api/productions/{a1['production_id']}/sources/{editor_source.json()['id']}"
@@ -779,11 +792,17 @@ def test_acl01_to_08_role_matrix_nested_ids_files_jobs_trash_and_admin_boundary(
         "name": "A1 manager save", "revision": manager_copy["revision"],
         "production_revision": manager_copy["production_revision"], "document": manager_copy["document"],
     })
-    assert manager_save.status_code == 200
+    assert manager_save.status_code == 410
+    assert manager.patch(f"/api/projects/{a1['id']}/metadata", json={
+        'expected_revision':manager_copy['revision'], 'patch':{'name':'A1 manager save'},
+    }).status_code == 200
     b_copy = owner_b.get(f"/api/projects/{b1['id']}").json()
     assert owner_b.put(f"/api/projects/{b1['id']}", json={
         "name": "B1 history", "revision": b_copy["revision"],
         "production_revision": b_copy["production_revision"], "document": b_copy["document"],
+    }).status_code == 410
+    assert owner_b.patch(f"/api/projects/{b1['id']}/metadata", json={
+        'expected_revision':b_copy['revision'], 'patch':{'name':'B1 history'},
     }).status_code == 200
     b_revision_id = owner_b.get(f"/api/projects/{b1['id']}/revisions").json()[0]["id"]
     assert editor.get(f"/api/projects/{b1['id']}/revisions/{b_revision_id}").status_code == 404

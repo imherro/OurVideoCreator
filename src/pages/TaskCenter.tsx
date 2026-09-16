@@ -3,6 +3,7 @@ import { Check, Clock, Download, ExternalLink, LoaderCircle, RefreshCw, RotateCc
 import { JobProgress } from "../JobProgress";
 import { deriveTaskCenterRows, filterTaskCenterRows, taskShotLabel, type TaskEpisode } from "../taskCenter";
 import { taskDetailHref } from "../jobDetail";
+import { CandidateReview } from '../CandidateReview';
 
 type Value = Record<string, any>;
 
@@ -44,6 +45,7 @@ export function TaskCenter({
   onRefreshCurrent,
   onOpenNode,
   onAdoptShots,
+  onAdoptCandidate,
 }: {
   productionName: string;
   episodes: TaskEpisode[];
@@ -55,6 +57,7 @@ export function TaskCenter({
   onRefreshCurrent: () => Promise<void>;
   onOpenNode: (projectId: string, nodeId: string) => Promise<void>;
   onAdoptShots: (job: Value) => void;
+  onAdoptCandidate: (job: Value,body:Value) => Promise<void>;
 }) {
   const [jobs, setJobs] = useState<Value[]>(currentJobs);
   const [documents, setDocuments] = useState<Record<string, Value>>({ [currentProjectId]: currentDocument });
@@ -139,6 +142,9 @@ export function TaskCenter({
         {job.phase && <p>{job.phase}</p>}
         <JobProgress job={job}/>
         {job.error && <div className="error">{job.error}</div>}
+        <CandidateReview job={job} request={request} onAdopt={async(job,body)=>{
+          await onAdoptCandidate(job,body);await load();
+        }}/>
         <div className="task-card-actions">
           <a className="task-detail-link" href={taskDetailHref(job.id)} target="_blank" rel="noopener noreferrer">任务详情 <ExternalLink size={13}/></a>
           {job.result?.assets?.map((asset: Value) => <a className="download-link" href={asset.url} download={asset.name} key={asset.id}><Download size={14}/>{asset.name}</a>)}

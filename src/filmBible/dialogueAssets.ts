@@ -29,7 +29,8 @@ export function projectCharacterDialogueRows({
         const matchesVersion = (descriptor: Record<string, any> | undefined) =>
           descriptor?.id === dialogue.id && descriptor?.voiceVersion === voiceVersion;
         const asset = assets.find((candidate) =>
-          candidate.kind === "audio" && matchesVersion(candidate.metadata?.input?.dialogue),
+          candidate.kind === "audio" && candidate.id === dialogue.audioAssetId && dialogue.audioVoiceVersion === voiceVersion
+            && candidate.metadata?.input?.dialogue?.text === dialogue.text && matchesVersion(candidate.metadata?.input?.dialogue),
         );
         const job = jobs.find((candidate) => matchesVersion(candidate.input?.dialogue));
         const jobStatus = String(job?.status || "");

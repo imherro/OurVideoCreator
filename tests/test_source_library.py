@@ -68,13 +68,13 @@ def test_import_120_chapters_and_create_recoverable_text_jobs_only(source_client
         f'/api/productions/{production["id"]}/chapters/{first_chapter["id"]}',
         json={
             "title": "修订后的第一章", "content": first_chapter["content"] + "\n补充。",
-            "revision": first_chapter["revision"],
+            "revision": first_chapter["revision"], "assignment_epoch": first_chapter['assignment_epoch'],
         },
     )
     assert saved.status_code == 200 and saved.json()["revision"] == 2
     stale = client.put(
         f'/api/productions/{production["id"]}/chapters/{first_chapter["id"]}',
-        json={"title": "旧页面覆盖", "content": "不应保存", "revision": 1},
+        json={"title": "旧页面覆盖", "content": "不应保存", "revision": 1, "assignment_epoch": first_chapter['assignment_epoch']},
     )
     assert stale.status_code == 409
     chapters = client.get(f'/api/productions/{production["id"]}/chapters').json()
@@ -173,14 +173,21 @@ def test_invalid_or_stale_extraction_preserves_existing_events(source_client, mo
 
     saved = client.put(
         f'/api/productions/{production["id"]}/chapters/{chapter["id"]}',
-        json={"title": chapter["title"], "content": chapter["content"] + " 天亮了。", "revision": chapter["revision"]},
+        json={"title": chapter["title"], "content": chapter["content"] + " 天亮了。", "revision": chapter["revision"],
+            "assignment_epoch": chapter['assignment_epoch']},
     )
     assert saved.status_code == 200, saved.text
-    with pytest.raises(ValueError, match="章节已在提取期间更新"):
-        replace_events(running, [{
-            "characters": ["阿青"], "summary": "新事件", "importance": "high",
-            "emotion": "期待", "continuity": {"weather": "clear"},
-        }])
+    candidate_event={"characters": ["阿青"], "summary": "新事件", "importance": "high",
+        "emotion": "期待", "continuity": {"weather": "clear"}}
+    monkeypatch.setattr(worker,'_chat_text',lambda *_args,**_kwargs:json.dumps({'events':[candidate_event]}))
+    result=worker.text(running,{'url':'http://unused','local':True})
+    assert s.job_update(extraction['id'],status='succeeded',result=result)
+    for row in (chapter,saved.json()):
+        rejected=client.post(f'/api/projects/{episode["id"]}/candidates/{extraction["id"]}/adopt',json={
+            'expected_revision':row['revision'],'assignment_epoch':row['assignment_epoch']})
+        assert rejected.status_code==409,rejected.text
+    with pytest.raises(ValueError, match='退役'):
+        replace_events(running,[candidate_event])
     assert client.get(
         f'/api/productions/{production["id"]}/source-events?chapter_id={chapter["id"]}'
     ).json()[0]["summary"] == "旧事件"
@@ -215,8 +222,15 @@ def test_valid_extraction_atomically_replaces_events_with_chapter_ownership(sour
         worker, "_chat_text",
         lambda *_args, **_kwargs: json.dumps({"events": [expected]}, ensure_ascii=False),
     )
-    rows = worker.text({**job, "status": "running"}, {"url": "http://unused", "local": True})["events"]
+    result = worker.text({**job, "status": "running"}, {"url": "http://unused", "local": True})
+    rows = result['events']
     assert rows[0]["continuity"] == {"door": "open"}
+    assert client.get(f'/api/productions/{production["id"]}/source-events').json()==[]
+    assert s.job_update(job['id'],status='succeeded',result=result)
+    assert client.get(f'/api/productions/{production["id"]}/source-events').json()==[]
+    adopted=client.post(f'/api/projects/{episode["id"]}/candidates/{job["id"]}/adopt',json={
+        'expected_revision':chapter['revision'],'assignment_epoch':chapter['assignment_epoch']})
+    assert adopted.status_code==200,adopted.text
     events = client.get(f'/api/productions/{production["id"]}/source-events').json()
     assert len(events) == 1
     assert events[0]["chapter_id"] == chapter["id"]
@@ -244,8 +258,9 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
         },
     ).json()["jobs"][0]
 
-    blocked = client.delete(
-        f'/api/productions/{production["id"]}/sources/{source["id"]}'
+    versions = {chapter['id']: {'revision': chapter['revision'], 'assignment_epoch': chapter['assignment_epoch']}}
+    blocked = client.request('DELETE',
+        f'/api/productions/{production["id"]}/sources/{source["id"]}', json={'versions': versions}
     )
     assert blocked.status_code == 409
     assert "事件提取任务" in blocked.text
@@ -262,8 +277,8 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
             ),
         )
 
-    deleted = client.delete(
-        f'/api/productions/{production["id"]}/sources/{source["id"]}'
+    deleted = client.request('DELETE',
+        f'/api/productions/{production["id"]}/sources/{source["id"]}', json={'versions': versions}
     )
     assert deleted.status_code == 200, deleted.text
     assert deleted.json()["soft"] is True
@@ -299,8 +314,10 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
         f'/api/productions/{production["id"]}/sources/{source["id"]}/chapters',
         json={"title": "旧第二章", "content": "阿青回到屋内。"},
     ).json()
-    assert client.delete(
-        f'/api/productions/{production["id"]}/chapters/{chapter["id"]}'
+    current = client.get(f'/api/productions/{production["id"]}/owned-content/chapter/{chapter["id"]}').json()
+    assert client.request('DELETE',
+        f'/api/productions/{production["id"]}/chapters/{chapter["id"]}',
+        json={'revision': current['revision'], 'assignment_epoch': current['assignment_epoch']}
     ).status_code == 200
     renumbered = client.get(f'/api/productions/{production["id"]}/chapters').json()
     assert renumbered[0]["id"] == second_chapter["id"]
@@ -308,9 +325,12 @@ def test_source_document_moves_to_trash_and_restores_with_chapters_and_events(so
     assert renumbered[0]["display_no"] == 1
     assert client.post(f'/api/trash/chapter/{chapter["id"]}/restore').status_code == 200
 
+    current_chapters = client.get(f'/api/productions/{production["id"]}/chapters').json()
     deleted_chapters = client.post(
         f'/api/productions/{production["id"]}/chapters/trash',
-        json={"chapter_ids": [chapter["id"], second_chapter["id"]]},
+        json={"chapter_ids": [chapter["id"], second_chapter["id"]], 'versions': {
+            row['id']: {'revision': row['revision'], 'assignment_epoch': row['assignment_epoch']}
+            for row in current_chapters}},
     )
     assert deleted_chapters.status_code == 200, deleted_chapters.text
     assert deleted_chapters.json()["count"] == 2

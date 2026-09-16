@@ -144,7 +144,7 @@
 | GET `/api/projects/{pid}/jobs` | Session | Production 成员，只得有权任务 | P3 |
 | GET `/api/jobs/{jid}` | Session | 由 job -> production 反查授权 | P3 |
 | POST `/api/jobs/{jid}/cancel` | Session | 发起者/对象 manager；远端可能继续计费 | P3/P6 |
-| POST `/api/jobs/{jid}/resume` | Session | 有权且状态允许；无句柄重排队前重新预占/确认 | P3/P6 |
+| POST `/api/jobs/{jid}/resume` | Session | 保留 P3 提交者/作品角色边界，并在身份锁及任务锁后核当前对象负责人/原分配代际；有远端句柄只恢复查询；无句柄重排必须原目标及引用/设置版本不变，否则要求新任务；无协作快照旧任务 410。预占/配额仍属 P6 | P3/P5/P6 |
 | GET `/api/events` | Session | 按会话的 Production 权限过滤，定期复核 | P3/P7 |
 | POST `/api/productions/{production_id}/source-extractions` | Session | 已在原著组登记；任务副作用交叉索引 | P3/P6 |
 
@@ -159,7 +159,51 @@
 
 应用同时设置 `docs_url=None`、`redoc_url=None`、`openapi_url=None`。`dist` 不存在时只缺少根 `StaticFiles` Mount；全部 `/api` 入口仍注册。build 完成后实际 `app.routes` 多一个根 Mount，且因为它最后注册，不覆盖前面的 API 匹配。
 
+## P5 对象命令（实施中）
+
+所有对象路由同时校验 URL Episode、真实对象 Production、当前有效个人 session 与成员关系。修改事务取得身份共享锁和对象行锁后再次复核，不能仅依赖中间件的请求开始时检查。对象权限与整个 P5 尚在集成，不表示阶段完成。
+
+| 方法与路径 | 权限和对象边界 |
+|---|---|
+| GET `/api/projects/{pid}/objects` | viewer+，只列本 Episode 及本 Production 共享视觉卡 |
+| POST `/api/projects/{pid}/objects` | editor+，新对象初始归当前用户，拒绝伪造作者/租户 |
+| GET `/api/projects/{pid}/objects/{oid}` | viewer+，真实父级复核 |
+| PATCH `/api/projects/{pid}/objects/{oid}` | 当前 assignee + editor，revision/epoch；timeline 另需有效 lease |
+| POST `/api/projects/{pid}/objects/batch` | 每项 assignee/revision/epoch/reference 检查，全部通过才写入 |
+| POST `/api/projects/{pid}/objects/commands` | 创建/修改/删除和结构变更原子命令；全部对象权限、版本、引用先验证；不接收整份项目 |
+| POST `/api/projects/{pid}/objects/{oid}/assign` | manager/owner 显式分配或接管；增加 epoch 并撤销租约 |
+| POST `/api/projects/{pid}/objects/{oid}/lease` | timeline 当前负责人，acquire/renew/release，锁后检查时间与 token/epoch |
+| POST `/api/projects/{pid}/objects/{oid}/review` | assignee 提交；manager/owner 确认/退回指定 revision |
+| GET `/api/projects/{pid}/objects/{oid}/history` | viewer+，与当前对象相同边界 |
+| POST `/api/projects/{pid}/objects/{oid}/restore` | assignee、版本与必要 lease；恢复产生新 revision |
+| GET `/api/projects/{pid}/objects/{oid}/comments` | viewer+，与当前对象相同边界 |
+| POST `/api/projects/{pid}/objects/{oid}/comments` | viewer+；仅 append 评论，不能修改内容 |
+| PATCH `/api/projects/{pid}/metadata` | manager/owner；小白名单、expected_revision；拒绝整份 document 和对象字段 |
+| POST `/api/projects/{pid}/script-promotion` | 当前自由文本节点及正式剧本负责人；节点/图结构/剧本 revision 与 epoch；同事务保存剧本并移除自由节点主源 |
+| POST `/api/projects/{pid}/director-captures` | 当前导演台负责人及 editor；导演台/图结构 revision 与 epoch；同集图片素材校验后原子建节点和更新结构 |
+| GET `/api/projects/{pid}/candidates/{jid}` | viewer+；任务必须属于当前分集，返回候选与真实父级内的当前目标供比较；分镜额外列明整集替换范围、旧镜头负责人/版本与待移除编号 |
+| POST `/api/projects/{pid}/candidates/{jid}/adopt` | 章节/剧本/节点/镜头/视觉卡当前负责人；改编 manager；任务成功、revision/epoch、来源版本及明确旧结果采纳检查，主数据/历史/事件/采纳收据同事务；视觉/音色/对白仅采纳该任务服务端已登记且未删除素材；分镜核原镜头集合及所有被替换镜头负责人，移除旧镜头还须 manager/owner；新卡/子节点/graph 同事务，旧视觉卡及音色保留；纯导出不采纳 |
+| PATCH `/api/productions/{production_id}/context` | manager/owner；风格/模型策略/故事设定小白名单；拒绝 visual/voices 对象 |
+
 ## 覆盖核对
+
+### P5 既有关系表内容入口
+
+| 方法与路径 | 权限和对象边界 |
+|---|---|
+| GET `/api/productions/{production_id}/owned-content/{kind}/{target_id}` | viewer+，关系表对象最新版本只读查询，真实父作品复核 |
+| POST `/api/productions/{production_id}/owned-content/{kind}/{target_id}/restore` | 当前负责人和 revision/epoch；复核历史来源，正文恢复为新版本，状态回进行中 |
+| POST `/api/productions/{production_id}/owned-content/{kind}/{target_id}/assign` | kind 仅 chapter/script；manager 显式分配，revision/epoch 校验，作者由会话决定 |
+| GET `/api/productions/{production_id}/owned-content/{kind}/{target_id}/history` | viewer+，章节/剧本真实父作品复核 |
+| GET `/api/productions/{production_id}/owned-content/{kind}/{target_id}/comments` | viewer+，相同对象归属校验 |
+| POST `/api/productions/{production_id}/owned-content/{kind}/{target_id}/comments` | viewer+，仅追加评论，不写对象正文 |
+| POST `/api/productions/{production_id}/owned-content/{kind}/{target_id}/review` | chapter：负责人提交、manager 确认/退回指定 revision/epoch；script 使用原正式审核小接口 |
+
+既有章节和剧本 PUT 要求当前 assignee、revision 与 assignment_epoch；剧本 review 要求负责人，approve/needs-changes 要求 manager。分配、撤权复用 P3 身份锁，不能凭管理者角色静默写正文。
+
+原著 DELETE 必须提交全部存活章节的 revision/assignment_epoch，管理者须先显式接管各章；章节批量 trash 全批校验权限和版本后才删除，单章 DELETE 也必须提交版本/epoch。改编 PUT/review/approve 在事务内限制 manager，GET 不再隐式写回。
+
+P5 回收站：分集、原著、章节和素材删除/恢复先取既有 P3 身份排他屏障，并在事务中复核当前会话及 manager，不能凭请求开始时的旧权限执行。分集删除/恢复各递增本集对象、正式剧本及分集元数据版本，同时递增对象/剧本 assignment_epoch、清除时间线旧租约；作品共享视觉卡不受影响。原著/章节只递增章节编辑代际并保留正文/负责人。恢复不绕过原著/素材所属分集的父级回收站检查，不复活单独删除的章节。素材 ID/文件保留，分类编辑用共享身份屏障与生命周期互斥；不引入新租约体系。
 
 P3 新增 18 个身份/成员入口，当前总数由脚本按实际注册项计算。脚本在临时 `MVC_DATA_DIR` 中导入应用、导出实际 `app.routes`、逐个核对本文的方法+路径分类，并额外捕获可选静态 Mount；发现任一未分类 `/api` 路由时返回非零。负向测试会注入虚构新路由，证明 ACL-09 守卫确实失败。
 

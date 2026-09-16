@@ -182,6 +182,11 @@ def test_two_webs_independent_worker_restart_and_single_worker_lock(tmp_path):
             'definition':{'name':'P1 text','upstream_model':'p1-fake-model','capabilities':{},'defaults':{},'rules':{}},
         })
         project = request_json(opener, base_one+'/api/projects', 'POST', {'name':'P1 Process Test'})
+        request_json(opener, base_one+f'/api/projects/{project["id"]}/objects', 'POST', {
+            'kind':'node', 'content':{'node':{
+                'id':'p1-text', 'type':'media', 'data':{'kind':'text'},
+            }},
+        })
         job = request_json(opener, base_one+f'/api/projects/{project["id"]}/jobs', 'POST', {
             'node_id':'p1-text','kind':'text','submission_id':'p1-process-job-001',
             'input':{'model_id':model['id'],'prompt':'process isolation'},

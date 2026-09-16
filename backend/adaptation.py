@@ -310,6 +310,7 @@ def _script_snapshot(row):
         'characters': json.loads(row['characters']), 'scenes': json.loads(row['scenes']),
         'props': json.loads(row['props']), 'generationJobId': row['generation_job_id'],
         'metadata': json.loads(row['metadata']),
+        **{key: row[key] for key in ('assignee_id','assignment_epoch','created_by','updated_by')},
     }
 
 
@@ -317,7 +318,8 @@ def _stale_scripts(connection, production_id):
     from . import store as s
     now = time.time()
     rows = connection.execute('''SELECT sc.* FROM episode_scripts sc JOIN projects p ON p.id=sc.project_id
-        WHERE p.production_id=%s AND sc.status IN ('review','approved')''',(production_id,)).fetchall()
+        WHERE p.production_id=%s AND sc.status IN ('review','approved')
+        ORDER BY sc.project_id FOR UPDATE OF sc''',(production_id,)).fetchall()
     for row in rows:
         connection.execute(
             'INSERT INTO episode_script_revisions VALUES(%s,%s,%s,%s,%s)',
@@ -332,7 +334,7 @@ def _stale_scripts(connection, production_id):
 def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_ids=()):
     """Mark derived planning/scripts stale after Source Library changes."""
     from .production_context import normalize_production_context
-    production = connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
+    production = connection.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
     if not production or not production['shared_context']:
         return None
     context = normalize_production_context(json.loads(production['shared_context']))
@@ -358,28 +360,26 @@ def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_id
     return _persist_production_context(connection, production, context) if changed else None
 
 
-def seed_episode_scripts(connection):
-    from . import store as s
+def seed_episode_scripts(connection, project_id):
+    from . import store as s, identity
     rows = connection.execute('''SELECT p.* FROM projects p LEFT JOIN episode_scripts sc ON sc.project_id=p.id
-        WHERE sc.project_id IS NULL ORDER BY p.created,p.id''').fetchall()
+        WHERE p.id=%s AND sc.project_id IS NULL''',(project_id,)).fetchall()
     for project in rows:
         document = json.loads(project['document'])
-        candidates = [node for node in document.get('nodes', []) if isinstance(node, dict)
-            and isinstance(node.get('data'), dict) and node['data'].get('kind') == 'text'
-            and isinstance(node['data'].get('text'), str) and node['data']['text'].strip()]
-        chosen = candidates[0] if candidates else None
-        body = chosen['data']['text'].strip() if chosen else ''
+        # New episode initialization only; never import another episode's legacy payload.
+        body = ''
         metadata = {
-            'projectionNodeId': chosen['id'] if chosen else 'script-projection-' + project['id'],
-            'legacyCandidateNodeIds': [node['id'] for node in candidates],
+            'projectionNodeId': 'script-projection-' + project['id'],
         }
         now = project['updated'] or time.time()
         connection.execute('''INSERT INTO episode_scripts(project_id,revision,status,title,synopsis,
             source_chapter_refs,story_goal,paywall_beat,body,estimated_duration,characters,scenes,props,
-            generation_job_id,metadata,created,updated) VALUES(%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(
+            generation_job_id,metadata,created,updated,assignee_id,created_by,updated_by)
+            VALUES(%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(
             project['id'], 'review' if body else 'draft', project['episode_title'] or project['name'], '',
             '[]', '', '{}', body, float(document.get('duration') or 60), '[]', '[]', '[]', None,
             s.dumps(metadata), project['created'], now,
+            identity.current().user_id,identity.current().user_id,identity.current().user_id,
         ))
 
 
@@ -400,6 +400,7 @@ def script_to_api(row):
         'characters': json.loads(row['characters']), 'scenes': json.loads(row['scenes']),
         'props': json.loads(row['props']), 'generationJobId': row['generation_job_id'],
         'metadata': json.loads(row['metadata']), 'created': row['created'], 'updated': row['updated'],
+        **{key: row[key] for key in ('assignee_id','assignment_epoch','created_by','updated_by')},
     }
 
 
@@ -438,8 +439,8 @@ def validate_generated_script(value):
     })
 
 
-def project_script_to_document(connection, project_id, document):
-    row = connection.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(project_id,)).fetchone()
+def project_script_to_document(connection, project_id, document, *, snapshot=None):
+    row = snapshot if snapshot is not None else connection.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(project_id,)).fetchone()
     if not row:
         return document
     value = copy.deepcopy(document)
@@ -619,47 +620,7 @@ def validate_approval_ready(connection, production_id, bundle):
 
 
 def apply_adaptation_generation(job, generated):
-    from . import store as s
-    from .production_context import normalize_production_context
-    bundle = validate_adaptation_bundle(generated, generated=True)
-    marker = job['input'].get('adaptation_generation') or {}
-    production_id = marker.get('productionId')
-    allowed_events = set(marker.get('sourceEventIds') or [])
-    if bundle['adaptationPlan']['format'] != marker.get('format'):
-        raise ValueError('模型返回的成片规格与任务提交规格不一致')
-    if not set(bundle['adaptationPlan']['sourceEventIds']) <= allowed_events:
-        raise ValueError('模型返回了任务快照中不存在的原著事件编号')
-    allowed_chapters = set(marker.get('sourceChapterIds') or [])
-    if any(not set(plan['sourceChapterRefs']) <= allowed_chapters for plan in bundle['episodePlans']):
-        raise ValueError('模型返回了任务快照中不存在的原著章节编号')
-    with s.db() as connection:
-        active = connection.execute(
-            'SELECT status,project_id,production_id,workspace_id FROM jobs WHERE id=%s FOR UPDATE',
-            (job['id'],),
-        ).fetchone()
-        if not active or active['status'] != 'running':
-            raise ValueError('改编策划任务已失效，未写入生成结果')
-        if (active['project_id'] != job['project_id'] or active['production_id'] != production_id or
-                job.get('production_id') != production_id or active['workspace_id'] != job.get('workspace_id')):
-            raise ValueError('改编策划任务归属已失效')
-        production = connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
-        if not production:
-            raise ValueError('改编策划任务的 Production 已不存在')
-        context = normalize_production_context(json.loads(production['shared_context']))
-        if adaptation_fingerprint(context) != marker.get('adaptationFingerprint'):
-            raise ValueError('改编策划已在生成期间更新，旧结果未写入')
-        sources = source_snapshot(connection, production_id)
-        if source_fingerprint(sources) != marker.get('sourceFingerprint'):
-            raise ValueError('原著事件已在生成期间更新，旧改编结果未写入')
-        validate_source_references(
-            connection, production_id,
-            [chapter for plan in bundle['episodePlans'] for chapter in plan['sourceChapterRefs']],
-        )
-        context.update(copy.deepcopy(bundle))
-        _stale_scripts(connection, production_id)
-        revision = _persist_production_context(connection, production, context)
-        s.event(job['project_id'], {'type': 'production', 'revision': revision}, connection=connection)
-    return {**bundle, 'productionRevision': revision}
+    raise ValueError('Worker 自动回写已退役；请通过候选采纳命令写入')
 
 
 def ensure_episode_for_plan(connection, production_id, episode_no):
@@ -673,7 +634,7 @@ def ensure_episode_for_plan(connection, production_id, episode_no):
         raise ValueError(f'第 {episode_no:02d} 集已在回收站，请先恢复后再操作')
     if row:
         if not connection.execute('SELECT 1 FROM episode_scripts WHERE project_id=%s',(row['id'],)).fetchone():
-            seed_episode_scripts(connection)
+            raise ValueError('既有分集缺少正式剧本，请由管理者检查；不会自动导入旧内容')
         return row
     production = connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
     if not production:
@@ -690,13 +651,16 @@ def ensure_episode_for_plan(connection, production_id, episode_no):
         VALUES(%s,%s,1,%s,%s,%s,%s,%s,%s)''',(
         project_id,title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_no,title,
     ))
-    seed_episode_scripts(connection)
+    seed_episode_scripts(connection,project_id)
+    from .collaboration import initialize_episode
+    initialize_episode(connection, project_id)
     return connection.execute('SELECT *,0 deleted FROM projects WHERE id=%s',(project_id,)).fetchone()
 
 
 def script_default_from_plan(project_id, plan):
     return {
         'project_id': project_id, 'revision': 0, 'status': 'draft',
+        'assignee_id': None, 'assignment_epoch': 0, 'created_by': None, 'updated_by': None,
         'title': f'第 {plan["episodeNo"]:02d} 集', 'synopsis': plan['logline'],
         'sourceChapterRefs': list(plan['sourceChapterRefs']), 'storyGoal': plan['coreConflict'],
         'paywallBeat': {
@@ -708,7 +672,7 @@ def script_default_from_plan(project_id, plan):
     }
 
 
-def save_script_row(connection, row, value, *, status='draft', generation_job_id=None):
+def save_script_row(connection, row, value, *, status='draft', generation_job_id=None, actor_id=None):
     from . import store as s
     normalized = validate_script(value)
     now = time.time()
@@ -718,51 +682,14 @@ def save_script_row(connection, row, value, *, status='draft', generation_job_id
     )
     connection.execute('''UPDATE episode_scripts SET revision=revision+1,status=%s,title=%s,synopsis=%s,
         source_chapter_refs=%s,story_goal=%s,paywall_beat=%s,body=%s,estimated_duration=%s,characters=%s,scenes=%s,props=%s,
-        generation_job_id=%s,updated=%s WHERE project_id=%s''',(
+        generation_job_id=%s,updated=%s,updated_by=COALESCE(%s,updated_by) WHERE project_id=%s''',(
         status,normalized['title'],normalized['synopsis'],s.dumps(normalized['sourceChapterRefs']),
         normalized['storyGoal'],s.dumps(normalized['paywallBeat']),normalized['body'],normalized['estimatedDuration'],
         s.dumps(normalized['characters']),s.dumps(normalized['scenes']),s.dumps(normalized['props']),
-        generation_job_id,now,row['project_id'],
+        generation_job_id,now,actor_id,row['project_id'],
     ))
     return script_row(connection, row['project_id'])
 
 
 def apply_episode_script_generation(job, generated):
-    from . import store as s
-    from .production_context import normalize_production_context
-    result = validate_generated_script(generated)
-    marker = job['input'].get('episode_script_generation') or {}
-    production_id = marker.get('productionId'); episode_no = marker.get('episodeNo')
-    with s.db() as connection:
-        active = connection.execute(
-            'SELECT status,project_id,production_id,workspace_id FROM jobs WHERE id=%s FOR UPDATE',
-            (job['id'],),
-        ).fetchone()
-        if not active or active['status'] != 'running':
-            raise ValueError('逐集剧本任务已失效，未写入生成结果')
-        if (active['project_id'] != job['project_id'] or active['production_id'] != production_id or
-                job.get('production_id') != production_id or active['workspace_id'] != job.get('workspace_id')):
-            raise ValueError('逐集剧本任务归属已失效')
-        project = connection.execute('SELECT * FROM projects WHERE id=%s AND production_id=%s',(job['project_id'],production_id)).fetchone()
-        row = connection.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(job['project_id'],)).fetchone()
-        if not project or project['episode_no'] != episode_no or not row:
-            raise ValueError('逐集剧本任务归属已失效')
-        if row['revision'] != marker.get('scriptRevision'):
-            raise ValueError('本集剧本已在生成期间更新，旧结果未写入')
-        production = connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
-        context = normalize_production_context(json.loads(production['shared_context']))
-        if adaptation_fingerprint(context) != marker.get('adaptationFingerprint'):
-            raise ValueError('分集规划已在生成期间更新，旧剧本结果未写入')
-        plan = next((item for item in context['episodePlans'] if item['episodeNo']==episode_no),None)
-        if context['adaptationPlan']['status'] != 'approved' or not plan or plan['status'] != 'approved':
-            raise ValueError('改编策划或目标分集已不再是已批准状态')
-        validate_source_references(connection, production_id, plan['sourceChapterRefs'])
-        merged = {
-            **result,
-            'sourceChapterRefs': list(plan['sourceChapterRefs']),
-            'storyGoal': plan['coreConflict'],
-            'paywallBeat': {'role': plan['paywallRole'], 'hook': plan['hook'], 'cliffhanger': plan['cliffhanger']},
-        }
-        saved = save_script_row(connection,row,merged,status='review',generation_job_id=job['id'])
-        s.event(job['project_id'], {'type': 'script', 'revision': saved['revision']}, connection=connection)
-    return {'script': saved}
+    raise ValueError('Worker 自动回写已退役；请通过候选采纳命令写入')

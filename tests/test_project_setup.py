@@ -95,7 +95,7 @@ def test_project_create_name_only_remains_backward_compatible(client):
     assert len(adaptation["episodePlans"]) == 1
 
 
-def test_legacy_fixed_adaptation_defaults_follow_existing_episode_when_untouched(client):
+def test_legacy_adaptation_get_is_read_only_and_setup_format_is_explicit(client):
     project = client.post("/api/projects", json={
         "name": "旧项目规格修复", "ratio": "16:9", "duration": 30,
     }).json()
@@ -107,11 +107,31 @@ def test_legacy_fixed_adaptation_defaults_follow_existing_episode_when_untouched
         }
         context["episodePlans"] = []
         db.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), project["production_id"]))
-    adaptation = client.get(f'/api/productions/{project["production_id"]}/adaptation').json()
-    assert adaptation["adaptationPlan"]["format"] == {
+    def snapshot():
+        with s.db() as db:
+            row = db.execute("SELECT shared_context,revision,updated FROM productions WHERE id=%s",
+                             (project["production_id"],)).fetchone()
+            history = db.execute("SELECT COUNT(*) count FROM production_revisions WHERE production_id=%s",
+                                 (project["production_id"],)).fetchone()['count']
+            events = db.execute("SELECT COUNT(*) count FROM events WHERE project_id=%s",
+                                (project["id"],)).fetchone()['count']
+        return dict(row), history, events
+    before = snapshot()
+    response = client.get(f'/api/productions/{project["production_id"]}/adaptation')
+    assert response.status_code == 200, response.text
+    adaptation = response.json()
+    # P5 forbids implicit legacy migration through a read endpoint.
+    assert adaptation["adaptationPlan"]["format"] == context["adaptationPlan"]["format"]
+    assert adaptation["episodePlans"] == []
+    assert snapshot() == before
+    from backend.adaptation import configure_adaptation_format
+    configured = configure_adaptation_format(context, 1, 30, '16:9', '通用短视频')
+    assert configured["adaptationPlan"]["format"] == {
         "episodeCount": 1, "targetDuration": 30.0, "ratio": "16:9", "platform": "通用短视频",
     }
-    assert len(adaptation["episodePlans"]) == 1
+    assert len(configured["episodePlans"]) == 1
+    assert configured["episodePlans"][0]["targetDuration"] == 30
+    assert context["episodePlans"] == []
 
 
 def test_invalid_generation_policy_leaves_no_partial_rows(client, configured_provider):
@@ -165,14 +185,21 @@ def test_shared_settings_save_preserves_adaptation_context(client):
         db.execute("UPDATE productions SET shared_context=%s WHERE id=%s", (s.dumps(context), project["production_id"]))
     current = client.get(f'/api/projects/{project["id"]}').json()
     current["document"]["generationPolicy"] = {"text": None, "image": None, "video": None}
-    saved = client.put(f'/api/projects/{project["id"]}', json={
+    retired = client.put(f'/api/projects/{project["id"]}', json={
         "name": current["name"],
         "revision": current["revision"],
         "production_revision": current["production_revision"],
         "document": current["document"],
     })
+    assert retired.status_code == 410, retired.text
+    saved = client.patch(f'/api/productions/{project["production_id"]}/context', json={
+        "expected_revision": current["production_revision"],
+        "patch": {"generationPolicy": current["document"]["generationPolicy"]},
+    })
     assert saved.status_code == 200, saved.text
+    assert saved.json()["revision"] == current["production_revision"] + 1
     production = client.get(f'/api/productions/{project["production_id"]}').json()["context"]
+    assert production["generationPolicy"] == current["document"]["generationPolicy"]
     assert production["adaptationPlan"]["status"] == "approved"
     assert production["adaptationPlan"]["premise"] == "保留改编方案"
     assert production["episodePlans"] == context["episodePlans"]

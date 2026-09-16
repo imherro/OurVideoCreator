@@ -8,11 +8,17 @@
 | P1 | P1-R3 已复验 | 通过 | `6358c76f238a680dc9bd27b44968d5fe82db29d0` | `evidence/P1-R3/REPORT.md` | 无；`OVC-P1-R2-01` 已关闭；`OVC-P1-R3-N01` 为非阻塞观察 | P2 |
 | P2 | P2-R2 已复验 | 通过 | `a70341bad5c0da23153ad6cd44b67f2cd863dde1` | `evidence/P2-R2/REPORT.md` | 无；`OVC-P2-01…05`、`OVC-P2-R1-01` 全部关闭 | P3 |
 | P3 | P3-R2 已复验 | 通过 | `de5ef13d6c772e62ec8a0e40be7be8abf1eb25d6` | `evidence/P3-R2/EXTERNAL_ACCEPTANCE.md` | 无；原六项及 R1-01/02/03 全部关闭 | P4 |
-| P4 | P4-R1 READY_FOR_REVIEW | 首轮不通过；R1 待审 | `c7d6a88a06a01035fd44e45309414c05e061ab64`（首轮） | `evidence/P4-R1/REPORT.md` | `OVC-P4-01/02/03`（待外部关闭） | 否 |
-| P5 | 未提交 | 未验收 | | | | 否 |
+| P4 | P4-R1 已复验 | 通过 | `c0152ffcfb5623fcc0b723dbdf450acec9f17f73` | `reviews/P4-R1/REVIEW.md` | 无；`OVC-P4-01/02/03` 全部关闭 | P5-COLLAB-01 |
+| P5 | 已授权实施，未提交 | 未验收 | | `prompts/P5_CODEX_PROMPT.md` | 尚未验收 | 否 |
 | P6 | 未提交 | 未验收 | | | | 否 |
 | P7 | 未提交 | 未验收 | | | | 否 |
 | P8 | 未提交 | 未验收 | | | | 不适用 |
+
+## P4-R1 外部复验通过及 P5 授权（2026-09-17）
+
+主 ChatGPT 会话明确结论：**通过。P4 已通过，允许进入 P5。** 通过 HEAD 为 `c0152ffcfb5623fcc0b723dbdf450acec9f17f73`，被测业务为 `e6c3edd95830d4c778fee357b8807d1443920a04`。关闭 `OVC-P4-01/02/03`，无新增阻塞，历史 P0–P3 通过结论不变。
+
+下一单一任务为 **P5-COLLAB-01：对象级分工协作前后端闭环**。P6、真实付费 API、公网部署未授权。外部审核执行边界为代码、提交及实施端原始证据复核，未在审核容器独立重跑项目测试。原始审核包按字节归档于 `reviews/P4-R1/`；下载及完整性记录见其中 `IMPORT.md`，完整 P5 提示词同步存放于 `prompts/P5_CODEX_PROMPT.md`。
 
 ## P0 首次外部验收记录
 

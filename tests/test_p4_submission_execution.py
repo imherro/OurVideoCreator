@@ -15,6 +15,7 @@ from PIL import Image
 from backend import store as s
 from tests.platform_model_helpers import admin, create_provider, create_model, CANARY, publish_test_model
 from tests.test_p1_processes import stop, wait_until
+from tests.collaboration_helpers import create_node, create_object
 
 
 def project(admin):
@@ -24,8 +25,17 @@ def project(admin):
 
 
 def submit(admin,pid,model_id,**changes):
+    kind = changes.get('kind', 'text')
+    nid = changes.get('node_id', 'p4-' + kind)
+    rows = admin.get(f'/api/projects/{pid}/objects').json()
+    # Public creation under the actual submitting editor; never take over an
+    # existing object or inject a Principal to make a provider test pass.
+    if not any(row['kind'] == 'node' and row['content']['node']['id'] == nid for row in rows) and not any(
+        row['kind'] == 'shot' and nid in (row['content']['shot'].get('textNode'),
+        row['content']['shot'].get('imageNode'), row['content']['shot'].get('videoNode')) for row in rows):
+        create_node(admin, pid, nid, kind)
     return admin.post(f'/api/projects/{pid}/jobs',json={
-        'node_id':'p4-node','kind':'text','submission_id':s.uid('p4-submit-'),
+        'node_id':nid,'kind':'text','submission_id':s.uid('p4-submit-'),
         'input':{'model_id':model_id,'prompt':'Synthetic test prompt'},**changes})
 
 
@@ -64,7 +74,7 @@ def test_single_and_document_nested_injection_rejected_without_job(admin,injecti
     document={**p['document'],'nodes':[{'id':'inject','data':{'kind':'text','model_id':model['id'],**injection}}]}
     response=admin.put(f"/api/projects/{p['id']}",json={'name':p['name'],'revision':p['revision'],
         'production_revision':p['production_revision'],'document':document})
-    assert response.status_code==400,response.text
+    assert response.status_code==410,response.text
     assert admin.get(f"/api/projects/{p['id']}/jobs").json()==before
 
 
@@ -89,9 +99,8 @@ def test_batch_late_invalid_parameters_rolls_back_all_jobs(admin):
         {'id':'second','position':{'x':10,'y':10},'data':{'kind':'text','prompt':'second','model_id':model['id'],
                                                     'parameters':{'max_tokens':201}}},
     ],'edges':[]}
-    saved=admin.put(f"/api/projects/{p['id']}",json={'name':p['name'],'revision':p['revision'],
-        'production_revision':p['production_revision'],'document':document})
-    assert saved.status_code==200,saved.text
+    for node in document['nodes']:
+        create_node(admin, p['id'], node['id'], **node['data'])
     valid=admin.post(f"/api/projects/{p['id']}/run",json={'submission_id':s.uid('batch-valid-'),
                                                      'node_ids':['first'],'exact':True})
     assert valid.status_code==200,valid.text
@@ -108,6 +117,8 @@ def test_audio_batch_late_error_is_atomic(admin):
     model=publish_test_model(admin,'audio-batch-model',kind='audio',provider_type='volcengine_speech',
         rules={'voice_type':{'type':'string','enum':['synthetic-voice']}},defaults={'voice_type':'synthetic-voice'})
     p=project(admin)
+    for nid in ('a', 'b'):
+        create_node(admin, p['id'], nid, 'audio')
     def item(node,voice):
         return {'node_id':node,'kind':'audio','submission_id':s.uid('audio-batch-'),
                 'input':{'model_id':model['id'],'prompt':'测试对白','parameters':{'voice_type':voice}}}
@@ -126,10 +137,10 @@ def test_shot_timing_uses_canonical_duration_and_published_rules(admin):
         capabilities={'fps':24,'min_frames':124,'frame_step':17,'max_frames':345},
         rules={'frames':{'type':'integer','min':124,'max':345}},defaults={'frames':124})
     p=project(admin)
-    p['document']['shots']=[{'id':'shot','videoNode':'p4-node','duration':8}]
-    saved=admin.put(f"/api/projects/{p['id']}",json={'name':p['name'],'revision':p['revision'],
-        'production_revision':p['production_revision'],'document':p['document']})
-    assert saved.status_code==200,saved.text
+    create_object(admin, p['id'], 'shot', {
+        'shot':{'id':'shot','videoNode':'p4-video','duration':8},
+        'nodes':[{'id':'p4-video','type':'media','data':{'kind':'video'}}],
+    })
     response=submit(admin,p['id'],model['id'],kind='video',input={
         'model_id':model['id'],'prompt':'镜头移动','parameters':{'frames':124},
         'model_capabilities':{'fps':1000}})

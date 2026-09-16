@@ -379,6 +379,8 @@ def authorize_request(request: Request, principal: Principal) -> None:
                 needed = 'manager'
             if method == 'POST' and suffix == 'chapters/trash':
                 needed = 'manager'
+            if method == 'POST' and re.fullmatch(r'owned-content/(chapter|script)/[^/]+/comments', suffix):
+                needed = 'viewer'
             if suffix.endswith('/approve') or suffix.endswith('/needs-changes'):
                 needed = 'manager'
             require_production(connection, principal, production_id, needed)
@@ -393,6 +395,8 @@ def authorize_request(request: Request, principal: Principal) -> None:
                 needed = 'editor'
             if method in {'PUT', 'DELETE'} and not suffix:
                 needed = 'manager'
+            if method == 'POST' and re.fullmatch(r'objects/[^/]+/comments', suffix):
+                needed = 'viewer'
             if method == 'DELETE' and suffix.startswith('assets/'):
                 needed = 'manager'
             require_production(connection, principal, production_id, needed)

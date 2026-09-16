@@ -1,4 +1,6 @@
-# P3 数据主源与对象归属
+# 数据主源与对象归属（P4 已通过，P5 实施中）
+
+P5 实际字段、唯一主源和命令映射见 [P5_OBJECT_COLLABORATION.md](P5_OBJECT_COLLABORATION.md)。下方目标表名是冻结行为的建议，不要求为同构 JSON 内容逐个新建物理表；P5 复用已有剧本/原文关系表，六类内容对象共用受限 kind 的对象表。
 
 ## 语义映射
 
@@ -11,14 +13,15 @@
 
 | 当前表/载体 | 当前主数据 | 当前版本机制 | 问题 |
 |---|---|---|---|
-| `settings` | Provider/Key、prompt library、FFmpeg 路径 | 部分 JSON revision | P3 仅 PA 可写、普通用户只得安全投影；P4 迁版本化加密凭证 |
+| `settings` | FFmpeg 等部署设置；不再作为 Provider/Key 主源 | 部分 JSON revision | P4 已退役普通用户供应商设置及明文回落 |
+| `model_providers/provider_config_versions/provider_credential_versions/model_catalog/model_versions` | 平台供应商、配置/加密凭证版本、发布模型 | 不可变版本与撤销状态 | P4 已通过；普通成员只得安全模型目录，Worker 按冻结版本执行 |
 | `users/sessions/invitations/password_reset_tokens` | 个人身份、摘要令牌与一次性邀请/重置 | expiry/revocation | P3 已落地；手机号未验证不授予角色 |
 | `productions/workspaces/*_members` | 作品名、共享 Film Bible/策略/改编 context 与租户/作品角色 | revision + `production_revisions` | P3 已有 workspace_id 与成员 ACL；P5 再细化对象负责人 |
 | `projects` | Episode 元数据和大 `document` JSON | revision + `revisions` | 多对象共享一个写冲突域 |
 | `source_documents/source_chapters/source_events` | 原著、章节、提取事件 | 章节 revision；事件替换 | 由 production 归属隔离；P5 增负责人 |
 | `episode_scripts` | 一集正式剧本 | revision + revisions | 已接近目标粒度 |
 | `assets` | 媒体身份与磁盘 key | 无内容 revision | P3 以 production_id 授权，project_id 仅来源；P7 完成对象存储 |
-| `jobs/job_private` | 任务、冻结输入、Provider 快照及 workspace/production/actor scope | status/update time | P3 查询/操作已授权；`job_private` 明文 Key 在 P4 迁除 |
+| `jobs/job_private` | 任务、冻结模型/配置/凭证版本引用及 workspace/production/actor scope | status/update time | P4 已移除明文 Key 快照与 settings 回落；P5 补对象基线与候选采纳 |
 | `events` | 带 workspace/production scope 的 SSE 通知日志 | 自增 cursor | P3 按当前成员过滤并每 2 秒复核；P7 完整复测 |
 | `provider_asset_*` | 幻场远端登记映射 | provider/account hash 唯一 | 缺租户/凭证版本显式维度 |
 | `deleted_items` | 软删除索引 | 时间戳 | 通用表，授权依赖调用方 |

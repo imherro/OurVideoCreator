@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, RefreshCw, Save, Sparkles } from "lucide-react";
 import { STATUS_LABELS, normalizeEpisodeSelection, splitList } from "../adaptation";
+import {OwnedContentPanel} from '../OwnedContentPanel';
+import type {OwnedContentDrafts} from '../ownedContentDrafts';
 
 type Value = Record<string, any>;
 
 export function ScriptRoomPage({
   productionId, currentEpisodeNo, providers, defaultTarget, refreshKey = 0, request, notify, report, onChanged, onSelectEpisode, onEnterEpisode,
+  store,actorId,canManage,canEdit,
 }: {
   productionId: string; currentEpisodeNo: number; providers: Value[]; defaultTarget?: Value; refreshKey?: number;
+  store:OwnedContentDrafts;actorId:string;canManage:boolean;canEdit:boolean;
   request: (path: string, options?: RequestInit) => Promise<any>;
   notify: (message: string) => void; report: (error: unknown) => void;
   onChanged: (projectId?: string) => void | Promise<void>;
@@ -17,7 +21,12 @@ export function ScriptRoomPage({
   const [items, setItems] = useState<Value[]>([]);
   const [chapters, setChapters] = useState<Value[]>([]);
   const [active, setActive] = useState(currentEpisodeNo);
-  const [draft, setDraft] = useState<Value | null>(null);
+  const [,render]=useState(0),selection=useRef(0),listSequence=useRef(0),activeRef=useRef(active);
+  const redraw=()=>render(value=>value+1);
+  const draft=store.productionId===productionId?store.value(String(active)):null;
+  const entry=store.drafts.entries.get(String(active));
+  store.selectedId=String(active);
+  const editable=canEdit&&store.editable(String(active),actorId);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const textProviders = useMemo(
@@ -29,20 +38,30 @@ export function ScriptRoomPage({
   const defaultModelId = configuredDefaultProvider?.id || "";
 
   async function loadList(preferred = active) {
+    const sequence=++listSequence.current,selectedAtStart=selection.current,generation=store.generation;
     const [scripts, sourceChapters] = await Promise.all([
       request(`/productions/${productionId}/scripts`),
       request(`/productions/${productionId}/chapters`),
     ]);
+    if(!store.matches(productionId,generation)||sequence!==listSequence.current)return;
+    scripts.forEach((item:Value)=>{if(item.script)store.receive(String(item.episodeNo),item.script,productionId,generation);});
+    store.reconcileIds(scripts.map((item:Value)=>String(item.episodeNo)));
     setItems(scripts); setChapters(sourceChapters);
+    redraw();
+    if(selectedAtStart!==selection.current)return;
     const target = scripts.some((item: Value) => item.episodeNo === preferred) ? preferred : scripts[0]?.episodeNo || 1;
-    setActive(target);
-    setDraft(scripts.length ? await request(`/productions/${productionId}/episode-scripts/${target}`) : null);
+    if(scripts.length)await selectEpisode(target);
   }
   async function selectEpisode(episodeNo: number) {
-    setActive(episodeNo);
-    setDraft(await request(`/productions/${productionId}/episode-scripts/${episodeNo}`));
+    const selected=++selection.current,generation=store.generation;
+    activeRef.current=episodeNo;setActive(episodeNo);
+    const value=await request(`/productions/${productionId}/episode-scripts/${episodeNo}`);
+    if(selected!==selection.current||!store.matches(productionId,generation))return;
+    store.receive(String(episodeNo),value,productionId,generation);redraw();
   }
-  useEffect(() => { setItems([]); setDraft(null); setSelected(new Set()); void loadList(currentEpisodeNo).catch(report); }, [productionId, refreshKey]);
+  useEffect(()=>{store.open(productionId);setItems([]);setSelected(new Set());
+    return()=>{listSequence.current++;selection.current++;};},[productionId,store]);
+  useEffect(() => { void loadList(activeRef.current).catch(report); }, [productionId, refreshKey]);
   useEffect(() => {
     if (currentEpisodeNo !== active) void selectEpisode(currentEpisodeNo).catch(report);
   }, [currentEpisodeNo]);
@@ -52,29 +71,28 @@ export function ScriptRoomPage({
   }
   const item = items.find((value) => value.episodeNo === active);
   const plan = item?.plan;
-  function patch(value: Value) { setDraft((current) => current && ({ ...current, ...value })); }
+  function patch(value: Value) { if(editable){store.patch(String(active),value);redraw();} }
 
   async function save() {
     if (!draft) return;
-    const value = await request(`/productions/${productionId}/episode-scripts/${active}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        revision: draft.revision, title: draft.title, synopsis: draft.synopsis, body: draft.body,
-        estimatedDuration: Number(draft.estimatedDuration), sourceChapterRefs: draft.sourceChapterRefs,
-        storyGoal: draft.storyGoal, paywallBeat: draft.paywallBeat || {}, characters: draft.characters,
-        scenes: draft.scenes, props: draft.props,
-      }),
-    });
-    setDraft(value); await onChanged(value.project_id); await loadList(active);
-    notify(`EP${String(active).padStart(2, "0")} 剧本已保存为草稿`);
+    const pending=store.save(String(active),actorId,request);redraw();
+    try{const value=await pending;if(!value)return;
+      notify(store.unsaved?'提交成功；后续编辑仍未保存':`EP${String(active).padStart(2,"0")} 剧本已保存为草稿`);
+      if(!store.unsaved)await onChanged(value.project_id);
+    }finally{redraw();}
   }
   async function transition(action: "review" | "approve" | "needs-changes") {
     if (!draft) return;
-    const value = await request(`/productions/${productionId}/episode-scripts/${active}/${action}`, { method: "POST", body: JSON.stringify({ revision: draft.revision }) });
-    setDraft(value); await onChanged(value.project_id); await loadList(active);
+    if(entry?.state!=='saved')throw new Error('请先保存或解决当前剧本草稿，再审核');
+    const generation=store.generation;
+    const value = await request(`/productions/${productionId}/episode-scripts/${active}/${action}`, { method: "POST", body: JSON.stringify({ revision: draft.revision, assignment_epoch: draft.assignment_epoch }) });
+    if(!store.matches(productionId,generation))return;
+    store.receive(String(active),value,productionId,generation);redraw();
+    if(!store.unsaved)await onChanged(value.project_id);
     notify(action === "review" ? "本集剧本已提交审核" : action === "approve" ? "本集剧本已批准；下一步可以进入分镜规划" : "本集剧本已退回修改");
   }
   async function generate(episodeNos: number[]) {
+    if(store.unsaved)throw new Error('请先保存或处理剧本草稿，再生成');
     const normalized = normalizeEpisodeSelection(episodeNos, items.length);
     if (!normalized.length) return;
     const provider = configuredDefaultProvider;
@@ -94,9 +112,9 @@ export function ScriptRoomPage({
   return <section className="script-room-page workflow-domain-page">
     <header className="domain-header"><div><span className="eyebrow">SCRIPT ROOM</span><h1>剧本室</h1><p>逐集剧本是正式数据；画布草稿设为正式剧本后，会在这里统一修订并同步回画布。</p></div><div className="settings-actions">
       <button disabled={busy} onClick={() => run(() => loadList(active))}><RefreshCw size={15} />刷新</button>
-      <button disabled={busy || !draft} onClick={() => run(save)}><Save size={15} />保存草稿</button>
-      <button disabled={busy || !draft} onClick={() => run(() => transition("review"))}>提交审核</button>
-      <button className="primary" disabled={busy || draft?.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
+      <button disabled={busy || !editable || entry?.state==='conflict'} onClick={() => run(save)}><Save size={15} />保存草稿</button>
+      <button disabled={busy || !editable || entry?.state!=='saved'} onClick={() => run(() => transition("review"))}>提交审核</button>
+      <button className="primary" disabled={busy || !canManage || entry?.state!=='saved' || draft?.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
     </div></header>
     <div className="script-room-layout">
       <aside className="script-episode-list"><header><b>分集</b><small>勾选后批量生成</small></header>{items.map((value) => <div className={active === value.episodeNo ? "active" : ""} key={value.episodeNo}>
@@ -104,9 +122,11 @@ export function ScriptRoomPage({
         <button onClick={() => run(async () => { await onSelectEpisode(value.episodeNo); await selectEpisode(value.episodeNo); })}><b>EP{String(value.episodeNo).padStart(2, "0")}</b><span>{value.episodeTitle}</span><small className={value.script?.status || value.plan.status}>{STATUS_LABELS[value.script?.status || value.plan.status]}</small></button>
       </div>)}</aside>
       <main>{draft && plan ? <>
+        <OwnedContentPanel key={`${productionId}:${active}`} store={store} id={String(active)} actorId={actorId}
+          canManage={canManage} canEdit={canEdit} request={request} onChange={redraw} onSave={save}/>
         {draft.metadata?.origin === "canvas" && <div className="notice"><b>来自画布快速创作</b><span>这里保存的是同一份正式剧本；修改后画布投影会同步更新。</span></div>}
         <div className="script-summary-strip"><span className={`workflow-status ${draft.status}`}>{STATUS_LABELS[draft.status]}</span><span>目标 {plan.targetDuration} 秒</span><span>{plan.paywallRole}</span><span>{draft.project_id ? "已建立 Episode" : "首次保存或生成时建立 Episode"}</span></div>
-        <article className="domain-card"><div className="domain-fields">
+        <fieldset className="owned-content-fields" disabled={!editable}><article className="domain-card"><div className="domain-fields">
           <label>标题<input value={draft.title} onChange={(e) => patch({ title: e.target.value })} /></label>
           <label>预计时长（秒）<input type="number" value={draft.estimatedDuration} onChange={(e) => patch({ estimatedDuration: Number(e.target.value) })} /></label>
           <label>本集概要<textarea value={draft.synopsis} onChange={(e) => patch({ synopsis: e.target.value })} /></label>
@@ -118,7 +138,7 @@ export function ScriptRoomPage({
           <label>角色（逗号或换行）<textarea rows={3} value={draft.characters.join("、")} onChange={(e) => patch({ characters: splitList(e.target.value) })} /></label>
           <label>场景（逗号或换行）<textarea rows={3} value={draft.scenes.join("、")} onChange={(e) => patch({ scenes: splitList(e.target.value) })} /></label>
           <label>道具（逗号或换行）<textarea rows={3} value={draft.props.join("、")} onChange={(e) => patch({ props: splitList(e.target.value) })} /></label>
-        </div></article><div className="script-state-actions"><button disabled={busy} onClick={() => run(() => transition("needs-changes"))}>退回修改</button><button disabled={busy} onClick={() => run(() => generate([active]))}><Sparkles size={15} />{draft.body ? "重新生成本集" : "生成本集"}</button>{draft.status === "approved" && <button className="primary" disabled={busy || !draft.project_id} onClick={() => run(() => Promise.resolve(onEnterEpisode(active)))} >进入分镜规划<ArrowRight size={15}/></button>}</div>
+        </div></article></fieldset><div className="script-state-actions"><button disabled={busy||!canManage||entry?.state!=='saved'} onClick={() => run(() => transition("needs-changes"))}>退回修改</button><button disabled={busy||!editable||store.unsaved} onClick={() => run(() => generate([active]))}><Sparkles size={15} />{draft.body ? "重新生成本集" : "生成本集"}</button>{draft.status === "approved" && <button className="primary" disabled={busy || !draft.project_id} onClick={() => run(() => Promise.resolve(onEnterEpisode(active)))} >进入分镜规划<ArrowRight size={15}/></button>}</div>
       </> : <div className="empty-state"><h3>先完成分集规划</h3><p>改编策划批准后，可以在这里逐集生成和修订剧本。</p></div>}</main>
     </div>
     <footer className="domain-generation-bar"><div><b>批量生成所选剧本</b><small>已选 {selected.size} 集 · 使用项目默认模型：{configuredDefaultProvider?.name || "未配置外部 Provider"} · {defaultModelId || "未配置模型 ID"}</small></div><button className="primary" disabled={busy || !selected.size} onClick={() => run(() => generate([...selected]))}><Sparkles size={15} />生成 {selected.size} 集</button></footer>

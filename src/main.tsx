@@ -1,5 +1,6 @@
 import { planShotTimeline } from "./shotTimeline";
-import { ensureShotNodes, importStoryboardShots } from "./shotNodes";
+import {OwnedContentDrafts} from './ownedContentDrafts';
+import { ensureShotNodes } from "./shotNodes";
 import { autoLayoutCanvas } from "./canvasLayout";
 import {shotParameters} from './generationParameters';
 import { imageSizeForRatio, VIDEO_FORMATS, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from "./mediaSpecs";
@@ -182,6 +183,9 @@ import {
   type ProductionSummary,
 } from "./app/production";
 import { ProductionLibrary } from "./pages/ProductionLibrary";
+import { CollaborationClient } from "./collaborationClient";
+import { CollaborationPanel } from "./CollaborationPanel";
+import { reconcileTimelineEdit } from "./editor/legacyTimeline";
 import { ProjectSetupDialog } from "./pages/ProjectSetupDialog";
 import {
   applyRatioChange,
@@ -248,7 +252,7 @@ type Doc = {
   applied?: string[];
   editor?: EditorDocument;
 };
-type Project = EpisodeSummary & { document: Doc; production_revision: number };
+type Project = EpisodeSummary & { document: Doc; production_revision: number; objects?: Any[]; object_collaboration?: boolean };
 type SyncFailureKind = "api" | "sse" | "media";
 type SyncFailure = {
   kind: SyncFailureKind;
@@ -668,6 +672,18 @@ function Studio() {
 }
 
 function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }) {
+  const sourceDrafts=useRef(new OwnedContentDrafts('chapter'));
+  const scriptDrafts=useRef(new OwnedContentDrafts('script'));
+  const ownedUnsaved=()=>sourceDrafts.current.unsaved||scriptDrafts.current.unsaved;
+  function requireOwnedSaved(){if(ownedUnsaved())throw new Error('原著或剧本仍有未保存草稿；请回到对应页面保存、比较或明确放弃后再切换作品/分集。');}
+  useEffect(()=>{
+    const guard=(event:BeforeUnloadEvent)=>{if(ownedUnsaved()){event.preventDefault();event.returnValue='';}};
+    window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
+  },[]);
+  const collaboration = useRef<CollaborationClient | null>(null);
+  if (!collaboration.current) collaboration.current = new CollaborationClient(api, session.user.id);
+  const collaborationAssets = useRef<Asset[]>([]);
+  const projectOpenSequence = useRef(0);
   const initialWorkflowStage = parseWorkflowStage(window.location.search);
   const [productions, setProductions] = useState<ProductionSummary[]>([]),
     [projects, setProjects] = useState<EpisodeSummary[]>([]),
@@ -684,6 +700,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     [config, setConfig] = useState<Any>({
       models: [],
     });
+  collaborationAssets.current = assets;
   const [activeWorkspaceId,setActiveWorkspaceId]=useState<string>(session.workspaces[0].id);
   const canCreateProduction = session.workspaces.some(
     (workspace: Any) => workspace.id === activeWorkspaceId && workspace.role === "owner",
@@ -737,6 +754,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     ),
     fileInput = useRef<HTMLInputElement>(null),
     observedCompletedJobs = useRef(new Set<string>()),
+    observedCandidateJobs = useRef(new Set<string>()),
     { fitView } = useReactFlow(),
     updateNodeInternals = useUpdateNodeInternals();
   const [layoutVersion, setLayoutVersion] = useState(0);
@@ -754,6 +772,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     next: WorkflowStage,
     historyMode: "push" | "replace" | "none" = "push",
   ) {
+    if(next!==workflowStageRef.current&&ownedUnsaved())setNotice('原著/剧本草稿已保留在当前作品；返回对应页面后可以继续保存或比较。');
     workflowStageRef.current = next;
     setWorkflowStage(next);
     if (historyMode !== "none") {
@@ -789,11 +808,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   const update = useCallback((fn: (d: Doc) => Doc) => {
     const base = current.current.doc;
     if (!base) return;
-    if ((current.current.project as Any)?.permissions?.legacy_document_write === false) {
-      setError("当前角色不能修改整份作品文档；P3 仅作品 manager 或团队 owner 可使用旧编辑入口。");
+    if ((current.current.project as Any)?.permissions?.can_generate === false) {
+      setError("当前为只读成员；可以查看和评论，但不能编辑对象。");
       return;
     }
-    const next = deriveManagedGraph(fn(base));
+    let next:Doc;
+    try {next=deriveManagedGraph(reconcileTimelineEdit(base,fn(base),collaborationAssets.current) as Doc);}
+    catch(e:any){setError(e.message);return;}
+    collaboration.current?.mark(next, collaborationAssets.current);
     current.current = { ...current.current, doc: next };
     setDoc(next);
     dirty.current = true;
@@ -842,9 +864,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     return work;
   }, []);
   async function openProject(pid: string) {
+    requireOwnedSaved();
     if (dirty.current || saveFlight.current) await save();
     if (dirty.current)
       throw new Error("项目尚未保存，已保留当前编辑。请先解决保存冲突。");
+    const openSequence = ++projectOpenSequence.current;
     // Only switch views after every part of the new project snapshot arrives.
     // This leaves the current canvas visible if a refresh fails mid-request.
     let p: Project, a: Asset[], j: Job[], usages: VisualUsage[], adaptation: Any, scripts: Any[];
@@ -865,12 +889,16 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       });
       throw e;
     }
+    if (openSequence !== projectOpenSequence.current) return;
+    requireOwnedSaved();
+    if(dirty.current||saveFlight.current)throw new Error('载入期间当前作品又有编辑，已保留草稿；请先保存再切换。');
     const migratedDocument = migrateLinkedNodePrompts(p.document);
     const projectedDocument = deriveManagedGraph(migratedDocument);
     const openedProject = { ...p, document: projectedDocument };
     revision.current = p.revision;
     productionRevision.current = p.production_revision;
-    dirty.current = projectedDocument !== p.document;
+    dirty.current = false;
+    collaboration.current!.open({...openedProject,document:projectedDocument}, a);
     // Update the imperative snapshot before scheduling React state changes.
     // This prevents an autosave tick from pairing the new project id with the
     // previous project's document while the project switch is being rendered.
@@ -891,7 +919,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     setPanorama(null);
     setTimelineOpen(false);
     setView(defaultViewForStage(workflowStageRef.current));
-    setSaved(projectedDocument === p.document ? "已保存" : "未保存");
+    setSaved("已保存");
     setPanel(null);
     setTimeout(() => {
       fitView({ padding: 0.2 });
@@ -950,6 +978,19 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       try {
         const data = JSON.parse(e.data);
         const pid = current.current.project?.id;
+        if(data.project_id===pid&&['chapter','script','source_deleted','source_chapters_deleted'].includes(data.type)){
+          setWorkflowDataRevision(value=>({...value,
+            source:value.source+Number(data.type!=='script'),
+            script:value.script+Number(data.type==='script')}));
+        }
+        if (data.project_id === pid && data.type === "object" && data.object_id) {
+          const generation = collaboration.current!.drafts.generation;
+          void api(`/projects/${pid}/objects`).then((rows) => {
+            if (current.current.project?.id !== pid || collaboration.current!.drafts.generation !== generation || !current.current.doc) return;
+            const next = collaboration.current!.mergeRemoteRows(rows, current.current.doc, collaborationAssets.current,data.object_id) as Doc;
+            acceptObjectDocument(next);
+          }).catch(report);
+        }
         if (data.project_id === pid && data.type === "production" && typeof data.revision === "number") {
           setProductions((items) => items.map((item) => item.id === current.current.project?.production_id ? { ...item, revision: data.revision } : item));
           if (!dirty.current && !saveFlight.current && data.revision !== productionRevision.current) {
@@ -957,6 +998,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               if (current.current.project?.id !== pid || dirty.current || saveFlight.current) return;
               const projectedDocument = deriveManagedGraph(latest.document);
               const openedProject = { ...latest, document: projectedDocument };
+              collaboration.current!.open(openedProject,collaborationAssets.current);
               revision.current = latest.revision;
               productionRevision.current = latest.production_revision;
               current.current = { project: openedProject, doc: projectedDocument };
@@ -972,6 +1014,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               if (current.current.project?.id !== pid || dirty.current || saveFlight.current) return;
               const projectedDocument = deriveManagedGraph(latest.document);
               const openedProject = { ...latest, document: projectedDocument };
+              collaboration.current!.open(openedProject,collaborationAssets.current);
               revision.current = latest.revision;
               productionRevision.current = latest.production_revision;
               current.current = { project: openedProject, doc: projectedDocument };
@@ -1019,7 +1062,9 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     try {
       const snapshot = current.current;
       if (!snapshot.project || !snapshot.doc) return;
+      const generation=collaboration.current!.drafts.generation;
       const latest = await api("/projects/" + snapshot.project.id);
+      if(current.current.project?.id!==snapshot.project.id||collaboration.current!.drafts.generation!==generation)return;
       const backup = JSON.stringify(
         {
           format: "yingxu-project-draft-v1",
@@ -1046,6 +1091,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       dirty.current = false;
       conflictRef.current = false;
       setConflict(false);
+      collaboration.current!.open(latest,collaborationAssets.current);
+      current.current={project:latest,doc:latest.document};
       setProject(latest);
       setDoc(latest.document);
       setSelected(null);
@@ -1073,15 +1120,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const name = projectSnapshot.name.trim() || "未命名短片";
     const work = (async () => {
       try {
-        const result = await api(
-          "/projects/" + projectSnapshot.id,
-          send("PUT", {
-            name,
-            revision: revision.current,
-            production_revision: productionRevision.current,
-            document: snapshot.doc,
-          }),
-        );
+        const result = await collaboration.current!.save(snapshot.doc!, name, collaborationAssets.current);
+        if (current.current.project?.id !== projectSnapshot.id) return;
         revision.current = result.revision;
         productionRevision.current = result.production_revision;
         setProject((current) =>
@@ -1092,6 +1132,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 episode_title: name,
                 revision: result.revision,
                 production_revision: result.production_revision,
+                objects: result.objects,
               }
             : current,
         );
@@ -1127,6 +1168,42 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       saveFlight.current = null;
     }
   }
+  function acceptObjectDocument(next:Any) {
+    const active=current.current.project;
+    if(!active||!collaboration.current)return;
+    const openedProject={...active,objects:[...collaboration.current.rows.values()]};
+    current.current={project:openedProject,doc:next as Doc};
+    setProject(openedProject);setDoc(next as Doc);
+    dirty.current=collaboration.current.hasChanges(next,active.name,collaborationAssets.current);
+    const hasConflict=[...collaboration.current.drafts.entries.values()].some(item=>item.state==='conflict');
+    conflictRef.current=hasConflict;setConflict(hasConflict);
+    setSaved(hasConflict?'保存冲突':dirty.current?'未保存':'已保存');
+  }
+  async function saveObject(id:string) {
+    if(saveFlight.current)await saveFlight.current;
+    const snapshot=current.current;
+    if(!snapshot.doc||!snapshot.project)return;
+    const work=(async()=>{
+      try{
+        await collaboration.current!.saveOnly(id,snapshot.doc!,collaborationAssets.current);
+      }finally{
+        if(current.current.project?.id===snapshot.project!.id&&current.current.doc)
+          acceptObjectDocument(current.current.doc);
+      }
+    })();
+    saveFlight.current=work;
+    try{await work;}finally{saveFlight.current=null;}
+  }
+  async function saveCurrentView(){
+    const stage=workflowStageRef.current;
+    const store=stage==='source'?sourceDrafts.current:stage==='script'?scriptDrafts.current:null;
+    if(!store)return save();
+    if(!store.selectedId||!store.value(store.selectedId))return;
+    setSaved('保存中');
+    try{await store.save(store.selectedId,session.user.id,api);setSaved(ownedUnsaved()?'仍有未保存正文草稿':'已保存');}
+    catch(error){setSaved('正文保存失败或冲突');throw error;}
+    finally{setWorkflowDataRevision(value=>({...value,[stage]:value[stage as 'source'|'script']+1}));}
+  }
   useEffect(() => {
     const interval = setInterval(() => {
       if (dirty.current) save();
@@ -1134,7 +1211,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        save();
+        void saveCurrentView().catch(report);
       }
     };
     window.addEventListener("keydown", key);
@@ -1154,56 +1231,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
   useEffect(() => {
-    if (!doc) return;
-    const completed = jobs
-      .filter(
-        (j) =>
-          j.status === "succeeded" && j.result &&
-          !["source_analysis", "adaptation_generation", "script_generation"].includes(j.input?.stage) &&
-          !doc.applied?.includes(j.id),
-      )
-      .sort((a, b) => a.created - b.created);
-    if (!completed.length) {
-      const repaired = reconcileCompiledVideoResults(doc, jobs);
-      if (repaired !== doc) update(() => repaired as Doc);
-      return;
-    }
-    const importedStoryboard = completed.find((job) => job.kind === "storyboard" && job.result?.shots);
-    update((d) => {
-      let next = reconcileCompiledVideoResults(d, jobs);
-      for (const job of completed) {
-        if (job.kind === "audio" && job.input?.voice_profile) {
-          next = acceptVoiceResult(next, job);
-        } else if (job.node_id.startsWith("visual-version:")) {
-          next = acceptVisualReferenceResult(next, job);
-        } else if (job.kind === "storyboard" && job.result?.shots) {
-          const storyboardNode = next.nodes.find(
-            (item) => item.id === job.node_id && item.data.kind === "storyboard",
-          );
-          const withFilmBible = job.result.filmBible
-            ? { ...next, filmBible: { ...next.filmBible, ...job.result.filmBible } }
-            : next;
-          next = importStoryboardShots(
-            withFilmBible,
-            job.result.shots,
-            config.models,
-            system.models,
-            id,
-            storyboardNode?.id,
-          );
-        } else {
-          next = acceptResult(next, job, jobs);
-        }
-      }
-      return {
-        ...next,
-        applied: [...(d.applied || []), ...completed.map((j) => j.id)],
-      };
-    });
-    if (importedStoryboard) {
-      setNotice(`分镜规划已完成并自动导入 ${importedStoryboard.result.shots.length} 个分镜，画布节点和连线已同步建立`);
-    }
-  }, [jobs, doc?.applied, config.models, system.models]);
+    const completed = jobs.filter(job => job.status === "succeeded" && job.result && !observedCandidateJobs.current.has(job.id));
+    completed.forEach(job => observedCandidateJobs.current.add(job.id));
+    if (completed.length) setNotice(`有 ${completed.length} 个生成结果已完成；结果为候选，需明确采纳后才会修改对象。`);
+  }, [jobs]);
   useEffect(() => {
     const completed = jobs.filter((job) => job.status === "succeeded");
     const newlyCompleted = completed.filter((job) => !observedCompletedJobs.current.has(job.id));
@@ -1217,20 +1248,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         adaptation: value.adaptation + Number(workflowCompleted.some((job) => ["source_analysis", "adaptation_generation"].includes(job.input?.stage))),
         script: value.script + Number(workflowCompleted.some((job) => job.input?.stage === "script_generation")),
       }));
-      if (workflowCompleted.some((job) => job.input?.stage === "script_generation")) {
-        const pid = current.current.project?.id;
-        if (pid && !dirty.current && !saveFlight.current) {
-          void api(`/projects/${pid}`).then((latest) => {
-            if (current.current.project?.id !== pid || dirty.current) return;
-            const projectedDocument = deriveManagedGraph(latest.document);
-            revision.current = latest.revision;
-            productionRevision.current = latest.production_revision;
-            current.current = { project: { ...latest, document: projectedDocument }, doc: projectedDocument };
-            setProject({ ...latest, document: projectedDocument });
-            setDoc(projectedDocument);
-          }).catch(report);
-        }
-      }
+      setNotice('文本生成已完成，结果仅作为候选保留；请在任务中心比较后明确采纳。');
     }
   }, [jobs]);
   useEffect(() => {
@@ -1439,33 +1457,82 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   }
   async function promoteCanvasScript(sourceNode: Any) {
     const snapshot = current.current;
+    const client = collaboration.current!;
+    const generation = client.drafts.generation;
     const body = String(sourceNode?.data?.text || "").trim();
     if (!snapshot.project || !snapshot.doc || sourceNode?.data?.kind !== "text" || !body)
       throw new Error("请先生成或填写剧本正文");
+    requireOwnedSaved();
     await save();
-    if (dirty.current) throw new Error("请先解决保存冲突，再保存正式剧本");
+    const check = () => {
+      if (current.current.project?.id !== snapshot.project!.id || client.drafts.generation !== generation)
+        throw new Error("作品已切换，已取消旧页面的剧本提升操作");
+      requireOwnedSaved();
+      if (dirty.current || saveFlight.current) throw new Error("请先保存当前修改或解决冲突，再提升正式剧本");
+    };
+    check();
+    const node = [...client.rows.values()].find(row => row.kind === 'node' && row.content.node.id === sourceNode.id);
+    const graph = [...client.rows.values()].find(row => row.kind === 'graph');
+    if (!node || !graph || node.assignee_id !== session.user.id)
+      throw new Error("只能提升自己负责且已保存的自由文本节点");
+    if (String(node.content.node.data.text||'').trim()!==body)
+      throw new Error('节点正文在操作期间已变化，请重新查看后再提升');
+    const objectVersion = (row: Any) => ({id:row.id,expected_revision:row.revision,assignment_epoch:row.assignment_epoch});
+    const nodeVersion = objectVersion(node), graphVersion = objectVersion(graph);
     const episodeNo = snapshot.project.episode_no || 1;
     const currentScript = await api(`/productions/${snapshot.project.production_id}/episode-scripts/${episodeNo}`);
-    await api(
-      `/productions/${snapshot.project.production_id}/episode-scripts/${episodeNo}`,
-      send("PUT", {
-        revision: currentScript.revision,
-        title: currentScript.title || sourceNode.data.label || snapshot.project.episode_title || snapshot.project.name,
-        synopsis: currentScript.synopsis || "",
-        body,
-        estimatedDuration: Number(currentScript.estimatedDuration || snapshot.doc.duration || 15),
-        sourceChapterRefs: currentScript.sourceChapterRefs || [],
-        storyGoal: currentScript.storyGoal || "",
-        paywallBeat: currentScript.paywallBeat || {},
-        characters: currentScript.characters || [],
-        scenes: currentScript.scenes || [],
-        props: currentScript.props || [],
-        canvasNodeId: sourceNode.id,
-      }),
-    );
+    check();
+    if (currentScript.assignee_id !== session.user.id)
+      throw new Error("请先在剧本页分配或明确接管正式剧本，再提升画布正文");
+    await api(`/projects/${snapshot.project.id}/script-promotion`,send("POST", {
+      node:nodeVersion,graph:graphVersion,
+      script_revision:currentScript.revision,script_assignment_epoch:currentScript.assignment_epoch,
+    }));
+    if (current.current.project?.id !== snapshot.project.id || client.drafts.generation !== generation) return;
     setWorkflowDataRevision((value) => ({ ...value, script: value.script + 1 }));
+    if (dirty.current || saveFlight.current || ownedUnsaved()) {
+      setNotice("正式剧本已提升；操作期间新增的本地草稿已保留，请处理草稿后刷新查看");
+      return;
+    }
     await openProject(snapshot.project.id);
     setNotice("画布剧本已保存为本集正式剧本；可进入剧本页继续修订和审核");
+  }
+  async function captureDirector(blob:Blob,prompt:string,capturedStage:Any) {
+    const snapshot=current.current,client=collaboration.current!,generation=client.drafts.generation;
+    if(!snapshot.project||!snapshot.doc)throw new Error('请先打开分集');
+    const pid=snapshot.project.id,stageSnapshot=JSON.stringify(capturedStage);
+    const check=()=>{
+      if(current.current.project?.id!==pid||client.drafts.generation!==generation)
+        throw new Error('作品已切换，已取消旧页面的截图操作');
+      requireOwnedSaved();
+      if(JSON.stringify((current.current.doc as Any)?.director||defaultStage())!==stageSnapshot)
+        throw new Error('截图期间导演台已改变，请重新截图');
+    };
+    check();await save();check();
+    if(dirty.current||saveFlight.current)throw new Error('请先解决保存冲突再截图');
+    const director=[...client.rows.values()].find(row=>row.kind==='director');
+    const graph=[...client.rows.values()].find(row=>row.kind==='graph');
+    if(!director||!graph||director.assignee_id!==session.user.id)
+      throw new Error('请先分配或明确接管导演台，才能建立截图节点');
+    const version=(row:Any)=>({id:row.id,expected_revision:row.revision,assignment_epoch:row.assignment_epoch});
+    const directorVersion=version(director),graphVersion=version(graph);
+    const nid=id(),node={id:nid,type:'media',data:{kind:'image',label:titles.image,prompt,
+      ...nodeDefaults('image',config.models,system.models,snapshot.doc.generationPolicy),resolution:'1280x720'}};
+    const form=new FormData();form.append('file',blob,'导演构图.png');
+    const asset=await api(`/projects/${pid}/assets`,{method:'POST',body:form});
+    check();
+    if(dirty.current||saveFlight.current)throw new Error('截图已上传为素材；页面有新修改，请保存后重新截图建节点');
+    await api(`/projects/${pid}/director-captures`,send('POST',{
+      director:directorVersion,graph:graphVersion,asset_id:asset.id,node,
+    }));
+    if(current.current.project?.id!==pid||client.drafts.generation!==generation)return;
+    if(dirty.current||saveFlight.current||ownedUnsaved()){
+      setNotice('截图节点已建立；本地新草稿已保留，处理后刷新查看');return;
+    }
+    await openProject(pid);
+    if(current.current.project?.id!==pid)return;
+    setSelected(nid);activateWorkflowStage('canvas');
+    setNotice('构图已保存为图像节点，完善场景描述后即可生成');
   }
   function startStoryboardPlanning() {
     if (!doc) return;
@@ -1506,6 +1573,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     setSelected(null);
   }
   async function prepareProjectSwitch() {
+    requireOwnedSaved();
     let preservedDraft = false;
     if (dirty.current || saveFlight.current) await save();
     if (dirty.current) {
@@ -1551,6 +1619,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       api(`/productions?workspace_id=${encodeURIComponent(workspaceId)}`),
       api(`/projects?workspace_id=${encodeURIComponent(workspaceId)}`),
     ]);
+    requireOwnedSaved();
     setActiveWorkspaceId(workspaceId);setProductions(productionList);setProjects(episodeList);
     if(episodeList.length) await openProject(episodeList[0].id);
     else {
@@ -1777,31 +1846,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   }
   function adoptShots(job: Job) {
     if (!job.result?.shots) return;
-    update((d) => {
-      const storyboardNode = d.nodes.find(
-        (item) => item.id === job.node_id && item.data.kind === "storyboard",
-      );
-      const withFilmBible = job.result.filmBible
-        ? {
-            ...d,
-            filmBible: {
-              ...d.filmBible,
-              ...job.result.filmBible,
-            },
-          }
-        : d;
-      return importStoryboardShots(
-        withFilmBible,
-        job.result.shots,
-        config.models,
-        system.models,
-        id,
-        storyboardNode?.id,
-      );
-    });
-    activateWorkflowStage("storyboard");
-    const cardCount = Object.keys(job.result.filmBible?.visual?.cards || {}).length;
-    setNotice(`已导入 ${job.result.shots.length} 个分镜${cardCount ? `和 ${cardCount} 张视觉卡` : ""}，画布节点和连线已同步建立；检查后可运行画布`);
+    setPanel("jobs");
+    setNotice("请在任务中心比较分镜候选及影响范围后明确采纳；不会在本地覆盖整份分镜表。");
   }
   function shotNodes(shot: Any, _index: number) {
     update((d) =>
@@ -2032,6 +2078,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   async function generateVisualReference(versionId: string) {
     const snapshot = current.current;
     if (!snapshot.project || !snapshot.doc) return;
+    const generation = collaboration.current!.drafts.generation;
     const visual = visualBibleOf(snapshot.doc);
     const version = visual.versions[versionId];
     const card = version ? visual.cards[version.cardId] : undefined;
@@ -2066,7 +2113,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       target,
       capabilities,
     );
+    if (current.current.project?.id !== snapshot.project.id || collaboration.current!.drafts.generation !== generation)
+      throw new Error("作品已切换，请从当前作品重新提交");
     await save();
+    if (current.current.project?.id !== snapshot.project.id || collaboration.current!.drafts.generation !== generation)
+      throw new Error("作品已切换，请从当前作品重新提交");
     if (dirty.current) throw new Error("项目尚未保存，请先解决保存冲突");
     const submissionId = id();
     const job = await api(
@@ -2090,37 +2141,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         },
       }),
     );
-    if (
-      !job.project_document ||
-      typeof job.project_revision !== "number" ||
-      typeof job.production_revision !== "number"
-    )
-      throw new Error("服务端未返回已持久化的参考图任务归属");
-    if (job.production_revision < productionRevision.current) {
-      await refresh(snapshot.project.id);
-      setNotice("主参考图任务已进入队列；已保留服务器上的较新项目版本");
-      return;
-    }
-    const projectedDocument = deriveManagedGraph(job.project_document);
-    revision.current = job.project_revision;
-    productionRevision.current = job.production_revision;
-    dirty.current = projectedDocument !== job.project_document;
-    const updatedProject = {
-      ...snapshot.project,
-      revision: job.project_revision,
-      production_revision: job.production_revision,
-      document: projectedDocument,
-    };
-    current.current = { project: updatedProject, doc: projectedDocument };
-    setProject((currentProject) =>
-      currentProject && currentProject.id === snapshot.project!.id
-        ? updatedProject
-        : currentProject,
-    );
-    setDoc(projectedDocument);
-    setSaved(dirty.current ? "未保存" : "已保存");
+    if (!job.collaboration?.target) throw new Error("服务端未返回生成目标快照");
+    if (current.current.project?.id !== snapshot.project.id) return;
     await refresh(snapshot.project.id);
-    setNotice("主参考图任务已进入队列；完成后请人工确认并锁定");
+    setNotice("主参考图任务已进入队列；完成后在任务中心比较并采纳，再人工确认锁定");
   }
   async function runSmartBatch(kind: BatchGenerationKind) {
     const snapshot = current.current;
@@ -2401,12 +2425,15 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       } catch (reason) { report(reason); }
     },
     onGenerateVoice: async (cardId, profile) => {
+      const generation = collaboration.current!.drafts.generation;
       const card = visualBibleOf(doc).cards[cardId];
       if (!card) throw new Error("角色资产卡不存在");
       const next = saveVoiceProfile(doc, cardId, profile);
       const savedProfile = voiceProfilesOf(next)[cardId];
       update(()=>next);
       await save();
+      if (current.current.project?.id !== project.id || collaboration.current!.drafts.generation !== generation)
+        throw new Error("作品已切换，请从当前作品重新提交");
       if (dirty.current) throw new Error("角色声音设定尚未保存，请先解决保存冲突");
       const job = await api(`/projects/${project.id}/jobs`, send("POST", {
         node_id: `voice-profile:${cardId}`,
@@ -2424,15 +2451,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           voice_profile: { cardId, version: savedProfile.version },
         },
       }));
-      update((document)=>({
-        ...document,
-        filmBible:{
-          ...document.filmBible,
-          voices:{profiles:{...voiceProfilesOf(document),[cardId]:{...voiceProfilesOf(document)[cardId],generationJobId:job.id}}},
-        },
-      }));
+      if (!job.collaboration?.target) throw new Error("服务端未返回音色目标快照");
+      if (current.current.project?.id !== project.id) return;
       await refresh(project.id);
-      setNotice("角色固定音色试听已进入任务队列");
+      setNotice("角色音色试听已进入队列；完成后在任务中心比较并采纳");
     },
     onLockVoice: (cardId, locked) => {
       try {
@@ -2450,17 +2472,16 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           .map((dialogue: Any, index: number) => ({ shot, dialogue, index })),
       );
       if (!dialogues.length) throw new Error("本集分镜没有该角色的结构化对白；重新生成分镜规划后会自动提取对白");
-      const existing = new Set(assets.flatMap((asset) => {
-        const dialogue = asset.metadata?.input?.dialogue;
-        return dialogue?.id && dialogue.voiceVersion === profile.version ? [dialogue.id] : [];
-      }));
-      const pending = new Set(jobs.flatMap((job) => {
-        const dialogue = job.input?.dialogue;
-        return dialogue?.id && dialogue.voiceVersion === profile.version && ["queued","running","succeeded"].includes(job.status) ? [dialogue.id] : [];
-      }));
+      const existing = new Set(dialogues.filter(({dialogue})=>dialogue.audioVoiceVersion===profile.version
+        && assets.some(asset=>asset.id===dialogue.audioAssetId&&asset.kind==='audio'
+          &&asset.metadata?.input?.dialogue?.text===dialogue.text)).map(({dialogue})=>dialogue.id));
+      const pending = new Set(dialogues.filter(({dialogue})=>jobs.some(job=>job.input?.dialogue?.id===dialogue.id
+        &&job.input.dialogue.text===dialogue.text&&job.input.dialogue.voiceVersion===profile.version
+        &&["queued","running","succeeded"].includes(job.status))).map(({dialogue})=>dialogue.id));
       const needed = dialogues.filter(({dialogue})=>!existing.has(dialogue.id) && !pending.has(dialogue.id));
-      if (!needed.length) throw new Error("该角色本集对白已经生成或正在生成");
+      if (!needed.length) throw new Error("该角色本集对白已采纳、正在生成或有待采纳候选；请查看任务中心");
       await save();
+      if (dirty.current) throw new Error("镜头或音色尚未保存，请先解决保存冲突");
       const audioJobs=needed.map(({shot,dialogue,index})=>{
         const performance = dialoguePerformance(shot, dialogue, profile);
         return {
@@ -2676,12 +2697,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           {saved}
         </span>
         <div className="top-spacer" />
+        <button className={panel==='collaboration'?'quiet active':'quiet'}
+          onClick={()=>setPanel(panel==='collaboration'?null:'collaboration')}>对象协作</button>
         <button
           className="icon-button"
           aria-label="保存项目"
           title="保存 Ctrl+S"
-          onClick={() => save()}
-          disabled={(project as Any).permissions?.legacy_document_write===false}
+          onClick={() => void saveCurrentView().catch(report)}
+          disabled={(project as Any).permissions?.can_generate===false || !project.object_collaboration}
         >
           <Save size={18} />
         </button>
@@ -2693,7 +2716,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           {session.user?.nickname?.slice(0,1)||'我'}
         </button>
       </header>
-      {(project as Any).permissions?.legacy_document_write===false&&<div className="permission-banner">当前为 {(project as Any).permissions?.role||'只读'} 视图。整份作品写入在 P3 仅开放给 manager / owner。</div>}
+      <div className="permission-banner">当前角色：{(project as Any).permissions?.role||'只读'}。按对象分工保存；只能编辑自己负责的内容，管理者修改他人对象前须显式接管。{!project.object_collaboration&&' 此旧测试项目为只读，请创建新的协作项目。'}</div>
       <GlobalNav
         active={panel}
         taskCount={activeCount}
@@ -2833,6 +2856,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "source" ? (
           <SourceLibraryPage
+            store={sourceDrafts.current} actorId={session.user.id}
+            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
             projectId={project.id}
             providers={config.models}
@@ -2861,6 +2886,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "script" ? (
           <ScriptRoomPage
+            store={scriptDrafts.current} actorId={session.user.id}
+            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
             currentEpisodeNo={project.episode_no}
             providers={config.models}
@@ -2871,7 +2898,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             report={report}
             onChanged={async (changedProjectId) => {
               await refreshProductionHierarchy();
-              if (changedProjectId === project.id) await openProject(project.id);
+              if (changedProjectId === project.id&&!ownedUnsaved()) await openProject(project.id);
             }}
             onSelectEpisode={async (episodeNo) => {
               const episode = currentEpisodes.find((item) => item.episode_no === episodeNo);
@@ -3204,21 +3231,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               stage={(doc as any).director || defaultStage()}
               onChange={(director) => update((d) => ({ ...d, director }))}
               newId={id}
-              onCapture={async (blob, prompt) => {
-                const form = new FormData();
-                form.append("file", blob, "导演构图.png");
-                const asset = await api(`/projects/${project.id}/assets`, {
-                  method: "POST",
-                  body: form,
-                });
-                await refresh(project.id);
-                newNode("image", prompt, {
-                  asset_ids: [asset.id],
-                  resolution: "1280x720",
-                });
-                activateWorkflowStage("canvas");
-                setNotice("构图已保存，完善场景描述后即可生成");
-              }}
+              onCapture={(blob,prompt)=>captureDirector(blob,prompt,(doc as Any).director||defaultStage())}
             />
           </Suspense>
         ) : null}
@@ -3780,28 +3793,16 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                     </span>
                     {j.result?.assets?.[0] && (
                       <button
-                        onClick={() =>
-                          editNode({
-                            assetId: j.result.assets[0].id,
-                            resultJob: j.id,
-                            stale: true,
-                          })
-                        }
+                        onClick={() => setPanel("jobs")}
                       >
-                        使用此版本
+                        比较并采纳此版本
                       </button>
                     )}
                     {j.result?.text && (
                       <button
-                        onClick={() =>
-                          editNode({
-                            text: j.result.text,
-                            resultJob: j.id,
-                            stale: true,
-                          })
-                        }
+                        onClick={() => setPanel("jobs")}
                       >
-                        使用此文本
+                        比较并采纳此文本
                       </button>
                     )}
                   </div>
@@ -3850,7 +3851,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         <div
           className={
             "side-panel " +
-            (["settings", "assets", "jobs", "characters", "filmBible", "projectInfo", "trash"].includes(
+            (["settings", "assets", "jobs", "characters", "filmBible", "projectInfo", "trash", "collaboration"].includes(
               panel,
             )
               ? panel === "filmBible"
@@ -3876,6 +3877,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                   run: "运行工作流",
                   filmBible: "视觉圣经",
                   trash: "回收站",
+                  collaboration: "对象分工与协作",
                 }[panel]
               }
             </h2>
@@ -3888,6 +3890,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             </button>
           </div>
           <div className="panel-scroll">
+            {panel === "collaboration" && <CollaborationPanel key={project.id}
+              client={collaboration.current!} document={doc} assets={assets} actorId={session.user.id}
+              canManage={Boolean((project as Any).permissions?.can_manage)}
+              canEdit={(project as Any).permissions?.can_generate!==false}
+              request={api} onDocument={acceptObjectDocument} onSave={saveObject} />}
             {panel === "filmBible" && <FilmBiblePanel {...filmBiblePanelProps} />}
             {panel === "run" && (
               <RunWorkflow
@@ -4133,6 +4140,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             )}
             {panel === "jobs" && (
               <TaskCenter
+                key={project.production_id}
                 productionName={currentProduction?.name || project.name}
                 episodes={currentEpisodes}
                 currentProjectId={project.id}
@@ -4147,6 +4155,21 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                   activateWorkflowStage("canvas");
                 }}
                 onAdoptShots={(job) => adoptShots(job as Job)}
+                onAdoptCandidate={async(job,body)=>{
+                  const snapshot=current.current;
+                  if(!snapshot.project||snapshot.project.production_id!==job.production_id)
+                    throw new Error('作品已切换，不能从旧任务列表采纳');
+                  requireOwnedSaved();
+                  if(dirty.current||saveFlight.current)throw new Error('请先保存或处理当前对象草稿，再采纳候选');
+                  const generation=collaboration.current!.drafts.generation;
+                  await api(`/projects/${job.project_id}/candidates/${job.id}/adopt`,send('POST',body));
+                  if(current.current.project?.id!==snapshot.project.id||collaboration.current!.drafts.generation!==generation)return;
+                  setWorkflowDataRevision(value=>({source:value.source+1,adaptation:value.adaptation+1,script:value.script+1}));
+                  await refresh(snapshot.project.id);
+                  if(current.current.project?.id!==snapshot.project.id||collaboration.current!.drafts.generation!==generation)return;
+                  if(!dirty.current&&!saveFlight.current&&!ownedUnsaved())await openProject(snapshot.project.id);
+                  setNotice('候选已明确采纳；若操作期间产生了新草稿，会保留草稿供比较。');
+                }}
               />
             )}
             {panel === "export" && (
@@ -4486,7 +4509,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           e.target.value = "";
         }}
       />
-      {conflict && (
+      {conflict && panel!=='collaboration' && (
         <div className="modal-overlay">
           <div
             className="panorama-modal"
@@ -4494,11 +4517,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             aria-modal="true"
             aria-label="解决保存冲突"
           >
-            <h2>项目已在另一页面更新</h2>
+            <h2>对象版本发生冲突</h2>
             <p>
-              本页编辑仍然保留，自动保存已暂停。先将本页草稿下载为 JSON
-              备份，再载入主机最新版本继续编辑。
+              本页草稿仍然保留，自动保存已暂停。可在对象协作中逐个比较和处理冲突，
+              也可以备份整页草稿后重新载入。
             </p>
+            <button onClick={()=>setPanel('collaboration')}>比较并处理单个对象</button>
             <button
               className="primary"
               disabled={recoveryBusy}

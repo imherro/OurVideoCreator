@@ -131,7 +131,7 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
         result.pop('dialogue_audio_mode', None)
         return result
     profiles = (((document.get('filmBible') or {}).get('voices') or {}).get('profiles') or {})
-    candidates = sorted(assets or [], key=lambda item: float(item.get('created') or 0), reverse=True)
+    candidates = assets or []
     selected = []
     for dialogue in dialogues:
         card_id = str(dialogue.get('characterCardId') or '')
@@ -142,12 +142,15 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
         version = int(profile.get('version') or 1)
         match = next((asset for asset in candidates if (
             asset.get('kind') == 'audio'
+            and asset.get('id') == dialogue.get('audioAssetId')
+            and dialogue.get('audioVoiceVersion') == version
             and ((asset.get('metadata') or {}).get('input') or {}).get('dialogue', {}).get('id') == dialogue.get('id')
+            and ((asset.get('metadata') or {}).get('input') or {}).get('dialogue', {}).get('text') == dialogue.get('text')
             and int((((asset.get('metadata') or {}).get('input') or {}).get('dialogue', {}).get('voiceVersion') or 0)) == version
         )), None)
         if not match:
             name = str(dialogue.get('characterName') or '角色')
-            raise ValueError(f'{name}的本镜对白尚未使用当前固定音色生成，请先生成本集对白')
+            raise ValueError(f'{name}的本镜对白尚未使用当前固定音色生成并明确采纳，请先在任务中心采纳本集对白')
         duration = float((match.get('metadata') or {}).get('duration') or 0)
         if duration <= 0:
             raise ValueError(f'对白音频“{match.get("name") or match.get("id")}”时长无效，请重新生成')

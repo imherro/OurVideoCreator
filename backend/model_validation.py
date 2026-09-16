@@ -214,7 +214,7 @@ def model_definition(body, config, kind):
     return value
 
 
-def shot_parameters(definition, submitted, kind, document, node_id):
+def shot_parameters(definition, submitted, kind, document, node_id, *, complete=True):
     """Recompute linked-shot controls from canonical state and frozen model rules."""
     # Canonical shot controls may fill missing fields. Require completeness only
     # after that derivation, before freezing or making any external request.
@@ -223,7 +223,7 @@ def shot_parameters(definition, submitted, kind, document, node_id):
                  if item.get(kind + 'Node') == node_id
                  or (item.get('pipeline') or {}).get(kind + 'NodeId') == node_id), None)
     if not shot:
-        return parameters(definition, result)
+        return parameters(definition, result, complete=complete)
     caps, rules = definition['capabilities'], definition['rules']
     if kind == 'video' and 'fps' in caps and float(shot.get('duration', 0)) > 0:
         minimum, step, maximum = caps['min_frames'], caps['frame_step'], caps['max_frames']
@@ -237,7 +237,7 @@ def shot_parameters(definition, submitted, kind, document, node_id):
                 '1:1':'2048x2048', '3:4':'1536x2048', '9:16':'1152x2048'}.get(document.get('ratio'))
         if name and size and rules[name]['type'] == 'string' and ('enum' not in rules[name] or size in rules[name]['enum']):
             result[name] = size
-    return parameters(definition, result)
+    return parameters(definition, result, complete=complete)
 
 
 def parameters(definition, submitted, *, complete=True):

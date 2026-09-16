@@ -12,23 +12,17 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from psycopg import sql
 from sqlalchemy.engine import make_url
 
 from backend import store as s
-from backend.app import (
-    ProjectSave,
-    SourceExtractionCreate,
-    app,
-    extract_source_events,
-    save_project,
-)
+from backend.app import SourceExtractionCreate, app
 from backend.database import WorkerAdvisoryLock, check_ready
 from tests.postgres_test_db import _assert_safe_target
 from tests.auth_helpers import login_admin
 from tests.platform_model_helpers import publish_test_model
+from tests.test_p3_r2_interleavings import wait_for_db_waiters
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,31 +112,29 @@ def test_db03_two_connections_same_revision_yield_one_success_one_conflict():
     client = authenticated_client()
     try:
         project = create_project(client, 'P2 concurrent save')
-        body = ProjectSave(
-            name='P2 concurrent winner', revision=project['revision'],
-            production_revision=project['production_revision'],
-            document=copy.deepcopy(project['document']),
-        )
+        body = {'expected_revision': project['revision'], 'patch': {'name': 'P2 concurrent winner'}}
         barrier = threading.Barrier(3)
         outcomes = []
         lock = threading.Lock()
 
         def contender(index):
-            local = body.model_copy(deep=True)
-            local.document['brief'] = f'contender-{index}'
+            local = copy.deepcopy(body)
+            local['patch']['brief'] = f'contender-{index}'
             barrier.wait()
-            try:
-                value = save_project(project['id'], local)
-                outcome = ('success', value['revision'])
-            except HTTPException as exc:
-                outcome = ('conflict', exc.status_code)
+            response = client.patch(f'/api/projects/{project["id"]}/metadata', json=local)
+            outcome = ('success', response.json()['revision']) if response.status_code == 200 else ('conflict', response.status_code)
             with lock:
                 outcomes.append(outcome)
 
         threads = [threading.Thread(target=contender, args=(index,)) for index in (1, 2)]
-        for thread in threads:
-            thread.start()
-        barrier.wait()
+        with s.db() as blocker:
+            blocker.execute('SELECT id FROM projects WHERE id=%s FOR UPDATE', (project['id'],))
+            for thread in threads:
+                thread.start()
+            barrier.wait()
+            waits = wait_for_db_waiters(2)
+            assert all(row['blockers'] for row in waits)
+            print('P2 metadata concurrent save PostgreSQL trace:', waits)
         for thread in threads:
             thread.join(timeout=20)
             assert not thread.is_alive()
@@ -169,12 +161,11 @@ def test_db04_injected_save_failure_rolls_back_content_history_and_event(monkeyp
     client = authenticated_client()
     try:
         project = create_project(client, 'P2 rollback')
-        body = ProjectSave(
-            name='must roll back', revision=project['revision'],
-            production_revision=project['production_revision'],
-            document=copy.deepcopy(project['document']),
-        )
-        body.document['brief'] = 'must not persist'
+        body = {'expected_revision': project['revision'],
+            'patch': {'name': 'must roll back', 'brief': 'must not persist'}}
+        with s.db() as connection:
+            before_events = connection.execute('SELECT COUNT(*) count FROM events WHERE project_id=%s',
+                (project['id'],)).fetchone()['count']
 
         def fail_event(*_args, **kwargs):
             assert kwargs.get('connection') is not None
@@ -182,7 +173,7 @@ def test_db04_injected_save_failure_rolls_back_content_history_and_event(monkeyp
 
         monkeypatch.setattr(s, 'event', fail_event)
         with pytest.raises(RuntimeError, match='injected event failure'):
-            save_project(project['id'], body)
+            client.patch(f'/api/projects/{project["id"]}/metadata', json=body)
         with s.db() as connection:
             row = connection.execute(
                 'SELECT revision,document FROM projects WHERE id=%s', (project['id'],)
@@ -195,7 +186,7 @@ def test_db04_injected_save_failure_rolls_back_content_history_and_event(monkeyp
             ).fetchone()['count']
         assert row['revision'] == 1
         assert json.loads(row['document']).get('brief') != 'must not persist'
-        assert history == events == 0
+        assert history == 0 and events == before_events
     finally:
         client.__exit__(None, None, None)
 
@@ -234,7 +225,7 @@ def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(mo
             submission_id='p2-last-item-rollback',
         )
         with pytest.raises(RuntimeError, match='last batch item'):
-            extract_source_events(production['id'], body)
+            client.post(f'/api/productions/{production["id"]}/source-extractions', json=body.model_dump())
         with s.db() as connection:
             jobs = connection.execute(
                 'SELECT COUNT(*) count FROM jobs WHERE submission_id LIKE %s',

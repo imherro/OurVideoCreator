@@ -149,10 +149,19 @@ def read_project_state(connection, project_id, *, for_update=False):
         raise ValueError('项目缺少 Production 共享上下文')
     episode_document = json.loads(project['document'])
     context = normalize_production_context(json.loads(production['shared_context']))
+    objects = []
+    if project.get('object_collaboration'):
+        from .collaboration_document import compose
+        objects = connection.execute('''SELECT * FROM collaboration_objects WHERE production_id=%s
+            AND (project_id=%s OR project_id IS NULL) AND NOT deleted ORDER BY kind,object_key,id''',
+            (project['production_id'], project_id)).fetchall()
+        episode_document, context = compose(episode_document, context, objects)
     return {
         'project': project,
         'production': production,
         'episode_document': episode_document,
         'production_context': context,
         'document': compose_project_document(episode_document, context),
+        'objects': objects,
+        'script': connection.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(project_id,)).fetchone(),
     }

@@ -14,6 +14,7 @@ from tests.auth_helpers import login_admin
 from tests.platform_model_helpers import publish_test_model
 from tests.egress_helpers import mock_egress
 from backend import platform_models
+from tests.collaboration_helpers import create_node, set_edges
 
 
 @pytest.fixture
@@ -49,7 +50,8 @@ def test_batch_carries_static_reference_asset_to_minimax(batch_authenticated):
         {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头向前推进'}},
     ]
     doc['edges']=[{'id':'frame','source':'reference','target':'video'}]
-    assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={'submission_id':'static-frame-batch-001','allow_cloud':True})
     assert result.status_code==200,result.text
     jobs=client.get('/api/projects/'+item['id']+'/jobs').json()
@@ -70,7 +72,8 @@ def test_exact_video_batch_reuses_completed_image_without_rerunning_it(batch_aut
         {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头缓慢推进'}},
     ]
     doc['edges']=[{'id':'frame','source':'image','target':'video'}]
-    assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={
         'submission_id':'exact-video-batch-001','node_ids':['video'],'exact':True,'allow_cloud':True,
     })
@@ -91,7 +94,8 @@ def test_batch_rejects_multiple_minimax_frames_before_queueing(batch_authenticat
         {'id':'video','data':{'kind':'video','model_id':'hailuo','prompt':'镜头向前推进'}},
     ]
     doc['edges']=[{'id':'one-edge','source':'one','target':'video'},{'id':'two-edge','source':'two','target':'video'}]
-    assert client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc}).status_code==200
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={'submission_id':'many-frame-batch-001','allow_cloud':True})
     assert result.status_code==400
     assert '一张首帧' in result.text
@@ -113,8 +117,8 @@ def test_batch_seedream_keeps_canvas_reference_order_after_parent_finishes(batch
         {'id':'generated-first','source':'generated-node','target':'target'},
         {'id':'static-second','source':'static-node','target':'target'},
     ]
-    saved=client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc})
-    assert saved.status_code==200,saved.text
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={'submission_id':'ordered-ark-batch-001','allow_cloud':True})
     assert result.status_code==200,result.text
     jobs={job['node_id']:job for job in client.get('/api/projects/'+item['id']+'/jobs').json()}
@@ -155,8 +159,8 @@ def test_batch_seedance_allows_dynamic_first_frame_with_explicit_last_frame(batc
         {'id':'video','data':{'kind':'video','model_id':'ark-video','prompt':'生成连续转场','end_asset_id':tail['id']}},
     ]
     doc['edges']=[{'id':'first-frame','source':'first','target':'video'}]
-    saved=client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc})
-    assert saved.status_code==200,saved.text
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={'submission_id':'ark-fl2v-batch-001','allow_cloud':True})
     assert result.status_code==200,result.text
     jobs={job['node_id']:job for job in client.get('/api/projects/'+item['id']+'/jobs').json()}
@@ -185,8 +189,8 @@ def test_batch_seedance_rejects_end_frame_when_selected_model_lacks_capability(b
         }},
     ]
     doc['edges']=[{'id':'first-frame','source':'first','target':'video'}]
-    saved=client.put('/api/projects/'+item['id'],json={'name':item['name'],'revision':item['revision'],'document':doc})
-    assert saved.status_code==200,saved.text
+    for node in doc['nodes']:create_node(client,item['id'],node['id'],**node['data'])
+    set_edges(client,item['id'],doc['edges'])
     result=client.post('/api/projects/'+item['id']+'/run',json={
         'submission_id':'ark-no-tail-batch-001','node_ids':['video'],'exact':True,'allow_cloud':True,
     })

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import os
 import re
@@ -18,22 +17,13 @@ from backend import database
 from backend import store as s
 from backend.app import (
     AdaptationSave,
-    ChapterCreate,
-    EpisodeCreate,
-    PromptTemplateSave,
     ScriptSave,
     app,
-    cancel,
-    create_episode,
-    create_source_chapter,
-    resume,
-    save_adaptation,
-    save_episode_script,
-    save_prompt_template,
 )
 from backend.worker import Worker
 from tests.auth_helpers import login_admin
 from tests.platform_model_helpers import publish_test_model
+from tests.collaboration_helpers import create_node
 from backend import platform_models
 
 
@@ -176,7 +166,9 @@ def test_p2_r1_first_prompt_write_and_parent_sequences_are_serialized(client):
 
     def episode_contender(index):
         episode_barrier.wait()
-        episode_results.append(create_episode(production['id'],EpisodeCreate(title=f'Episode {index}')))
+        response = client.post(f'/api/productions/{production["id"]}/episodes', json={'title':f'Episode {index}'})
+        assert response.status_code == 200, response.text
+        episode_results.append(response.json())
 
     threads = [threading.Thread(target=episode_contender,args=(index,)) for index in (1,2)]
     for thread in threads: thread.start()
@@ -195,9 +187,10 @@ def test_p2_r1_first_prompt_write_and_parent_sequences_are_serialized(client):
 
     def chapter_contender(index):
         chapter_barrier.wait()
-        chapter_results.append(create_source_chapter(
-            production['id'],source['id'],ChapterCreate(title=f'Chapter {index}',content='content')
-        ))
+        response = client.post(f'/api/productions/{production["id"]}/sources/{source["id"]}/chapters',
+            json={'title':f'Chapter {index}', 'content':'content'})
+        assert response.status_code == 200, response.text
+        chapter_results.append(response.json())
 
     threads = [threading.Thread(target=chapter_contender,args=(index,)) for index in (1,2)]
     for thread in threads: thread.start()
@@ -219,7 +212,15 @@ def test_p2_r1_resume_cancel_races_serialize_and_duplicate_resume_does_not_reset
     original_event = s._event
 
     def run_race(first, second, expected_status):
-        job_id = _interrupted_job(project['id'], expected_status)
+        nid = s.uid('resume-node-')
+        create_node(client, project['id'], nid)
+        response = client.post(f'/api/projects/{project["id"]}/jobs', json={
+            'node_id':nid, 'kind':'text', 'submission_id':s.uid('race-'),
+            'input':{'model_id':'p2-resume-model', 'prompt':'frozen'},
+        })
+        assert response.status_code == 200, response.text
+        job_id = response.json()['id']
+        s.job_update(job_id, status='interrupted', phase='interrupted')
         inside = threading.Event()
         release = threading.Event()
         outcomes = []
@@ -235,8 +236,9 @@ def test_p2_r1_resume_cancel_races_serialize_and_duplicate_resume_does_not_reset
 
         def invoke(name):
             try:
-                value = resume(job_id) if name == 'queued' else cancel(job_id)
-                outcomes.append((name, value['status']))
+                action = 'resume' if name == 'queued' else 'cancel'
+                response = client.post(f'/api/jobs/{job_id}/{action}')
+                outcomes.append((name, response.json()['status'] if response.status_code == 200 else response.status_code))
             except HTTPException as exc:
                 outcomes.append((name, exc.status_code))
 
@@ -261,11 +263,15 @@ def test_p2_r1_resume_cancel_races_serialize_and_duplicate_resume_does_not_reset
 
     with s.db() as connection:
         connection.execute("UPDATE jobs SET status='interrupted',phase='again' WHERE id=%s",(resumed_job,))
-    first = resume(resumed_job)
+    response = client.post(f'/api/jobs/{resumed_job}/resume')
+    assert response.status_code == 200, response.text
+    first = response.json()
     assert first['status'] == 'queued'
     with s.db() as connection:
         connection.execute("UPDATE jobs SET status='running',progress=37 WHERE id=%s",(resumed_job,))
-    duplicate = resume(resumed_job)
+    response = client.post(f'/api/jobs/{resumed_job}/resume')
+    assert response.status_code == 200, response.text
+    duplicate = response.json()
     assert duplicate['status'] == 'running' and duplicate['progress'] == 37
     print(json.dumps({
         'case':'resume_cancel',
@@ -299,12 +305,14 @@ def test_p2_r1_event_failure_rolls_back_job_adaptation_and_script(client, monkey
     })
     monkeypatch.setattr(s, 'event', fail_event)
     with pytest.raises(RuntimeError, match='injected event failure'):
-        save_adaptation(production['id'],body)
+        client.put(f'/api/productions/{production["id"]}/adaptation', json=body.model_dump())
     after = client.get(f'/api/productions/{production["id"]}/adaptation').json()
     assert after == before
 
     monkeypatch.undo()
-    saved_adaptation = save_adaptation(production['id'],body)
+    response = client.put(f'/api/productions/{production["id"]}/adaptation', json=body.model_dump())
+    assert response.status_code == 200, response.text
+    saved_adaptation = response.json()
     script = client.get(f'/api/productions/{production["id"]}/episode-scripts/1').json()
     assert script['revision'] >= 1 and saved_adaptation['revision'] > body.revision
     script_body = ScriptSave(**{
@@ -313,6 +321,7 @@ def test_p2_r1_event_failure_rolls_back_job_adaptation_and_script(client, monkey
             'storyGoal','paywallBeat','characters','scenes','props',
         )},
         'body':'must roll back',
+        'assignment_epoch':script['assignment_epoch'],
     })
     monkeypatch.setattr(s, 'event', fail_event)
     with s.db() as connection:
@@ -320,7 +329,7 @@ def test_p2_r1_event_failure_rolls_back_job_adaptation_and_script(client, monkey
             'SELECT COUNT(*) count FROM episode_script_revisions WHERE project_id=%s',(episode['id'],)
         ).fetchone()['count']
     with pytest.raises(RuntimeError, match='injected event failure'):
-        save_episode_script(production['id'],1,script_body)
+        client.put(f'/api/productions/{production["id"]}/episode-scripts/1', json=script_body.model_dump())
     with s.db() as connection:
         saved = connection.execute(
             'SELECT revision,body FROM episode_scripts WHERE project_id=%s',(episode['id'],)

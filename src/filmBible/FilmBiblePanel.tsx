@@ -421,7 +421,7 @@ export function FilmBiblePanel({
               <small>{dialogueRows.length ? `${dialogueRows.filter((item)=>item.status==="ready").length}/${dialogueRows.length} 已生成` : "分镜中暂无该角色对白"}</small>
             </div>
             {dialogueRows.length > 0 && <div className="voice-dialogue-list">{dialogueRows.map((row)=>{
-              const statusLabel = {missing:"未生成",queued:"排队中",running:"生成中",failed:"生成失败",interrupted:"待恢复",syncing:"正在同步",ready:"已生成"}[row.status];
+              const statusLabel = {missing:"未生成",queued:"排队中",running:"生成中",failed:"生成失败",interrupted:"待恢复",syncing:"候选待采纳（任务中心）",ready:"已采纳"}[row.status];
               return <div className="voice-dialogue-row" key={row.id}>
                 <div className="voice-dialogue-copy">
                   <div><b>第 {row.shotOrder} 镜</b>{row.emotion && <small>{row.emotion}</small>}</div>
