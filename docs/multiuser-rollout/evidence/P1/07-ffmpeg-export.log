@@ -1,0 +1,11 @@
+{
+  "name": "07-ffmpeg-export",
+  "command": "C:\\Python314\\python.exe -m pytest -q tests/test_export.py -s",
+  "started_utc": "2026-09-16T05:29:45.976544+00:00",
+  "duration_seconds": 7.729,
+  "exit_code": 0,
+  "log": "07-ffmpeg-export.log"
+}
+
+.....
+5 passed in 7.03s

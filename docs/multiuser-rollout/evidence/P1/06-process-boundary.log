@@ -1,0 +1,12 @@
+{
+  "name": "06-process-boundary",
+  "command": "C:\\Python314\\python.exe -m pytest -q tests/test_p1_processes.py -s",
+  "started_utc": "2026-09-16T05:29:40.102478+00:00",
+  "duration_seconds": 5.874,
+  "exit_code": 0,
+  "log": "06-process-boundary.log"
+}
+
+{"web_pids": [22992, 10864, 26092], "worker_pid": 25024, "job_id": "job-52ff7eb3e906483ab123e31843447c97", "job_status": "succeeded", "fake_request_count": 1, "second_worker_exit": 2}
+.
+1 passed in 5.21s

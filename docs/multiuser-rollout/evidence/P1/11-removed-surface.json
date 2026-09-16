@@ -1,0 +1,6 @@
+{
+  "embedded_inference_directory_exists": false,
+  "runtime_module_exists": false,
+  "tracked_removed_paths": [],
+  "expected": "all false/empty"
+}
