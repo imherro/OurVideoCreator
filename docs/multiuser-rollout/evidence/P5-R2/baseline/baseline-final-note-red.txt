@@ -1,0 +1,132 @@
+P5-R2 receipt observation: {"only":false,"during":false,"host":{"id":"x","uid":"x","action":"v2","note":"","order":1},"hostSaved":"未保存","hostConflict":false,"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]},"state":"saved","serial":0},"requests":[{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":1,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}}],"deletes":[]}},{"label":"second","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":2,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}],"deletes":[]}}],"server":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}}
+P5-R2 receipt observation: {"only":false,"during":true,"host":{"id":"x","uid":"x","action":"v2","note":"typed while saving","order":1},"hostSaved":"未保存","hostConflict":false,"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v2","note":"typed while saving"},"nodes":[]},"state":"conflict","serial":3,"error":"远端对象已更新；本地草稿保留，请比较后明确处理","remote":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}},"requests":[{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":1,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}}],"deletes":[]}},{"label":"second","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":2,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}],"deletes":[]}}],"server":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}}
+P5-R2 receipt observation: {"only":true,"during":false,"host":{"id":"x","uid":"x","action":"v2","note":"","order":1},"hostSaved":"已保存","hostConflict":false,"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]},"state":"saved","serial":0},"requests":[{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":1,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}}],"deletes":[]}},{"label":"second","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":2,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}],"deletes":[]}}],"server":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}}
+P5-R2 receipt observation: {"only":true,"during":true,"host":{"id":"x","uid":"x","action":"v2","note":"typed while saving","order":1},"hostSaved":"保存冲突","hostConflict":true,"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v2","note":"typed while saving"},"nodes":[]},"state":"conflict","serial":3,"error":"远端对象已更新；本地草稿保留，请比较后明确处理","remote":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}},"requests":[{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":1,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}}],"deletes":[]}},{"label":"second","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":2,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}],"deletes":[]}}],"server":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}}
+P5-R2 final note observation: {"before":{"host":{"project":{"id":"episode","production_id":"production","name":"Episode","revision":1,"production_revision":1,"object_collaboration":true,"permissions":{"can_manage":false},"document":{"ratio":"16:9","style":"film","generationPolicy":{},"filmBible":{"visual":{"cards":{},"versions":{}},"voices":{"profiles":{}}},"shots":[{"id":"x","uid":"x","action":"v1","note":"","order":1},{"id":"y","uid":"y","action":"y1","note":"","order":2}],"nodes":[],"edges":[],"director":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]},"editor":{"version":1,"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}},"timeline":[],"audio_id":"","music_volume":0.3},"objects":[{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},{"id":"shot-y","kind":"shot","object_key":"y","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"y","uid":"y","action":"y1","note":""},"nodes":[]}},{"id":"graph-graph","kind":"graph","object_key":"graph","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"edges":[],"positions":{},"nodeOrder":[],"shotOrder":["x","y"]}},{"id":"timeline-timeline","kind":"timeline","object_key":"timeline","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}}},{"id":"director-director","kind":"director","object_key":"director","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"stage":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]}}}],"episode_title":"Episode"},"doc":{"ratio":"16:9","style":"film","generationPolicy":{},"filmBible":{"visual":{"cards":{},"versions":{}},"voices":{"profiles":{}}},"shots":[{"id":"x","uid":"x","action":"v2","note":"","order":1},{"id":"y","uid":"y","action":"y1","note":"","order":2}],"nodes":[],"edges":[],"director":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]},"editor":{"version":1,"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}},"timeline":[],"audio_id":"","music_volume":0.3},"saved":"未保存","conflict":false,"errors":[]},"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":2,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":3,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]},"state":"saved","serial":0}},"host":{"project":{"id":"episode","production_id":"production","name":"Episode","revision":1,"production_revision":1,"object_collaboration":true,"permissions":{"can_manage":false},"document":{"ratio":"16:9","style":"film","generationPolicy":{},"filmBible":{"visual":{"cards":{},"versions":{}},"voices":{"profiles":{}}},"shots":[{"id":"x","uid":"x","action":"v1","note":"","order":1},{"id":"y","uid":"y","action":"y1","note":"","order":2}],"nodes":[],"edges":[],"director":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]},"editor":{"version":1,"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}},"timeline":[],"audio_id":"","music_volume":0.3},"objects":[{"id":"shot-x","kind":"shot","object_key":"x","revision":4,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}},{"id":"shot-y","kind":"shot","object_key":"y","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"y","uid":"y","action":"y1","note":""},"nodes":[]}},{"id":"graph-graph","kind":"graph","object_key":"graph","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"edges":[],"positions":{},"nodeOrder":[],"shotOrder":["x","y"]}},{"id":"timeline-timeline","kind":"timeline","object_key":"timeline","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}}},{"id":"director-director","kind":"director","object_key":"director","revision":1,"assignment_epoch":1,"assignee_id":"editor-a","content":{"stage":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]}}}],"episode_title":"Episode"},"doc":{"ratio":"16:9","style":"film","generationPolicy":{},"filmBible":{"visual":{"cards":{},"versions":{}},"voices":{"profiles":{}}},"shots":[{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt","order":1},{"id":"y","uid":"y","action":"y1","note":"","order":2}],"nodes":[],"edges":[],"director":{"objects":[],"camera":{"yaw":25,"pitch":12,"distance":8,"fov":45,"targetHeight":1},"views":[]},"editor":{"version":1,"timeline":{"version":2,"backgroundColor":"#000000","tracks":[{"id":"t-legacy-v1","name":"V1 · 导入旧剪辑","type":"video","elements":[]}],"assets":{}}},"timeline":[],"audio_id":"","music_volume":0.3},"saved":"已保存","conflict":false,"errors":[]},"row":{"id":"shot-x","kind":"shot","object_key":"x","revision":4,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}},"baseline":{"key":"x","kind":"shot","content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}},"draft":{"base":{"id":"shot-x","kind":"shot","object_key":"x","revision":4,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}},"content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]},"state":"saved","serial":2},"requests":[{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":1,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":""},"nodes":[]}}],"deletes":[]}},{"label":"second","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":2,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v3 from second page","note":""},"nodes":[]}}],"deletes":[]}},{"label":"first","body":{"creates":[],"updates":[{"id":"shot-x","expected_revision":3,"assignment_epoch":1,"content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}}],"deletes":[]}}],"server":{"id":"shot-x","kind":"shot","object_key":"x","revision":4,"assignment_epoch":1,"assignee_id":"editor-a","content":{"shot":{"id":"x","uid":"x","action":"v2","note":"only note changed after receipt"},"nodes":[]}}}
+✖ late receipt preserves host/body/CAS consistency (only=false, during=false) (6.7087ms)
+✖ late receipt preserves host/body/CAS consistency (only=false, during=true) (2.5883ms)
+✖ late receipt preserves host/body/CAS consistency (only=true, during=false) (2.3912ms)
+✖ late receipt preserves host/body/CAS consistency (only=true, during=true) (5.3597ms)
+✖ note-only autosave after late receipt never silently overwrites unaccepted v3 (2.2533ms)
+✖ older echo cannot replace the newer snapshot cached during flight (1.7854ms)
+✔ own echo and receipt settle normally without another HTTP save (1.9177ms)
+✔ explicit discard accepts v3 body before a new note save (1.9979ms)
+✔ explicit keep-draft is still CAS checked against a further remote save (2.4885ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 3
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 576.3699
+
+✖ failing tests:
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=false, during=false) (6.7087ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'saved'
+  - 'conflict'
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:116:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'saved',
+    expected: 'conflict',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=false, during=true) (2.5883ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  '未保存' !== '保存冲突'
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:122:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '未保存',
+    expected: '保存冲突',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=true, during=false) (2.3912ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'saved'
+  - 'conflict'
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:116:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'saved',
+    expected: 'conflict',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=true, during=true) (5.3597ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(only?f.error?.status===409:f.error===null)
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:123:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests\p5_receipt_host.test.mjs:133:1
+✖ note-only autosave after late receipt never silently overwrites unaccepted v3 (2.2533ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'v2'
+  - 'v3 from second page'
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:142:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'v2',
+    expected: 'v3 from second page',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\p5_receipt_host.test.mjs:147:1
+✖ older echo cannot replace the newer snapshot cached during flight (1.7854ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 3
+  
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:149:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

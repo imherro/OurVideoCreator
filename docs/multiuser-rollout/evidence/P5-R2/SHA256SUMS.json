@@ -1,0 +1,23 @@
+{
+  "ATTEMPT_HISTORY.md": "26ba5f5aec7ba770ae565fa0c89ed80bff824f79fdf52bfc341378969ad86cda",
+  "baseline/baseline-final-note-red.txt": "eb8f302498d664f9f026af58ccf82cc4293c47ba00e7665f6602a9ffaf29782c",
+  "baseline/baseline-host-red-valid.txt": "cfaac34b9d4b3fcd15605fbd528ccd2fd21fe3843c5b10afc100935278a2caf5",
+  "baseline/baseline-host-red.txt": "f4892081bf3724d648f061329d458cb3c1c9a38a38bc63391f630d0ab45d0dee",
+  "baseline/final-note-baseline-test.mjs": "18174b6d4d347f1ea8c0681602d3c37ec435daddebe5ca353c37228adb29faad",
+  "capture.mjs": "c3c3aa2f1f92984552acb5a214e1a1535642188f05d1eb98439efe9bf2eac94d",
+  "commands-aebffe3/backend-equivalence.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "commands-aebffe3/build.txt": "67c5fa69f5f1f91c28e6ef338d34d2410dcd31836ef603251fce2bb83d6d3448",
+  "commands-aebffe3/diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "commands-aebffe3/frontend.txt": "5f0500ee722c05fefcd6f2197c98a811f7810210a130d69eb985629843bc4814",
+  "commands-aebffe3/runs.json": "6c5f8c69984f7b2724c945ecafd4571474910ad44892768bc72bc57e4b19fea7",
+  "commands-aebffe3/targeted.txt": "e3af7cd3b835ae76a2770a2e1ef99eba1983c3f1c956ebe922588f5edb45983f",
+  "commands-aebffe3/typescript.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "development/developer-build.txt": "a4c5c518bd1a89c305107bcd1fd7e841b5bcde8dcce9717f6dd5c0afb0182736",
+  "development/developer-frontend-green.txt": "946e23de99c5ef250567f8d7788e4edc69f6cedd4689767baaa4c68457daea01",
+  "development/developer-frontend.txt": "8f9fd0d988e3445b58359094a41b6364f3db990fefc7a98f80a3c302d92d1ef6",
+  "development/developer-green.txt": "32ecc084a3c7432e12b4356547c8ea110658443934da7cd18e4408ac6aadf363",
+  "development/scope-developer.txt": "8eac8039e4f3f45ba06b537f320e3df0e2baaef976e8e715553d8ba90717986c",
+  "MATRIX.md": "c79e784edc70baaec15907a04aa343bac5e575f338caa8cb024af98979b5a6fd",
+  "prepare_public_evidence.py": "11fcaa0ee4003a5fb536a911e46f6983f7680564fcf9ce43d50c809ac160fd7d",
+  "REPORT.md": "08348d067bb08c5c0e1281dbd5757bf81b4bc04d6c286eacd599c98eb615f754"
+}

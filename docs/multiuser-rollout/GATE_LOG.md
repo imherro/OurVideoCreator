@@ -281,3 +281,15 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 随后提交迟到保存回执独立客户端红测的精确时序，主会话复读固定源码后正式补记 **OVC-P5-02（S2）**：先收到较新r3快照、后收到已提交r2的旧成功回执，draft基线与页面/rows/baseline正文错位，下一次保存可静默覆盖r3。该确认不是外部复跑新增测试，也不是P5-R1复验通过。
 
 补充原件 `reviews/P5-Supplement/DECISION.md`、`DECISION.json`，完整下一任务 `prompts/P5_R2_CODEX_PROMPT.md`。明确授权：**先完成P5-R1独立提交及取证，再以其实际最终提交为base执行P5-R2**；两项分别审核关闭，不将前端返修混入当前固定SHA日志，不回退到5143ee3。P5整体仍不通过，P6/付费API/公网未授权。
+
+## P5-R1 外部通过：仅关闭 OVC-P5-01
+
+2026-09-17 主 ChatGPT 会话最终回复（思考7m22s）：**P5-R1通过，OVC-P5-01正式关闭，无该项新增阻塞或证据缺口**。固定业务 `34d646d5c17d5ba12fdc56d4948ab513703731ff`，通过 evidence HEAD `78fd14f40339e0b71908a685efb2354a0c1045ce`。原始复验包已下载、全文阅读，归档 `reviews/P5-R1/`；ZIP SHA256 `def3b52a9a41a0802dcb94bb6341efe2a5fa43772e647d8d34bcc2add420e59c`。
+
+审核以实际代码、提交树、测试实现及实施端原始证据交叉核验；审核端未独立重跑项目/PG/浏览器，其DNS限制有原始记录。不是Codex自签通过。**P5整体仍未通过，OVC-P5-02仍OPEN/S2**。下一单一任务仍P5-R2，base明确78fd14f，无新要求；P0–P4通过不变，P6/付费API/公网未授权。
+
+## P5-R2 独立交付待复验
+
+状态 **READY_FOR_REVIEW**。base `78fd14f40339e0b71908a685efb2354a0c1045ce`，固定业务 `aebffe364313601aceb611fbcd0ca2b01a42e29d`，后续docs-only证据提交。选择已授权B方案：迟到r2回执保留本地正文/r2版本，r3留待明确比较，实际host显示保存冲突；保留新增输入、独立对象保存、显式重提CAS与作用域/epoch隔离。
+
+基线严格mock CAS及真实client/host回调红测6failed/3passed，记录note-only以expected3携带v2写成r4的实际错误。固定新SHA49定向/195全部前端通过，TS/build通过，backend与已通过34d646d完全等同；未冒称重跑PG或浏览器。证据见 `evidence/P5-R2/REPORT.md`、`MATRIX.md`、`commands-aebffe3/runs.json`。历史失败、fixture失败和旧实例均保留。**OVC-P5-02只请求关闭，不自行签发P5通过。**

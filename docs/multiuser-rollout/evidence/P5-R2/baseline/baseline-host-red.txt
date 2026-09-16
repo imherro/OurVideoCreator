@@ -1,0 +1,152 @@
+RUNTIME_HEAD 78fd14f40339e0b71908a685efb2354a0c1045ce
+TEST_SOURCE_SHA256 EAFDDB4807FE6C77BCA6977526A00E55BB18039B55DE8515A6F858F32676F71B
+UTC_START 2026-09-16T23:18:57.5121122Z
+COMMAND node --test tests/p5_receipt_host.test.mjs
+✖ late receipt preserves host/body/CAS consistency (only=false, during=false) (2.0649ms)
+✖ late receipt preserves host/body/CAS consistency (only=false, during=true) (0.3284ms)
+✖ late receipt preserves host/body/CAS consistency (only=true, during=false) (0.2546ms)
+✖ late receipt preserves host/body/CAS consistency (only=true, during=true) (0.2519ms)
+✖ older echo cannot replace the newer snapshot cached during flight (0.3018ms)
+✖ own echo and receipt settle normally without another HTTP save (0.3456ms)
+✖ explicit discard accepts v3 body before a new note save (0.3004ms)
+✖ explicit keep-draft is still CAS checked against a further remote save (0.2672ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 0
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 850.6895
+
+✖ failing tests:
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=false, during=false) (2.0649ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:108:19)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=false, during=true) (0.3284ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:108:19)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=true, during=false) (0.2546ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:108:19)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:107:3
+✖ late receipt preserves host/body/CAS consistency (only=true, during=true) (0.2519ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:108:19)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:133:1
+✖ older echo cannot replace the newer snapshot cached during flight (0.3018ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:134:17)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:139:1
+✖ own echo and receipt settle normally without another HTTP save (0.3456ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:140:11)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:153:1
+✖ explicit discard accepts v3 body before a new note save (0.3004ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:154:17)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+
+test at tests\p5_receipt_host.test.mjs:164:1
+✖ explicit keep-draft is still CAS checked against a further remote save (0.2672ms)
+  TypeError: Failed to execute 'structuredClone': Options cannot be converted to a dictionary
+      at codedTypeError (node:internal/webidl:217:15)
+      at makeException (node:internal/webidl:226:10)
+      at Object.StructuredSerializeOptions (node:internal/webidl:294:13)
+      at structuredClone (node:internal/worker/js_transferable:117:40)
+      at Array.map (<anonymous>)
+      at snapshot (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:58:36)
+      at fixture (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:79:82)
+      at race (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:90:11)
+      at TestContext.<anonymous> (file:///[LOCAL_USER]/Documents/ChatGPT/OurVideoCreator/tests/p5_receipt_host.test.mjs:165:17)
+      at Test.runInAsyncScope (node:async_hooks:214:14) {
+    code: 'ERR_INVALID_ARG_TYPE'
+  }
+EXIT_CODE 1
+UTC_END 2026-09-16T23:18:58.4815337Z

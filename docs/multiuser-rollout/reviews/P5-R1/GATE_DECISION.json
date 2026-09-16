@@ -1,0 +1,95 @@
+{
+  "repository": "imherro/OurVideoCreator",
+  "review_scope": "P5-R1 / OVC-P5-01 only",
+  "base_sha": "5143ee36f55ab783f203832558cfedd4efce4936",
+  "business_sha": "34d646d5c17d5ba12fdc56d4948ab513703731ff",
+  "evidence_head": "78fd14f40339e0b71908a685efb2354a0c1045ce",
+  "decision": "PASS",
+  "decision_zh": "通过（仅OVC-P5-01）",
+  "closed_issues": [
+    {
+      "id": "OVC-P5-01",
+      "severity": "S2",
+      "status": "CLOSED"
+    }
+  ],
+  "new_blockers": [],
+  "remaining_issues": [
+    {
+      "id": "OVC-P5-02",
+      "severity": "S2",
+      "status": "OPEN",
+      "reviewed_in_this_gate": false,
+      "task": "P5-R2"
+    }
+  ],
+  "overall_p5_pass": false,
+  "overall_p5_status": "BLOCKED_BY_OVC-P5-02",
+  "historical_gates_unchanged": [
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "authorized_next_task": "P5-R2",
+  "next_base": "78fd14f40339e0b71908a685efb2354a0c1045ce",
+  "P6_authorized": false,
+  "paid_provider_calls_authorized": false,
+  "public_deployment_authorized": false,
+  "tested_artifacts_match_evidence_head_except_docs": true,
+  "runtime_changed_paths": [
+    "backend/collaboration.py"
+  ],
+  "implementation_evidence": {
+    "baseline_red": {
+      "failed": 3,
+      "seconds": 15.46,
+      "exit": 1
+    },
+    "targeted": {
+      "passed": 15,
+      "seconds": 66.21,
+      "exit": 0
+    },
+    "backend": {
+      "passed": 473,
+      "warnings": 2,
+      "seconds": 1162.95,
+      "exit": 0
+    },
+    "concurrency": {
+      "passed": 10,
+      "seconds": 43.52,
+      "exit": 0
+    },
+    "frontend_default": {
+      "passed": 179,
+      "failed": 0,
+      "skipped": 0,
+      "exit": 0,
+      "includes_deferred_OVC_P5_02": false
+    },
+    "build": {
+      "modules": 1837,
+      "seconds": 9.03,
+      "exit": 0
+    },
+    "routes": {
+      "registered": 125,
+      "api": 122,
+      "classified": 122,
+      "unclassified": 0
+    }
+  },
+  "reviewer_execution": {
+    "project_test_suites": false,
+    "postgres_tests": false,
+    "powershell_tests": false,
+    "browser": false,
+    "limited_logic_probe": false,
+    "environment_read_only_git_and_local_hash_check": true
+  },
+  "remote_repository_modified": false,
+  "user_services_or_databases_accessed": false
+}

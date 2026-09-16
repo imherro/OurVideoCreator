@@ -1,0 +1,81 @@
+{
+  "head": "aebffe364313601aceb611fbcd0ca2b01a42e29d",
+  "node": "v24.13.0",
+  "runs": [
+    {
+      "name": "targeted",
+      "command": [
+        "node",
+        "--test",
+        "tests/p5_receipt_host.test.mjs",
+        "tests/object_drafts.test.mjs",
+        "tests/owned_content_drafts.test.mjs",
+        "tests/collaboration_client.test.mjs"
+      ],
+      "started": "2026-09-16T23:24:05.614Z",
+      "ended": "2026-09-16T23:24:06.279Z",
+      "exit": 0
+    },
+    {
+      "name": "frontend",
+      "command": [
+        "node",
+        "--test",
+        "tests/*.test.mjs"
+      ],
+      "started": "2026-09-16T23:24:06.281Z",
+      "ended": "2026-09-16T23:24:07.650Z",
+      "exit": 0
+    },
+    {
+      "name": "typescript",
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "-b"
+      ],
+      "started": "2026-09-16T23:24:07.651Z",
+      "ended": "2026-09-16T23:24:13.019Z",
+      "exit": 0
+    },
+    {
+      "name": "build",
+      "command": [
+        "node",
+        "node_modules/vite/bin/vite.js",
+        "build"
+      ],
+      "started": "2026-09-16T23:24:13.019Z",
+      "ended": "2026-09-16T23:24:22.052Z",
+      "exit": 0
+    },
+    {
+      "name": "backend-equivalence",
+      "command": [
+        "git",
+        "diff",
+        "--exit-code",
+        "34d646d5c17d5ba12fdc56d4948ab513703731ff",
+        "aebffe364313601aceb611fbcd0ca2b01a42e29d",
+        "--",
+        "backend"
+      ],
+      "started": "2026-09-16T23:24:22.053Z",
+      "ended": "2026-09-16T23:24:22.092Z",
+      "exit": 0
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "78fd14f40339e0b71908a685efb2354a0c1045ce",
+        "aebffe364313601aceb611fbcd0ca2b01a42e29d"
+      ],
+      "started": "2026-09-16T23:24:22.092Z",
+      "ended": "2026-09-16T23:24:22.138Z",
+      "exit": 0
+    }
+  ]
+}

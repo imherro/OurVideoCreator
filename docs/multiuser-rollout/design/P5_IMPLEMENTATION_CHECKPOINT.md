@@ -428,3 +428,10 @@ CUA 原绑定 `p4browser`、`p5candidateA/B`、`p5latestA/B`、`p5secondA` 保�
 - **session20970已完成exit0，禁止再次轮询或重启。** 固定业务34d646d：473后端/1162.95s/2既有warnings，10并发/43.52s，179默认前端，TS/build1837modules/9.03s/routes125总122API全分类/compile/diff均exit0。全部命令UTC22:53:07.925732—23:13:49.061445。15专项另在targeted-green.txt。
 - 正式日志已复制evidence/P5-R1/commands-34d646d，REPORT/MATRIX/SUMMARY/PROVENANCE更新为READY_FOR_REVIEW，仅OVC-P5-01，OVC-P5-02明确未修/独立红测不计默认绿测，禁止自签整体PASS。准备对docs脱敏/校验后独立提交、push origin，并发送R1复验。
 - R1证据提交完成后下一单一授权P5-R2；先读取P5_R2完整提示词并记录实际R1最终HEAD。最小安全方案可让旧ack遇更新remote时保留r2基线并进入conflict；client.save须向主页面传播冲突，不能仍resolve让host显示已保存。检查main.tsx save成功/失败、saveObject finally acceptObjectDocument；不要只修孤立draft断言。此处仅只读分析，尚未修改前端代码。
+
+### P5-R1 外部PASS / P5-R2已完成固定SHA取证
+
+- R1证据78fd14f已推送并发送审核；主会话最终7m22s回复正式关闭OVC-P5-01，原件8文件归档reviews/P5-R1。P5整体未通过，02仍OPEN。
+- R2以78fd14f为base，业务已提交 **aebffe364313601aceb611fbcd0ca2b01a42e29d**，3个运行时文件/2个测试文件。B冲突策略；实际main回调AST提取执行，非浏览器。新增16host测试，完整195pass，定向49pass，TS/build/backend-equivalence/diff全部exit0，正式UTC23:24:05.614—23:24:22.138。
+- 正式capture **session50831已结束exit0**，目录 `<TEMP>/ovc-p5-r2-fixed-aebffe3`；不要重启或再轮询。证据已复制evidence/P5-R2，失败尝试/原始red/固定green分开保留。raw red目录 `<TEMP>/ovc-p5-r2-red-6a060686879a49d290adfbf7ee85785b`。业务基线红9例6fail3pass，确有最终r4/v2覆盖；新green16host全pass。
+- 下一步仅证据脱敏/哈希/staged验证后docs提交，push origin，直接主会话发送P5-R2复验，请功能优先、使用OurVideoCreator新库。收到正式结论前不进入P6；保留所有历史服务与草稿，不清理。当前P5-R1外部回复已完成，可发送下一请求，无需用户批准。
