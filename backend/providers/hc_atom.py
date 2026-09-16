@@ -287,7 +287,7 @@ def _asset_group(client, provider):
     with _asset_library_lock:
         with s.db() as db:
             row = db.execute(
-                'SELECT remote_group_id FROM provider_asset_groups WHERE provider_id=? AND account_hash=?',
+                'SELECT remote_group_id FROM provider_asset_groups WHERE provider_id=%s AND account_hash=%s',
                 (provider_id, account_hash),
             ).fetchone()
         if row:
@@ -305,7 +305,7 @@ def _asset_group(client, provider):
         now = time.time()
         with s.db() as db:
             db.execute('''INSERT INTO provider_asset_groups(provider_id,account_hash,remote_group_id,created,updated)
-                VALUES(?,?,?,?,?) ON CONFLICT(provider_id,account_hash) DO UPDATE SET
+                VALUES(%s,%s,%s,%s,%s) ON CONFLICT(provider_id,account_hash) DO UPDATE SET
                 remote_group_id=excluded.remote_group_id,updated=excluded.updated''',
                 (provider_id, account_hash, group_id, now, now))
         return group_id
@@ -314,7 +314,7 @@ def _asset_group(client, provider):
 def _asset_mapping(provider, local_asset_id):
     with s.db() as db:
         return db.execute('''SELECT * FROM provider_asset_mappings
-            WHERE provider_id=? AND account_hash=? AND local_asset_id=?''', (
+            WHERE provider_id=%s AND account_hash=%s AND local_asset_id=%s''', (
                 str(provider.get('id') or '').strip(), _asset_account_hash(provider), local_asset_id,
             )).fetchone()
 
@@ -324,7 +324,7 @@ def _save_asset_mapping(provider, local_asset_id, remote_asset_id, group_id, sta
     with s.db() as db:
         db.execute('''INSERT INTO provider_asset_mappings(
                 provider_id,account_hash,local_asset_id,remote_asset_id,remote_group_id,status,error,created,updated
-            ) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(provider_id,account_hash,local_asset_id) DO UPDATE SET
+            ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(provider_id,account_hash,local_asset_id) DO UPDATE SET
                 remote_asset_id=excluded.remote_asset_id,remote_group_id=excluded.remote_group_id,
                 status=excluded.status,error=excluded.error,updated=excluded.updated''', (
                 str(provider.get('id') or '').strip(), _asset_account_hash(provider), local_asset_id,

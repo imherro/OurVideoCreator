@@ -46,7 +46,7 @@ async def auth(request: Request, call_next):
         if request.url.path not in PUBLIC and not signed_provider_asset:
             token = request.cookies.get('mvc_session','')
             with s.db() as c:
-                row = c.execute('SELECT expires FROM sessions WHERE token=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+                row = c.execute('SELECT expires FROM sessions WHERE token=%s',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
             if not row or row['expires'] < time.time():
                 return Response(s.dumps({'detail':'请登录工作室'}),401,media_type='application/json')
     result = await call_next(request)
@@ -71,7 +71,7 @@ def health():
 def auth_status(request: Request):
     token = hashlib.sha256(request.cookies.get('mvc_session','').encode()).hexdigest()
     with s.db() as c:
-        row = c.execute('SELECT expires FROM sessions WHERE token=?',(token,)).fetchone()
+        row = c.execute('SELECT expires FROM sessions WHERE token=%s',(token,)).fetchone()
     return {'configured':bool(s.get_setting('password')),'authenticated':bool(row and row['expires']>time.time()),'can_setup':True}
 
 class Password(BaseModel):
@@ -83,8 +83,8 @@ def password_hash(password,salt):
 def session(response, request):
     token = secrets.token_urlsafe(48)
     with s.db() as c:
-        c.execute('DELETE FROM sessions WHERE expires<?',(time.time(),))
-        c.execute('INSERT INTO sessions VALUES(?,?)',(hashlib.sha256(token.encode()).hexdigest(),time.time()+7*86400))
+        c.execute('DELETE FROM sessions WHERE expires<%s',(time.time(),))
+        c.execute('INSERT INTO sessions VALUES(%s,%s)',(hashlib.sha256(token.encode()).hexdigest(),time.time()+7*86400))
     response.set_cookie('mvc_session',token,max_age=7*86400,httponly=True,samesite='strict',secure=request.url.scheme=='https')
 
 @app.post('/api/auth/setup')
@@ -92,9 +92,9 @@ def setup(body:Password,request:Request,response:Response):
     salt = secrets.token_hex(16)
     encoded = s.dumps({'salt':salt,'hash':password_hash(body.password,salt)})
     with s.db() as c:
-        if c.execute('SELECT 1 FROM settings WHERE key=?',('password',)).fetchone():
+        if c.execute('SELECT 1 FROM settings WHERE key=%s',('password',)).fetchone():
             raise HTTPException(409,'工作室已经设置密码，请登录。')
-        c.execute('INSERT INTO settings VALUES(?,?)',('password',encoded))
+        c.execute('INSERT INTO settings VALUES(%s,%s)',('password',encoded))
     session(response,request)
     return {'ok':True}
 
@@ -116,13 +116,13 @@ def login(body:Password,request:Request,response:Response):
 @app.post('/api/auth/logout')
 def logout(request:Request,response:Response):
     with s.db() as c:
-        c.execute('DELETE FROM sessions WHERE token=?',(hashlib.sha256(request.cookies.get('mvc_session','').encode()).hexdigest(),))
+        c.execute('DELETE FROM sessions WHERE token=%s',(hashlib.sha256(request.cookies.get('mvc_session','').encode()).hexdigest(),))
     response.delete_cookie('mvc_session')
     return {'ok':True}
 
 def project(pid):
     with s.db() as c:
-        row = c.execute("SELECT * FROM projects WHERE id=? AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id)",(pid,)).fetchone()
+        row = c.execute("SELECT * FROM projects WHERE id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id)",(pid,)).fetchone()
         state=read_project_state(c,pid) if row else None
     if not row:
         raise HTTPException(404,'项目不存在')
@@ -150,7 +150,7 @@ def production(production_id):
             (SELECT COUNT(*) FROM projects e WHERE e.production_id=p.id AND NOT EXISTS(
                 SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=e.id
             )) episode_count
-            FROM productions p WHERE p.id=?''',(production_id,)).fetchone()
+            FROM productions p WHERE p.id=%s''',(production_id,)).fetchone()
     if not row:raise HTTPException(404,'Production 不存在')
     value=dict(row)
     value['context']=normalize_production_context(json.loads(value.pop('shared_context')))
@@ -186,7 +186,7 @@ def create_production(body:ProductionCreate):
     now=time.time();name=normalized_project_name(body.name)
     context=new_production_context(default_ark_policy(s.get_setting('providers',[])))
     with s.db() as c:
-        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(?,?,1,?,?,?)',(production_id,name,s.dumps(context),now,now))
+        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(production_id,name,s.dumps(context),now,now))
     return production(production_id)
 
 @app.patch('/api/productions/{production_id}')
@@ -195,12 +195,11 @@ def update_production(production_id:str,body:ProductionUpdate):
     if not name:raise ValueError('作品名称不能为空')
     now=time.time()
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute('SELECT revision FROM productions WHERE id=?',(production_id,)).fetchone()
+        row=c.execute('SELECT revision FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
         if row['revision']!=body.revision:
             raise HTTPException(409,'Production 已在其他页面更新，请重新加载后编辑。')
-        c.execute('UPDATE productions SET name=?,revision=revision+1,updated=? WHERE id=?',(
+        c.execute('UPDATE productions SET name=%s,revision=revision+1,updated=%s WHERE id=%s',(
             name,now,production_id,
         ))
     return {'id':production_id,'name':name,'revision':body.revision+1,'updated':now}
@@ -214,7 +213,7 @@ def production_episodes(production_id:str):
     production(production_id)
     with s.db() as c:
         return [dict(row) for row in c.execute('''SELECT id,name,revision,created,updated,production_id,episode_no,episode_title
-            FROM projects WHERE production_id=? AND NOT EXISTS(
+            FROM projects WHERE production_id=%s AND NOT EXISTS(
                 SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id
             ) ORDER BY episode_no,id''',(production_id,))]
 
@@ -225,7 +224,7 @@ def production_visual_usage(production_id:str):
     usage={}
     with s.db() as c:
         episodes=c.execute('''SELECT id,episode_no,episode_title,document FROM projects
-            WHERE production_id=? AND NOT EXISTS(
+            WHERE production_id=%s AND NOT EXISTS(
                 SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=projects.id
             ) ORDER BY episode_no,id''',(production_id,)).fetchall()
     for episode in episodes:
@@ -257,20 +256,19 @@ def create_episode(production_id:str,body:EpisodeCreate):
     document=new_document(default_ark_policy(s.get_setting('providers',[])))
     now=time.time();pid=s.uid('project-')
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        parent=c.execute('SELECT * FROM productions WHERE id=?',(production_id,)).fetchone()
+        parent=c.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
         if not parent:raise HTTPException(404,'Production 不存在')
         episode_no=c.execute(
-            'SELECT COALESCE(MAX(episode_no),0)+1 value FROM projects WHERE production_id=?',
+            'SELECT COALESCE(MAX(episode_no),0)+1 value FROM projects WHERE production_id=%s',
             (production_id,),
         ).fetchone()['value']
         title=body.title.strip() or f'第 {episode_no:02d} 集'
         c.execute('''INSERT INTO projects(
             id,name,revision,document,created,updated,production_id,episode_no,episode_title
-        ) VALUES(?,?,1,?,?,?,?,?,?)''',(
+        ) VALUES(%s,%s,1,%s,%s,%s,%s,%s,%s)''',(
             pid,title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_no,title,
         ))
-        c.execute('UPDATE productions SET updated=? WHERE id=?',(now,production_id))
+        c.execute('UPDATE productions SET updated=%s WHERE id=%s',(now,production_id))
         from .adaptation import seed_episode_scripts
         seed_episode_scripts(c)
     return project(pid)
@@ -350,11 +348,10 @@ def create_project(body:ProjectCreate):
     episode_title=(body.episode_title or '').strip() if body.episode_title is not None else name
     episode_title=episode_title or '第 01 集'
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(?,?,1,?,?,?)',(production_id,name,s.dumps(context),now,now))
+        c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated) VALUES(%s,%s,1,%s,%s,%s)',(production_id,name,s.dumps(context),now,now))
         c.execute('''INSERT INTO projects(
             id,name,revision,document,created,updated,production_id,episode_no,episode_title
-        ) VALUES(?,?,1,?,?,?,?,1,?)''',(pid,episode_title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_title))
+        ) VALUES(%s,%s,1,%s,%s,%s,%s,1,%s)''',(pid,episode_title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_title))
         from .adaptation import seed_episode_scripts
         seed_episode_scripts(c)
     return project(pid)
@@ -366,12 +363,11 @@ def read_project(pid:str):
 @app.delete('/api/projects/{pid}')
 def delete_project(pid:str):
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute("SELECT * FROM projects WHERE id=? AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id)",(pid,)).fetchone()
+        row=c.execute("SELECT * FROM projects WHERE id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=projects.id)",(pid,)).fetchone()
         if not row: raise HTTPException(404,'项目不存在')
-        active=c.execute("SELECT COUNT(*) count FROM jobs WHERE project_id=? AND status IN ('queued','running')",(pid,)).fetchone()['count']
+        active=c.execute("SELECT COUNT(*) count FROM jobs WHERE project_id=%s AND status IN ('queued','running')",(pid,)).fetchone()['count']
         if active: raise HTTPException(409,f'项目仍有 {active} 个运行中任务，请先取消后再移入回收站。')
-        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('project',?,?,?)",(pid,pid,time.time()))
+        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('project',%s,%s,%s)",(pid,pid,time.time()))
     return {'deleted':pid,'soft':True}
 
 @app.get('/api/projects/{pid}/storyboard-sheet')
@@ -393,8 +389,7 @@ def save_project(pid:str,body:ProjectSave):
     document['generationPolicy']=validate_generation_policy(document['generationPolicy'],s.get_setting('providers',[]),allow_missing=True)
     projected_context=production_context_from_document(document)
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        state=read_project_state(c,pid)
+        state=read_project_state(c,pid,for_update=True)
         if not state: raise HTTPException(404,'项目不存在')
         old=state['project'];production_row=state['production']
         incoming_context={
@@ -414,7 +409,7 @@ def save_project(pid:str,body:ProjectSave):
         # first shared-context save while the Production is still at revision 1;
         # every later shared edit must carry the independent revision token.
         episode_count = c.execute(
-            'SELECT COUNT(*) count FROM projects WHERE production_id=?',
+            'SELECT COUNT(*) count FROM projects WHERE production_id=%s',
             (old['production_id'],),
         ).fetchone()['count']
         compatible_production_revision = (
@@ -431,7 +426,7 @@ def save_project(pid:str,body:ProjectSave):
         from .film_bible.versioning import validate_film_bible_transition
         before_shots=[];after_shots=[]
         for episode in c.execute(
-            'SELECT id,document FROM projects WHERE production_id=? ORDER BY episode_no,id',
+            'SELECT id,document FROM projects WHERE production_id=%s ORDER BY episode_no,id',
             (old['production_id'],),
         ):
             previous_episode=migrate_document(json.loads(episode['document']))
@@ -442,23 +437,33 @@ def save_project(pid:str,body:ProjectSave):
         after_validation={**document,'shots':after_shots}
         validate_film_bible_transition(before_validation,after_validation)
         updated=time.time()
-        c.execute('INSERT INTO revisions VALUES(?,?,?,?,?)',(
+        c.execute('INSERT INTO revisions VALUES(%s,%s,%s,%s,%s)',(
             s.uid(),pid,old['revision'],s.dumps(state['document']),updated,
         ))
         name=normalized_project_name(body.name)
-        c.execute('UPDATE projects SET name=?,episode_title=?,revision=revision+1,document=?,updated=? WHERE id=?',(name,name,encoded_episode,updated,pid))
+        updated_project=c.execute(
+            'UPDATE projects SET name=%s,episode_title=%s,revision=revision+1,document=%s,updated=%s '
+            'WHERE id=%s AND revision=%s RETURNING revision',
+            (name,name,encoded_episode,updated,pid,body.revision),
+        ).fetchone()
+        if not updated_project:
+            raise HTTPException(409,'项目已在其他页面更新，请重新加载后编辑。')
         production_revision=production_row['revision']
         if shared_changed:
-            c.execute('INSERT INTO production_revisions(id,production_id,revision,shared_context,created) VALUES(?,?,?,?,?)',(
+            c.execute('INSERT INTO production_revisions(id,production_id,revision,shared_context,created) VALUES(%s,%s,%s,%s,%s)',(
                 s.uid(),old['production_id'],production_revision,production_row['shared_context'],updated,
             ))
             production_revision+=1
-            c.execute('UPDATE productions SET revision=?,shared_context=?,updated=? WHERE id=?',(
-                production_revision,s.dumps(incoming_context),updated,old['production_id'],
-            ))
+            updated_production=c.execute(
+                'UPDATE productions SET revision=%s,shared_context=%s,updated=%s '
+                'WHERE id=%s AND revision=%s RETURNING revision',
+                (production_revision,s.dumps(incoming_context),updated,old['production_id'],compatible_production_revision),
+            ).fetchone()
+            if not updated_production:
+                raise HTTPException(409,'Production 共享资料已在其他页面更新，请重新加载后编辑。')
         else:
-            c.execute('UPDATE productions SET updated=? WHERE id=?',(updated,old['production_id']))
-    s.event(pid,{'type':'project','revision':body.revision+1})
+            c.execute('UPDATE productions SET updated=%s WHERE id=%s',(updated,old['production_id']))
+        s.event(pid,{'type':'project','revision':body.revision+1},connection=c)
     return {
         'revision':body.revision+1,
         'production_revision':production_revision,
@@ -469,12 +474,12 @@ def save_project(pid:str,body:ProjectSave):
 def revisions(pid:str):
     project(pid)
     with s.db() as c:
-        return [dict(r) for r in c.execute('SELECT id,revision,created FROM revisions WHERE project_id=? ORDER BY revision DESC LIMIT 100',(pid,))]
+        return [dict(r) for r in c.execute('SELECT id,revision,created FROM revisions WHERE project_id=%s ORDER BY revision DESC LIMIT 100',(pid,))]
 
 @app.get('/api/projects/{pid}/revisions/{rid}')
 def revision(pid:str,rid:str):
     with s.db() as c:
-        row=c.execute('SELECT * FROM revisions WHERE project_id=? AND id=?',(pid,rid)).fetchone()
+        row=c.execute('SELECT * FROM revisions WHERE project_id=%s AND id=%s',(pid,rid)).fetchone()
     if not row: raise HTTPException(404,'历史版本不存在')
     value=s.unpack(row)
     value['document']=migrate_document(value['document'])
@@ -482,7 +487,7 @@ def revision(pid:str,rid:str):
 
 def asset_row(aid):
     with s.db() as c:
-        row=c.execute("SELECT * FROM assets WHERE id=? AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id)",(aid,)).fetchone()
+        row=c.execute("SELECT * FROM assets WHERE id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id)",(aid,)).fetchone()
     if not row: raise HTTPException(404,'素材不存在')
     return s.unpack(row)
 
@@ -514,10 +519,10 @@ def assets(pid:str,category:str|None=None,kind:str|None=None,scope:str='episode'
     if scope not in ('episode','production'):raise ValueError('素材范围无效')
     clauses=["NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id)"]
     params=[]
-    if scope=='production':clauses.append('assets.production_id=?');params.append(owner['production_id'])
-    else:clauses.append('assets.project_id=?');params.append(pid)
-    if category is not None:clauses.append('category=?');params.append(category)
-    if kind is not None:clauses.append('kind=?');params.append(kind)
+    if scope=='production':clauses.append('assets.production_id=%s');params.append(owner['production_id'])
+    else:clauses.append('assets.project_id=%s');params.append(pid)
+    if category is not None:clauses.append('category=%s');params.append(category)
+    if kind is not None:clauses.append('kind=%s');params.append(kind)
     with s.db() as c:
         rows=c.execute('''SELECT assets.*,origin.name origin_project_name,
             origin.episode_no origin_episode_no FROM assets
@@ -530,10 +535,10 @@ def production_assets(production_id:str,category:str|None=None,kind:str|None=Non
     production(production_id)
     if category is not None:asset_category(category)
     if kind is not None and kind not in ASSET_KINDS:raise ValueError('媒体类型无效')
-    clauses=['assets.production_id=?',"NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id)"]
+    clauses=['assets.production_id=%s',"NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id)"]
     params=[production_id]
-    if category is not None:clauses.append('category=?');params.append(category)
-    if kind is not None:clauses.append('kind=?');params.append(kind)
+    if category is not None:clauses.append('category=%s');params.append(category)
+    if kind is not None:clauses.append('kind=%s');params.append(kind)
     with s.db() as c:
         rows=c.execute('''SELECT assets.*,origin.name origin_project_name,
             origin.episode_no origin_episode_no FROM assets
@@ -549,7 +554,7 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
     ext=Path(name).suffix.lower()
     allowed={'.png':'image','.jpg':'image','.jpeg':'image','.webp':'image','.mp4':'video','.webm':'video','.mov':'video','.wav':'audio','.mp3':'audio','.m4a':'audio','.srt':'subtitle'}
     if ext not in allowed: raise HTTPException(400,'支持 PNG/JPG/WebP、MP4/WebM/MOV、WAV/MP3/M4A、SRT')
-    aid=s.uid('asset-'); path=s.ASSETS/(aid+ext); total=0
+    aid=s.uid('asset-'); path=s.asset_path(aid,ext); total=0
     try:
         with path.open('wb') as out:
             while chunk:=await file.read(1024*1024):
@@ -567,7 +572,7 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
             from .media import probe
             metadata.update(await asyncio.to_thread(probe,path))
         with s.db() as c:
-            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)',(aid,pid,name,allowed[ext],path.name,mimetypes.guess_type(name)[0] or 'application/octet-stream',s.dumps(metadata),time.time(),category,'uploaded',owner['production_id']))
+            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(aid,pid,name,allowed[ext],path.name,mimetypes.guess_type(name)[0] or 'application/octet-stream',s.dumps(metadata),time.time(),category,'uploaded',owner['production_id']))
         return asset_public(asset_row(aid))
     except Exception:
         path.unlink(missing_ok=True)
@@ -581,7 +586,7 @@ def update_asset(pid:str,aid:str,body:AssetUpdate):
     category=asset_category(body.category)
     reference_asset(pid,aid)
     with s.db() as c:
-        c.execute('UPDATE assets SET category=? WHERE id=?',(category,aid))
+        c.execute('UPDATE assets SET category=%s WHERE id=%s',(category,aid))
     return asset_public(asset_row(aid))
 
 @app.delete('/api/projects/{pid}/assets/{aid}')
@@ -589,9 +594,9 @@ def delete_asset(pid:str,aid:str):
     project(pid)
     row=reference_asset(pid,aid)
     with s.db() as c:
-        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('asset',?,?,?)",(aid,row['project_id'],time.time()))
+        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('asset',%s,%s,%s)",(aid,row['project_id'],time.time()))
     with s.db() as c:
-        episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=?',(row['production_id'],))]
+        episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=%s',(row['production_id'],))]
     for episode_id in episode_ids:s.event(episode_id,{'type':'asset_deleted','id':aid})
     return {'deleted':aid,'soft':True}
 
@@ -620,22 +625,21 @@ def trash():
 def restore_deleted_item(kind:str,item_id:str):
     if kind not in ('project','asset','source','chapter'):raise HTTPException(400,'回收站类型无效')
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute('SELECT * FROM deleted_items WHERE kind=? AND item_id=?',(kind,item_id)).fetchone()
+        row=c.execute('SELECT * FROM deleted_items WHERE kind=%s AND item_id=%s',(kind,item_id)).fetchone()
         if not row:raise HTTPException(404,'回收站中没有该项目')
         if kind=='asset':
-            hidden_project=c.execute("SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=?",(row['project_id'],)).fetchone()
+            hidden_project=c.execute("SELECT 1 FROM deleted_items WHERE kind='project' AND item_id=%s",(row['project_id'],)).fetchone()
             if hidden_project:raise HTTPException(409,'请先恢复素材所属项目。')
-        c.execute('DELETE FROM deleted_items WHERE kind=? AND item_id=?',(kind,item_id))
+        c.execute('DELETE FROM deleted_items WHERE kind=%s AND item_id=%s',(kind,item_id))
         if kind=='asset':
-            asset=c.execute('SELECT production_id FROM assets WHERE id=?',(item_id,)).fetchone()
-            episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=?',(asset['production_id'],))] if asset and asset['production_id'] else [row['project_id']]
+            asset=c.execute('SELECT production_id FROM assets WHERE id=%s',(item_id,)).fetchone()
+            episode_ids=[item['id'] for item in c.execute('SELECT id FROM projects WHERE production_id=%s',(asset['production_id'],))] if asset and asset['production_id'] else [row['project_id']]
         elif kind=='source':
             episode_ids=production_event_targets(c,row['project_id'])
         elif kind=='chapter':
             chapter=c.execute('''SELECT sd.id source_id FROM source_chapters sc
-                JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id=?''',(item_id,)).fetchone()
-            hidden_source=c.execute("SELECT 1 FROM deleted_items WHERE kind='source' AND item_id=?",(chapter['source_id'],)).fetchone() if chapter else None
+                JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id=%s''',(item_id,)).fetchone()
+            hidden_source=c.execute("SELECT 1 FROM deleted_items WHERE kind='source' AND item_id=%s",(chapter['source_id'],)).fetchone() if chapter else None
             if hidden_source:raise HTTPException(409,'请先恢复章节所属原著。')
             episode_ids=production_event_targets(c,row['project_id'])
         else:episode_ids=[row['project_id']] if row['project_id'] else []
@@ -645,7 +649,7 @@ def restore_deleted_item(kind:str,item_id:str):
 @app.get('/api/assets/{aid}/file')
 def asset_file(aid:str):
     row=asset_row(aid)
-    path=(s.ASSETS/row['path']).resolve()
+    path=s.stored_asset_path(row['path'])
     if not path.is_relative_to(s.ASSETS) or not path.is_file(): raise HTTPException(404,'素材文件丢失')
     return FileResponse(path,media_type=row['mime'],filename=row['name'],content_disposition_type='inline')
 
@@ -655,7 +659,7 @@ def provider_asset_file(aid:str,expires:int,signature:str):
     if not valid_signature(aid,expires,signature):
         raise HTTPException(403,'素材访问链接无效或已过期')
     row=asset_row(aid)
-    path=(s.ASSETS/row['path']).resolve()
+    path=s.stored_asset_path(row['path'])
     if not path.is_relative_to(s.ASSETS) or not path.is_file():
         raise HTTPException(404,'素材文件丢失')
     return FileResponse(
@@ -825,8 +829,8 @@ def reference_asset(pid,aid):
             target.id target_project_id,target.production_id target_production_id
             FROM assets a
             JOIN projects origin ON origin.id=a.project_id
-            JOIN projects target ON target.id=?
-            WHERE a.id=? AND NOT EXISTS(
+            JOIN projects target ON target.id=%s
+            WHERE a.id=%s AND NOT EXISTS(
                 SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id
             )''',(pid,aid)).fetchone()
     if not row:raise HTTPException(404,'素材不存在')
@@ -844,8 +848,7 @@ def prompt_library():
 def save_prompt_template(tid:str,body:PromptTemplateSave):
     if len(tid)>100 or body.kind not in ('text','storyboard','image','video'):raise ValueError('模板类型或编号无效')
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute("SELECT value FROM settings WHERE key='prompt_library'").fetchone()
+        row=c.execute("SELECT value FROM settings WHERE key='prompt_library' FOR UPDATE").fetchone()
         library=json.loads(row['value']) if row else {'revision':0,'templates':[]}
         if library['revision']!=body.revision:raise HTTPException(409,'模板库已在另一页面更新，请刷新后保存；当前草稿仍保留')
         old=next((t for t in library['templates'] if t['id']==tid),None)
@@ -855,14 +858,14 @@ def save_prompt_template(tid:str,body:PromptTemplateSave):
         library['templates']=[template,*[t for t in library['templates'] if t['id']!=tid]]
         if len(library['templates'])>500:raise ValueError('模板库最多保存 500 个模板')
         library['revision']+=1
-        c.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',('prompt_library',s.dumps(library)))
+        c.execute('INSERT INTO settings VALUES(%s,%s) ON CONFLICT(key) DO UPDATE SET value=excluded.value',('prompt_library',s.dumps(library)))
     return library
 
 def create_job_record(c,pid,body):
     from .job_contracts import freeze_prompt_contract
     body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
-    old=c.execute('SELECT * FROM jobs WHERE submission_id=?',(body.submission_id,)).fetchone()
+    old=c.execute('SELECT * FROM jobs WHERE submission_id=%s',(body.submission_id,)).fetchone()
     if old:
         if old['project_id']!=pid: raise HTTPException(409,'提交标识冲突')
         if old['node_id']!=body.node_id or old['kind']!=body.kind or json.loads(old['input'])!=body.input:
@@ -870,7 +873,7 @@ def create_job_record(c,pid,body):
         return s.unpack(old)
     if body.input.get('visual_reference') is not None:
         active=c.execute("""SELECT * FROM jobs
-            WHERE project_id=? AND node_id=? AND kind=? AND status IN ('queued','running')
+            WHERE project_id=%s AND node_id=%s AND kind=%s AND status IN ('queued','running')
             ORDER BY created DESC LIMIT 1""",(pid,body.node_id,body.kind)).fetchone()
         if active:
             raise HTTPException(409,'该资产参考图已有任务排队或运行中，请等待完成后再生成')
@@ -954,15 +957,15 @@ def create_job_record(c,pid,body):
         if selected and selected['type']=='minimax':
             from .minimax_video import first_frame
             first_frame(asset)
-    owner=c.execute('SELECT production_id FROM projects WHERE id=?',(pid,)).fetchone()
+    owner=c.execute('SELECT production_id FROM projects WHERE id=%s',(pid,)).fetchone()
     if not owner:raise HTTPException(404,'制作集不存在')
     scope='production' if body.input.get('stage') in ('source_analysis','adaptation_generation') else 'episode'
     jid=s.uid('job-'); now=time.time()
     c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id']))
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id']))
     if selected:
-        c.execute('INSERT INTO job_private VALUES(?,?)',(jid,s.dumps(selected)))
-    return s.unpack(c.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone())
+        c.execute('INSERT INTO job_private VALUES(%s,%s)',(jid,s.dumps(selected)))
+    return s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone())
 
 @app.post('/api/projects/{pid}/jobs')
 def submit(pid:str,body:JobCreate):
@@ -992,11 +995,10 @@ def submit(pid:str,body:JobCreate):
     body=body.model_copy(update={'input':prepared_input})
     tracking = None
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         if body.input.get('reference_compiler'):
             current_revision=c.execute('''SELECT e.revision,p.revision production_revision
                 FROM projects e JOIN productions p ON p.id=e.production_id
-                WHERE e.id=?''',(pid,)).fetchone()
+                WHERE e.id=%s''',(pid,)).fetchone()
             if (
                 not current_revision
                 or current_revision['revision']!=saved_project['revision']
@@ -1007,6 +1009,12 @@ def submit(pid:str,body:JobCreate):
         if body.input.get('visual_reference') is not None:
             from .visual_references import record_visual_reference_submission
             tracking=record_visual_reference_submission(c,pid,body,result)
+        if tracking:
+            s.event(pid,{
+                'type':'production',
+                'revision':tracking['production_revision'],
+            },connection=c)
+        s.event(pid,{'type':'job','id':result['id']},connection=c)
     if tracking:
         result={
             **result,
@@ -1014,11 +1022,6 @@ def submit(pid:str,body:JobCreate):
             'production_revision':tracking['production_revision'],
             'project_document':tracking['document'],
         }
-        s.event(pid,{
-            'type':'production',
-            'revision':tracking['production_revision'],
-        })
-    s.event(pid,{'type':'job','id':result['id']})
     return result
 
 
@@ -1049,7 +1052,7 @@ class SourceExtractionCreate(BaseModel):
 
 def source_document_row(production_id,source_id):
     with s.db() as c:
-        row=c.execute('''SELECT * FROM source_documents WHERE id=? AND production_id=?
+        row=c.execute('''SELECT * FROM source_documents WHERE id=%s AND production_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='source' AND d.item_id=source_documents.id)''',(source_id,production_id)).fetchone()
     if not row:raise HTTPException(404,'原著文档不存在')
     return s.unpack(row)
@@ -1060,7 +1063,7 @@ def source_documents(production_id:str):
     with s.db() as c:
         rows=c.execute('''SELECT d.*,(SELECT COUNT(*) FROM source_chapters c WHERE c.source_id=d.id
             AND NOT EXISTS(SELECT 1 FROM deleted_items dc WHERE dc.kind='chapter' AND dc.item_id=c.id)) chapter_count
-            FROM source_documents d WHERE d.production_id=?
+            FROM source_documents d WHERE d.production_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
             ORDER BY d.updated DESC,d.id''',(production_id,)).fetchall()
     return [s.unpack(row) for row in rows]
@@ -1073,7 +1076,7 @@ def create_source_document(production_id:str,body:SourceCreate):
     if not body.title.strip():raise ValueError('原著名称不能为空')
     source_id=s.uid('source-');now=time.time()
     with s.db() as c:
-        c.execute('INSERT INTO source_documents VALUES(?,?,?,?,?,?,?)',(
+        c.execute('INSERT INTO source_documents VALUES(%s,%s,%s,%s,%s,%s,%s)',(
             source_id,production_id,body.type,body.title.strip(),s.dumps(body.metadata),now,now,
         ))
     return source_document_row(production_id,source_id)
@@ -1087,12 +1090,11 @@ def import_source_document(production_id:str,body:SourceImport):
     chapters=split_chapters(body.content)
     source_id=s.uid('source-');now=time.time()
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        c.execute('INSERT INTO source_documents VALUES(?,?,?,?,?,?,?)',(
+        c.execute('INSERT INTO source_documents VALUES(%s,%s,%s,%s,%s,%s,%s)',(
             source_id,production_id,body.type,body.title.strip(),s.dumps(body.metadata),now,now,
         ))
         for number,(title,content) in enumerate(chapters,1):
-            c.execute('INSERT INTO source_chapters VALUES(?,?,?,?,?,?,?,?,?)',(
+            c.execute('INSERT INTO source_chapters VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
                 s.uid('chapter-'),source_id,number,title,content,number,1,now,now,
             ))
     return {**source_document_row(production_id,source_id),'chapter_count':len(chapters)}
@@ -1102,17 +1104,16 @@ def delete_source_document(production_id:str,source_id:str):
     source=source_document_row(production_id,source_id)
     now=time.time()
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         active=c.execute('''SELECT COUNT(*) count FROM jobs j
             JOIN projects p ON p.id=j.project_id
             JOIN source_chapters sc ON j.node_id='source-chapter:' || sc.id
-            WHERE p.production_id=? AND sc.source_id=? AND j.status IN ('queued','running')''',
+            WHERE p.production_id=%s AND sc.source_id=%s AND j.status IN ('queued','running')''',
             (production_id,source_id)).fetchone()['count']
         if active:raise HTTPException(409,f'该原著仍有 {active} 个事件提取任务，请等待任务结束或先取消任务。')
-        chapter_ids=[row['id'] for row in c.execute('SELECT id FROM source_chapters WHERE source_id=?',(source_id,))]
+        chapter_ids=[row['id'] for row in c.execute('SELECT id FROM source_chapters WHERE source_id=%s',(source_id,))]
         event_ids=[row['id'] for row in c.execute('''SELECT e.id FROM source_events e
-            JOIN source_chapters sc ON sc.id=e.chapter_id WHERE sc.source_id=?''',(source_id,))]
-        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('source',?,?,?)",
+            JOIN source_chapters sc ON sc.id=e.chapter_id WHERE sc.source_id=%s''',(source_id,))]
+        c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('source',%s,%s,%s)",
             (source_id,production_id,now))
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=chapter_ids,event_ids=event_ids)
@@ -1126,23 +1127,25 @@ def trash_source_chapters(production_id,chapter_ids):
     production(production_id);now=time.time()
     chapter_ids=list(dict.fromkeys(chapter_ids))
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        placeholders=','.join('?' for _ in chapter_ids)
+        placeholders=','.join('%s' for _ in chapter_ids)
         chapters=c.execute(f'''SELECT sc.*,sd.title source_title FROM source_chapters sc
-            JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id IN ({placeholders}) AND sd.production_id=?
+            JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id IN ({placeholders}) AND sd.production_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items ds WHERE ds.kind='source' AND ds.item_id=sd.id)
             AND NOT EXISTS(SELECT 1 FROM deleted_items dc WHERE dc.kind='chapter' AND dc.item_id=sc.id)''',
             [*chapter_ids,production_id]).fetchall()
         if len(chapters)!=len(chapter_ids):raise HTTPException(404,'部分章节不存在或已在回收站')
         node_ids=['source-chapter:'+chapter_id for chapter_id in chapter_ids]
-        node_placeholders=','.join('?' for _ in node_ids)
+        node_placeholders=','.join('%s' for _ in node_ids)
         active=c.execute(f"SELECT COUNT(*) count FROM jobs WHERE node_id IN ({node_placeholders}) AND status IN ('queued','running')",
             node_ids).fetchone()['count']
         if active:raise HTTPException(409,f'所选章节仍有 {active} 个事件提取任务，请等待任务结束或先取消任务。')
         event_ids=[row['id'] for row in c.execute(
             f'SELECT id FROM source_events WHERE chapter_id IN ({placeholders})',chapter_ids)]
-        c.executemany("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('chapter',?,?,?)",
-            [(chapter_id,production_id,now) for chapter_id in chapter_ids])
+        with c.cursor() as cursor:
+            cursor.executemany(
+                "INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('chapter',%s,%s,%s)",
+                [(chapter_id,production_id,now) for chapter_id in chapter_ids],
+            )
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=chapter_ids,event_ids=event_ids)
         targets=production_event_targets(c,production_id)
@@ -1163,9 +1166,9 @@ def delete_source_chapter(production_id:str,chapter_id:str):
 @app.get('/api/productions/{production_id}/chapters')
 def source_chapters(production_id:str,source_id:str|None=None,q:str=''):
     production(production_id)
-    clauses=['d.production_id=?',"NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)","NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)"];params=[production_id]
-    if source_id:clauses.append('c.source_id=?');params.append(source_id)
-    if q.strip():clauses.append('(c.title LIKE ? OR c.content LIKE ?)');term='%'+q.strip()+'%';params.extend([term,term])
+    clauses=['d.production_id=%s',"NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)","NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)"];params=[production_id]
+    if source_id:clauses.append('c.source_id=%s');params.append(source_id)
+    if q.strip():clauses.append('(c.title LIKE %s OR c.content LIKE %s)');term='%'+q.strip()+'%';params.extend([term,term])
     with s.db() as c:
         rows=c.execute('''SELECT c.*,d.title source_title,1+(SELECT COUNT(*) FROM source_chapters previous
             WHERE previous.source_id=c.source_id
@@ -1182,13 +1185,12 @@ def create_source_chapter(production_id:str,source_id:str,body:ChapterCreate):
     if not body.title.strip():raise ValueError('章节标题不能为空')
     source_document_row(production_id,source_id);now=time.time()
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        next_no=c.execute('SELECT COALESCE(MAX(chapter_no),0)+1 value FROM source_chapters WHERE source_id=?',(source_id,)).fetchone()['value']
+        next_no=c.execute('SELECT COALESCE(MAX(chapter_no),0)+1 value FROM source_chapters WHERE source_id=%s',(source_id,)).fetchone()['value']
         chapter_id=s.uid('chapter-')
-        c.execute('INSERT INTO source_chapters VALUES(?,?,?,?,?,?,?,?,?)',(
+        c.execute('INSERT INTO source_chapters VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
             chapter_id,source_id,next_no,body.title.strip(),body.content,next_no,1,now,now,
         ))
-        c.execute('UPDATE source_documents SET updated=? WHERE id=?',(now,source_id))
+        c.execute('UPDATE source_documents SET updated=%s WHERE id=%s',(now,source_id))
     return next(item for item in source_chapters(production_id,source_id) if item['id']==chapter_id)
 
 @app.put('/api/productions/{production_id}/chapters/{chapter_id}')
@@ -1196,16 +1198,16 @@ def save_source_chapter(production_id:str,chapter_id:str,body:ChapterSave):
     if not body.title.strip():raise ValueError('章节标题不能为空')
     now=time.time()
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         row=c.execute('''SELECT c.*,d.production_id FROM source_chapters c JOIN source_documents d ON d.id=c.source_id
-            WHERE c.id=? AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
-            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)''',(chapter_id,)).fetchone()
+            WHERE c.id=%s AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
+            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)
+            FOR UPDATE OF c''',(chapter_id,)).fetchone()
         if not row or row['production_id']!=production_id:raise HTTPException(404,'章节不存在')
         if row['revision']!=body.revision:raise HTTPException(409,'章节已在其他页面更新，请重新加载。')
-        c.execute('UPDATE source_chapters SET title=?,content=?,revision=revision+1,updated=? WHERE id=?',(
+        c.execute('UPDATE source_chapters SET title=%s,content=%s,revision=revision+1,updated=%s WHERE id=%s',(
             body.title.strip(),body.content,now,chapter_id,
         ))
-        c.execute('UPDATE source_documents SET updated=? WHERE id=?',(now,row['source_id']))
+        c.execute('UPDATE source_documents SET updated=%s WHERE id=%s',(now,row['source_id']))
         from .adaptation import mark_adaptation_stale
         production_revision=mark_adaptation_stale(c,production_id,chapter_ids=[chapter_id])
     if production_revision is not None:
@@ -1219,12 +1221,12 @@ def source_events(production_id:str,chapter_id:str|None=None):
     query='''SELECT e.* FROM source_events e
         JOIN source_chapters c ON c.id=e.chapter_id
         JOIN source_documents d ON d.id=c.source_id
-        WHERE e.production_id=? AND NOT EXISTS(
+        WHERE e.production_id=%s AND NOT EXISTS(
             SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id
         ) AND NOT EXISTS(
             SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id
         )''';params=[production_id]
-    if chapter_id:query+=' AND e.chapter_id=?';params.append(chapter_id)
+    if chapter_id:query+=' AND e.chapter_id=%s';params.append(chapter_id)
     query+=' ORDER BY d.created,c.sort_order,c.chapter_no,e.event_order'
     with s.db() as c:rows=c.execute(query,params).fetchall()
     result=[]
@@ -1240,12 +1242,11 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
     production(production_id)
     if len(set(body.chapter_ids))!=len(body.chapter_ids):raise ValueError('不能重复选择同一章节')
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        owner=c.execute('SELECT id FROM projects WHERE id=? AND production_id=?',(body.project_id,production_id)).fetchone()
+        owner=c.execute('SELECT id FROM projects WHERE id=%s AND production_id=%s',(body.project_id,production_id)).fetchone()
         if not owner:raise ValueError('文本任务必须归属于当前 Production 的 Episode')
-        placeholders=','.join('?' for _ in body.chapter_ids)
+        placeholders=','.join('%s' for _ in body.chapter_ids)
         chapters=c.execute(f'''SELECT c.* FROM source_chapters c JOIN source_documents d ON d.id=c.source_id
-            WHERE d.production_id=? AND c.id IN ({placeholders})
+            WHERE d.production_id=%s AND c.id IN ({placeholders})
             AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
             AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)''',[production_id,*body.chapter_ids]).fetchall()
         if len(chapters)!=len(body.chapter_ids):raise ValueError('所选章节不存在或不属于当前 Production')
@@ -1257,9 +1258,10 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
                     'provider':body.provider,'model':body.model,
                     'stage':'source_analysis','prompt':f'章节标题：{chapter["title"]}\n\n原文：\n{chapter["content"]}',
                     'source_event_extraction':{'productionId':production_id,'chapterId':chapter_id,'chapterRevision':chapter['revision']},
-                })
+            })
             created.append(create_job_record(c,body.project_id,job_body))
-    for item in created:s.event(body.project_id,{'type':'job','id':item['id']})
+        for item in created:
+            s.event(body.project_id,{'type':'job','id':item['id']},connection=c)
     return {'jobs':created,'count':len(created)}
 
 
@@ -1300,7 +1302,7 @@ class ScriptGenerationCreate(BaseModel):
 
 def production_event_targets(connection,production_id):
     return [row['id'] for row in connection.execute('''SELECT p.id FROM projects p
-        WHERE p.production_id=? AND NOT EXISTS(
+        WHERE p.production_id=%s AND NOT EXISTS(
             SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id
         )''',(production_id,)).fetchall()]
 
@@ -1314,8 +1316,7 @@ def read_adaptation(production_id:str):
     revision=value['revision'];context=value['context'];targets=[]
     with s.db() as c:
         if has_legacy_default_format(context):
-            c.execute('BEGIN IMMEDIATE')
-            episodes=c.execute('''SELECT document FROM projects p WHERE p.production_id=?
+            episodes=c.execute('''SELECT document FROM projects p WHERE p.production_id=%s
                 AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id)
                 ORDER BY p.episode_no,p.id''',(production_id,)).fetchall()
             episode_document=json.loads(episodes[0]['document']) if episodes else {}
@@ -1323,7 +1324,7 @@ def read_adaptation(production_id:str):
                 context,max(1,len(episodes)),episode_document.get('duration',15),
                 episode_document.get('ratio','16:9'),'通用短视频',
             ))
-            row=c.execute('SELECT * FROM productions WHERE id=?',(production_id,)).fetchone()
+            row=c.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
             revision=_persist_production_context(c,row,context)
             targets=production_event_targets(c,production_id)
         sources=source_snapshot(c,production_id)
@@ -1337,8 +1338,7 @@ def save_adaptation(production_id:str,body:AdaptationSave):
         validate_source_references,
     )
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute('SELECT * FROM productions WHERE id=?',(production_id,)).fetchone()
+        row=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
         if row['revision']!=body.revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
         context=normalize_production_context(json.loads(row['shared_context']))
@@ -1357,8 +1357,7 @@ def save_adaptation(production_id:str,body:AdaptationSave):
 def transition_adaptation(production_id,expected_revision,target):
     from .adaptation import _persist_production_context,adaptation_bundle,validate_adaptation_bundle,validate_approval_ready
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        row=c.execute('SELECT * FROM productions WHERE id=?',(production_id,)).fetchone()
+        row=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
         if row['revision']!=expected_revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
         context=normalize_production_context(json.loads(row['shared_context']))
@@ -1390,7 +1389,6 @@ def approve_adaptation(production_id:str,body:RevisionAction):
 def generate_adaptation(production_id:str,body:TextGenerationCreate):
     from .adaptation import adaptation_fingerprint,source_fingerprint,source_snapshot
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         state=read_project_state(c,body.project_id)
         if not state or state['project']['production_id']!=production_id:
             raise ValueError('改编任务必须归属于当前 Production 的 Episode')
@@ -1412,7 +1410,7 @@ def generate_adaptation(production_id:str,body:TextGenerationCreate):
             },
         })
         result=create_job_record(c,body.project_id,job_body)
-    s.event(body.project_id,{'type':'job','id':result['id']})
+        s.event(body.project_id,{'type':'job','id':result['id']},connection=c)
     return result
 
 @app.get('/api/productions/{production_id}/scripts')
@@ -1422,7 +1420,7 @@ def production_scripts(production_id:str):
     with s.db() as c:
         rows=c.execute('''SELECT p.id project_id,p.episode_no,p.episode_title,sc.* FROM projects p
             LEFT JOIN episode_scripts sc ON sc.project_id=p.id
-            WHERE p.production_id=? AND NOT EXISTS(
+            WHERE p.production_id=%s AND NOT EXISTS(
                 SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id
             )''',(production_id,)).fetchall()
     existing={row['episode_no']:row for row in rows}
@@ -1435,7 +1433,7 @@ def production_scripts(production_id:str):
     return result
 
 def episode_plan_context(connection,production_id,episode_no):
-    row=connection.execute('SELECT * FROM productions WHERE id=?',(production_id,)).fetchone()
+    row=connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
     if not row:raise HTTPException(404,'Production 不存在')
     context=normalize_production_context(json.loads(row['shared_context']))
     plan=next((item for item in context['episodePlans'] if item['episodeNo']==episode_no),None)
@@ -1447,7 +1445,7 @@ def read_episode_script(production_id:str,episode_no:int):
     from .adaptation import script_default_from_plan,script_row
     with s.db() as c:
         _,_,plan=episode_plan_context(c,production_id,episode_no)
-        project_row=c.execute('''SELECT p.* FROM projects p WHERE p.production_id=? AND p.episode_no=?
+        project_row=c.execute('''SELECT p.* FROM projects p WHERE p.production_id=%s AND p.episode_no=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id)''',(production_id,episode_no)).fetchone()
         if not project_row:return script_default_from_plan(None,plan)
         return script_row(c,project_row['id']) or script_default_from_plan(project_row['id'],plan)
@@ -1456,11 +1454,10 @@ def read_episode_script(production_id:str,episode_no:int):
 def save_episode_script(production_id:str,episode_no:int,body:ScriptSave):
     from .adaptation import ensure_episode_for_plan,save_script_row,script_row,validate_source_references
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         _,_,plan=episode_plan_context(c,production_id,episode_no)
-        existed=c.execute('SELECT id FROM projects WHERE production_id=? AND episode_no=?',(production_id,episode_no)).fetchone()
+        existed=c.execute('SELECT id FROM projects WHERE production_id=%s AND episode_no=%s',(production_id,episode_no)).fetchone()
         project_row=ensure_episode_for_plan(c,production_id,episode_no)
-        row=c.execute('SELECT * FROM episode_scripts WHERE project_id=?',(project_row['id'],)).fetchone()
+        row=c.execute('SELECT * FROM episode_scripts WHERE project_id=%s FOR UPDATE',(project_row['id'],)).fetchone()
         compatible_revision=row['revision'] if not existed and body.revision==0 else body.revision
         if row['revision']!=compatible_revision:raise HTTPException(409,'本集剧本已在其他页面更新，请重新加载。')
         payload=body.model_dump(exclude={'revision','canvasNodeId'})
@@ -1473,7 +1470,7 @@ def save_episode_script(production_id:str,episode_no:int,body:ScriptSave):
                 raise ValueError('画布剧本节点不存在或类型无效')
             metadata=json.loads(row['metadata'])
             metadata.update({'origin':'canvas','projectionNodeId':body.canvasNodeId})
-            c.execute('UPDATE episode_scripts SET metadata=? WHERE project_id=?',(s.dumps(metadata),project_row['id']))
+            c.execute('UPDATE episode_scripts SET metadata=%s WHERE project_id=%s',(s.dumps(metadata),project_row['id']))
             saved=script_row(c,project_row['id'])
     s.event(project_row['id'],{'type':'script','revision':saved['revision']})
     return saved
@@ -1481,10 +1478,9 @@ def save_episode_script(production_id:str,episode_no:int,body:ScriptSave):
 def transition_script(production_id,episode_no,expected_revision,target):
     from .adaptation import ensure_episode_for_plan,script_row,script_to_api
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         _,context,plan=episode_plan_context(c,production_id,episode_no)
         project_row=ensure_episode_for_plan(c,production_id,episode_no)
-        row=c.execute('SELECT * FROM episode_scripts WHERE project_id=?',(project_row['id'],)).fetchone()
+        row=c.execute('SELECT * FROM episode_scripts WHERE project_id=%s FOR UPDATE',(project_row['id'],)).fetchone()
         if row['revision']!=expected_revision:raise HTTPException(409,'本集剧本已在其他页面更新，请重新加载。')
         if target in ('review','approved') and not row['body'].strip():raise ValueError('剧本正文为空，不能提交审核或批准')
         quick_canvas=json.loads(row['metadata']).get('origin')=='canvas'
@@ -1494,10 +1490,10 @@ def transition_script(production_id,episode_no,expected_revision,target):
         if target=='review' and row['status']=='stale':raise ValueError('剧本已过期，请先修订后再提交审核')
         now=time.time()
         from .adaptation import _script_snapshot
-        c.execute('INSERT INTO episode_script_revisions VALUES(?,?,?,?,?)',(
+        c.execute('INSERT INTO episode_script_revisions VALUES(%s,%s,%s,%s,%s)',(
             s.uid('script-revision-'),project_row['id'],row['revision'],s.dumps(_script_snapshot(row)),now,
         ))
-        c.execute('UPDATE episode_scripts SET status=?,revision=revision+1,updated=? WHERE project_id=?',(target,now,project_row['id']))
+        c.execute('UPDATE episode_scripts SET status=%s,revision=revision+1,updated=%s WHERE project_id=%s',(target,now,project_row['id']))
         saved=script_row(c,project_row['id'])
     s.event(project_row['id'],{'type':'script','revision':saved['revision']})
     return saved
@@ -1519,7 +1515,6 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
     from .adaptation import adaptation_fingerprint,ensure_episode_for_plan,script_to_api,validate_source_references
     if len(set(body.episode_nos))!=len(body.episode_nos):raise ValueError('不能重复选择同一集')
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         production_row,context,_=episode_plan_context(c,production_id,body.episode_nos[0])
         if context['adaptationPlan']['status']!='approved':raise ValueError('请先批准改编策划，再生成逐集剧本')
         plan_map={item['episodeNo']:item for item in context['episodePlans']}
@@ -1530,8 +1525,8 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
             if plan['status']!='approved':raise ValueError(f'第 {episode_no:02d} 集规划尚未批准')
             validate_source_references(c,production_id,plan['sourceChapterRefs'])
             project_row=ensure_episode_for_plan(c,production_id,episode_no)
-            script=c.execute('SELECT * FROM episode_scripts WHERE project_id=?',(project_row['id'],)).fetchone()
-            placeholders=','.join('?' for _ in plan['sourceChapterRefs'])
+            script=c.execute('SELECT * FROM episode_scripts WHERE project_id=%s',(project_row['id'],)).fetchone()
+            placeholders=','.join('%s' for _ in plan['sourceChapterRefs'])
             chapters=[]
             if plan['sourceChapterRefs']:
                 chapters=[dict(row) for row in c.execute(f'''SELECT id,title,content,revision FROM source_chapters
@@ -1546,9 +1541,10 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
                         'productionId':production_id,'episodeNo':episode_no,
                         'scriptRevision':script['revision'],'adaptationFingerprint':fingerprint,
                     },
-                })
+            })
             created.append(create_job_record(c,project_row['id'],job_body))
-    for item in created:s.event(item['project_id'],{'type':'job','id':item['id']})
+        for item in created:
+            s.event(item['project_id'],{'type':'job','id':item['id']},connection=c)
     return {'jobs':created,'count':len(created)}
 
 @app.post('/api/projects/{pid}/run')
@@ -1721,11 +1717,10 @@ async def run_workflow(pid:str,request:Request):
         prepared.append((node,parents,data,reference_sources))
     jobs_by_node={};created=[]
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
         if any(data.get('reference_compiler') for _,_,data,_ in prepared):
             current_revision=c.execute('''SELECT e.revision,p.revision production_revision
                 FROM projects e JOIN productions p ON p.id=e.production_id
-                WHERE e.id=?''',(pid,)).fetchone()
+                WHERE e.id=%s''',(pid,)).fetchone()
             if (
                 not current_revision
                 or current_revision['revision']!=p['revision']
@@ -1745,19 +1740,20 @@ async def run_workflow(pid:str,request:Request):
             ]
             result=create_job_record(c,pid,JobCreate(node_id=node['id'],kind=kind,submission_id=f'{group}:{node["id"]}',input=data))
             jobs_by_node[node['id']]=result['id'];created.append(result['id'])
-    for jid in created:s.event(pid,{'type':'job','id':jid})
+        for jid in created:
+            s.event(pid,{'type':'job','id':jid},connection=c)
     return {'job_ids':created,'count':len(created)}
 
 @app.get('/api/projects/{pid}/jobs')
 def jobs(pid:str):
     project(pid)
     with s.db() as c:
-        return [s.unpack(r) for r in c.execute('SELECT * FROM jobs WHERE project_id=? ORDER BY created DESC LIMIT 200',(pid,))]
+        return [s.unpack(r) for r in c.execute('SELECT * FROM jobs WHERE project_id=%s ORDER BY created DESC LIMIT 200',(pid,))]
 
 @app.get('/api/jobs/{jid}')
 def read_job(jid:str):
     with s.db() as c:
-        row=c.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone()
+        row=c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone()
     if not row: raise HTTPException(404,'任务不存在')
     return s.unpack(row)
 
@@ -1770,7 +1766,7 @@ def cancel(jid:str):
         # initial read and this state change is visible to remote cancellation.
         job=read_job(jid)
         with s.db() as c:
-            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=?',(jid,)).fetchone()
+            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(jid,)).fetchone()
         if snapshot:
             provider=json.loads(snapshot['provider'])
             if provider.get('type')=='replicate':
@@ -1799,12 +1795,11 @@ def resume(jid:str):
     # Remote jobs keep polling the original handle. Synchronous jobs do not have
     # one, so an explicit resume action requeues their frozen input instead.
     with s.db() as c:
-        c.execute('BEGIN IMMEDIATE')
-        job=c.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone()
+        job=c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone()
         if not job: raise HTTPException(404,'任务不存在')
         if job['status'] in ('queued','running','succeeded'): return s.unpack(job)
         if job['status']!='interrupted': raise HTTPException(409,'只有中断任务可以恢复查询')
-        snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=?',(jid,)).fetchone()
+        snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(jid,)).fetchone()
         provider=json.loads(snapshot['provider']) if snapshot else {}
         if job['provider_job_id']:
             if provider.get('type') not in ('maestro','comfy','video_api','minimax','replicate','volcengine_ark','hc_atom','runninghub'):
@@ -1815,15 +1810,15 @@ def resume(jid:str):
             marker=frozen_input.get('source_event_extraction') or {}
             if marker.get('chapterId'):
                 chapter=c.execute('''SELECT sc.id,sd.production_id FROM source_chapters sc
-                    JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id=?
+                    JOIN source_documents sd ON sd.id=sc.source_id WHERE sc.id=%s
                     AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='source' AND d.item_id=sd.id)
                     AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='chapter' AND d.item_id=sc.id)''',
                     (marker['chapterId'],)).fetchone()
                 if not chapter or chapter['production_id']!=marker.get('productionId'):
                     raise HTTPException(409,'原任务对应的章节已删除或归属已变化，无法重新排队')
             phase='使用已保存的输入重新排队'
-        c.execute('''UPDATE jobs SET status='queued',result=NULL,error=NULL,phase=?,progress=NULL,
-            started=NULL,finished=NULL,telemetry=NULL,updated=? WHERE id=?''',(phase,time.time(),jid))
+        c.execute('''UPDATE jobs SET status='queued',result=NULL,error=NULL,phase=%s,progress=NULL,
+            started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s''',(phase,time.time(),jid))
     s.event(job['project_id'],{'type':'job','id':jid})
     return read_job(jid)
 
@@ -1848,7 +1843,7 @@ async def events(request:Request,after:int|None=None):
         cursor = _event_cursor(latest, after, request.headers.get('last-event-id'))
         while not await request.is_disconnected():
             with s.db() as c:
-                rows=c.execute('SELECT * FROM events WHERE id>? ORDER BY id LIMIT 100',(cursor,)).fetchall()
+                rows=c.execute('SELECT * FROM events WHERE id>%s ORDER BY id LIMIT 100',(cursor,)).fetchall()
             for row in rows:
                 cursor=row['id']
                 yield f'id: {cursor}\ndata: {s.dumps({"project_id":row["project_id"],**json.loads(row["payload"])})}\n\n'

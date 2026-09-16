@@ -6,6 +6,7 @@ import json
 import os
 
 from . import store
+from .database import safe_database_identity
 
 
 def _canonical(path) -> str:
@@ -15,12 +16,16 @@ def _canonical(path) -> str:
 def describe() -> dict[str, str | int]:
     project_root = _canonical(store.ROOT)
     data_dir = _canonical(store.DATA)
-    digest = hashlib.sha256(f'{project_root}\0{data_dir}'.encode('utf-8')).hexdigest()
+    database_identity = safe_database_identity()
+    digest = hashlib.sha256(
+        f'{project_root}\0{data_dir}\0{database_identity}'.encode('utf-8')
+    ).hexdigest()
     return {
         'schema': 1,
         'instance_id': f'ovc-{digest[:32]}',
         'project_root': project_root,
         'data_dir': data_dir,
+        'database': database_identity,
     }
 
 

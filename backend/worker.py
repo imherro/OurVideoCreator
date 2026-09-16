@@ -12,7 +12,7 @@ import httpx
 from . import store as s
 from .prompts import TEMPLATES, SHOT_SCHEMA, validate_shots
 from .media import ffmpeg_executable,probe
-from .process_lock import ProcessLock
+from .database import WorkerAdvisoryLock
 from .editor_renderer import EditorRenderCompiler
 from .providers.common import RecoverableProviderError,assets_for,checked,download_result,register
 
@@ -25,7 +25,7 @@ class Worker:
         self.activity_lock=threading.Lock()
         self.active_count=0
         self.serial_execution_lock=threading.Lock()
-        self.process_lock=ProcessLock(s.DATA/'worker.lock')
+        self.process_lock=WorkerAdvisoryLock()
     def start(self):
         self.process_lock.acquire()
         try:
@@ -33,7 +33,7 @@ class Worker:
                 # Reconcile only after proving this process owns the queue.
                 c.execute("""UPDATE jobs SET status='interrupted',phase=CASE
                     WHEN provider_job_id IS NULL THEN '服务已重启，原任务输入已保留；点击待恢复可重新排队'
-                    ELSE '服务已重启，点击待恢复可继续查询上游任务' END,updated=?
+                    ELSE '服务已重启，点击待恢复可继续查询上游任务' END,updated=%s
                     WHERE status='running'""",(time.time(),))
                 c.execute("""UPDATE jobs SET phase='原任务输入已保留；点击待恢复可重新排队'
                     WHERE status='interrupted' AND provider_job_id IS NULL
@@ -64,7 +64,7 @@ class Worker:
 
     def ark_job(self,job):
         with s.db() as c:
-            row=c.execute('SELECT provider FROM job_private WHERE job_id=?',(job['id'],)).fetchone()
+            row=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(job['id'],)).fetchone()
         if not row:return False
         try:return json.loads(row['provider']).get('type') in ('volcengine_ark','volcengine_speech')
         except (TypeError,ValueError):return False
@@ -73,18 +73,26 @@ class Worker:
             failed=[]
             row=None
             with s.db() as c:
-                c.execute('BEGIN IMMEDIATE')
-                candidates=c.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created LIMIT 500").fetchall()
+                candidates=c.execute(
+                    "SELECT * FROM jobs WHERE status='queued' ORDER BY created LIMIT 500 "
+                    'FOR UPDATE SKIP LOCKED'
+                ).fetchall()
                 for candidate in candidates:
                     dependencies=json.loads(candidate['input']).get('upstream_job_ids',[])
-                    states=[c.execute('SELECT status FROM jobs WHERE id=?',(dep,)).fetchone() for dep in dependencies]
+                    states=[c.execute('SELECT status FROM jobs WHERE id=%s',(dep,)).fetchone() for dep in dependencies]
                     if any(not state or state['status'] in ('failed','cancelled') for state in states):
-                        c.execute("UPDATE jobs SET status='failed',phase='上游任务未完成',error='上游任务失败或取消，请修复上游后重新执行此分支',finished=?,updated=? WHERE id=?",(time.time(),time.time(),candidate['id']))
+                        c.execute("UPDATE jobs SET status='failed',phase='上游任务未完成',error='上游任务失败或取消，请修复上游后重新执行此分支',finished=%s,updated=%s WHERE id=%s",(time.time(),time.time(),candidate['id']))
                         failed.append(candidate)
                         continue
                     if any(state['status']!='succeeded' for state in states): continue
                     row=candidate;break
-                if row: c.execute("UPDATE jobs SET status='running',started=COALESCE(started,?),updated=? WHERE id=?",(time.time(),time.time(),row['id']))
+                if row:
+                    claimed=c.execute(
+                        "UPDATE jobs SET status='running',started=COALESCE(started,%s),updated=%s "
+                        "WHERE id=%s AND status='queued' RETURNING id",
+                        (time.time(),time.time(),row['id']),
+                    ).fetchone()
+                    if not claimed:row=None
             for item in failed:s.event(item['project_id'],{'type':'job','id':item['id']})
             if not row:
                 self.halt.wait(1)
@@ -118,7 +126,7 @@ class Worker:
                 self.mark_active(-1)
     def cancelled(self,job):
         with s.db() as c:
-            row=c.execute('SELECT status FROM jobs WHERE id=?',(job['id'],)).fetchone()
+            row=c.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
         return self.halt.is_set() or not row or row['status']=='cancelled'
     def progress(self,job,phase,percent=None):
         if self.cancelled(job): raise InterruptedError()
@@ -128,7 +136,7 @@ class Worker:
         if kind=='video':
             from .state_review import require_video_source_reviews
             with s.db() as c:
-                saved=c.execute('SELECT document FROM projects WHERE id=?',(job['project_id'],)).fetchone()
+                saved=c.execute('SELECT document FROM projects WHERE id=%s',(job['project_id'],)).fetchone()
             if saved:
                 # A queued batch may have produced its still before the browser
                 # can persist a review acknowledgement. Do not let that race
@@ -136,7 +144,7 @@ class Worker:
                 require_video_source_reviews(json.loads(saved['document']),job['node_id'],include_pending=True)
         upstream_text=[];asset_ids=list(inp.get('asset_ids',[]));upstream_results={}
         for dependency in inp.get('upstream_job_ids',[]):
-            with s.db() as c: previous=c.execute('SELECT * FROM jobs WHERE id=? AND project_id=?',(dependency,job['project_id'])).fetchone()
+            with s.db() as c: previous=c.execute('SELECT * FROM jobs WHERE id=%s AND project_id=%s',(dependency,job['project_id'])).fetchone()
             if not previous or previous['status']!='succeeded': raise ValueError('上游任务尚未完成')
             result=json.loads(previous['result'] or '{}')
             upstream_results[dependency]=result
@@ -170,7 +178,7 @@ class Worker:
         if not provider_id or provider_id=='local':
             raise ValueError('未配置外部模型服务；系统不会自动回退到本地或其他付费模型')
         with s.db() as c:
-            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=?',(job['id'],)).fetchone()
+            snapshot=c.execute('SELECT provider FROM job_private WHERE job_id=%s',(job['id'],)).fetchone()
         provider=json.loads(snapshot['provider']) if snapshot else None
         if not provider: raise ValueError('任务缺少冻结的外部 Provider 配置')
         if provider['type']=='replicate':
@@ -506,8 +514,8 @@ class Worker:
                 with s.db() as c:
                     return c.execute('''SELECT a.* FROM assets a
                         JOIN projects origin ON origin.id=a.project_id
-                        JOIN projects target ON target.id=?
-                        WHERE a.id=? AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
+                        JOIN projects target ON target.id=%s
+                        WHERE a.id=%s AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
                         AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id)
                     ''',(job['project_id'],asset_id)).fetchone()
             files=[]
@@ -566,8 +574,8 @@ class Worker:
                 with s.db() as c:
                     row=c.execute('''SELECT a.* FROM assets a
                         JOIN projects origin ON origin.id=a.project_id
-                        JOIN projects target ON target.id=?
-                        WHERE a.id=? AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
+                        JOIN projects target ON target.id=%s
+                        WHERE a.id=%s AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
                         AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id)
                     ''',(job['project_id'],asset_id)).fetchone()
                 if not row:return None

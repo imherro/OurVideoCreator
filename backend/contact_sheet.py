@@ -28,7 +28,7 @@ def render_sheet(project,columns=3,page=1):
         draw.rounded_rectangle((x,y,x+cell_w,y+cell_h),radius=8,fill='#252c32')
         node=nodes.get(shot.get('imageNode'),{});aid=node.get('data',{}).get('assetId');asset=None
         if aid:
-            with s.db() as c:asset=c.execute("SELECT * FROM assets WHERE id=? AND project_id=? AND kind='image'",(aid,project['id'])).fetchone()
+            with s.db() as c:asset=c.execute("SELECT * FROM assets WHERE id=%s AND project_id=%s AND kind='image'",(aid,project['id'])).fetchone()
         if asset:
             path=(s.ASSETS/asset['path']).resolve()
             if path.is_relative_to(s.ASSETS) and path.is_file():

@@ -144,7 +144,7 @@ def record_visual_reference_submission(c, pid, body, job):
     version['provenance'] = {**(version.get('provenance') or {}), 'referenceGeneration': generation}
     now = time.time()
     c.execute(
-        'INSERT INTO production_revisions(id,production_id,revision,shared_context,created) VALUES(?,?,?,?,?)',
+        'INSERT INTO production_revisions(id,production_id,revision,shared_context,created) VALUES(%s,%s,%s,%s,%s)',
         (s.uid(), production['id'], production['revision'], production['shared_context'], now),
     )
     production_revision = production['revision'] + 1
@@ -153,7 +153,7 @@ def record_visual_reference_submission(c, pid, body, job):
         'filmBible': document['filmBible'],
     }
     c.execute(
-        'UPDATE productions SET revision=?,shared_context=?,updated=? WHERE id=?',
+        'UPDATE productions SET revision=%s,shared_context=%s,updated=%s WHERE id=%s',
         (production_revision, s.dumps(production_context), now, production['id']),
     )
     return {

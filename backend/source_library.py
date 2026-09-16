@@ -86,14 +86,13 @@ def replace_events(job, rows):
     validated = validate_events({'events': rows})
     now = time.time()
     with s.db() as connection:
-        connection.execute('BEGIN IMMEDIATE')
         active = connection.execute(
-            "SELECT status FROM jobs WHERE id=?", (job['id'],)
+            "SELECT status FROM jobs WHERE id=%s", (job['id'],)
         ).fetchone()
         if not active or active['status'] != 'running':
             raise ValueError('事件提取任务已失效，未写入提取结果')
         chapter = connection.execute('''SELECT c.id,c.revision,d.production_id FROM source_chapters c
-            JOIN source_documents d ON d.id=c.source_id WHERE c.id=?
+            JOIN source_documents d ON d.id=c.source_id WHERE c.id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
             AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)''',(chapter_id,)).fetchone()
         if not chapter or chapter['production_id'] != production_id:
@@ -101,11 +100,11 @@ def replace_events(job, rows):
         if chapter['revision'] != expected_revision:
             raise ValueError('章节已在提取期间更新，旧结果未写入；请重新提取')
         previous_ids = [row['id'] for row in connection.execute(
-            'SELECT id FROM source_events WHERE chapter_id=?', (chapter_id,)
+            'SELECT id FROM source_events WHERE chapter_id=%s', (chapter_id,)
         ).fetchall()]
-        connection.execute('DELETE FROM source_events WHERE chapter_id=?',(chapter_id,))
+        connection.execute('DELETE FROM source_events WHERE chapter_id=%s',(chapter_id,))
         for order, row in enumerate(validated, 1):
-            connection.execute('INSERT INTO source_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(
+            connection.execute('INSERT INTO source_events VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(
                 s.uid('source-event-'),production_id,chapter_id,order,s.dumps(row['characters']),
                 row['summary'],row['importance'],row['emotion'],s.dumps(row['continuity']),
                 job['id'],now,now,

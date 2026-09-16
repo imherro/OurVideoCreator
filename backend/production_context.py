@@ -135,14 +135,15 @@ def merge_migration_contexts(documents, generation_policy=None):
     return merged
 
 
-def read_project_state(connection, project_id):
+def read_project_state(connection, project_id, *, for_update=False):
+    suffix = ' FOR UPDATE' if for_update else ''
     project = connection.execute(
-        'SELECT * FROM projects WHERE id=?', (project_id,)
+        'SELECT * FROM projects WHERE id=%s' + suffix, (project_id,)
     ).fetchone()
     if not project:
         return None
     production = connection.execute(
-        'SELECT * FROM productions WHERE id=?', (project['production_id'],)
+        'SELECT * FROM productions WHERE id=%s' + suffix, (project['production_id'],)
     ).fetchone()
     if not production or not production['shared_context']:
         raise ValueError('项目缺少 Production 共享上下文')

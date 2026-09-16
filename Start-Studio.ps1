@@ -12,7 +12,7 @@ $studioRoot=$PSScriptRoot
 $studioPython=Join-Path $studioRoot '.venv\Scripts\python.exe'
 if(-not (Test-Path -LiteralPath $studioPython)){ $studioPython=(Get-Command python).Source }
 . (Join-Path $studioRoot 'Studio-Process.ps1')
-$studioEnvironment=Get-StudioProcessEnvironmentSnapshot @('PYTHONUTF8','MVC_DATA_DIR')
+$studioEnvironment=Get-StudioProcessEnvironmentSnapshot @('PYTHONUTF8','MVC_DATA_DIR','OVC_DATABASE_URL')
 try{
     $env:PYTHONUTF8='1'
     $env:MVC_DATA_DIR=Resolve-StudioDataDirectory $studioRoot

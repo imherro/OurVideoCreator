@@ -36,8 +36,8 @@ def assets_for(job):
         for aid in job['input'].get('asset_ids',[]):
             row=c.execute('''SELECT a.* FROM assets a
                 JOIN projects origin ON origin.id=a.project_id
-                JOIN projects target ON target.id=?
-                WHERE a.id=? AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
+                JOIN projects target ON target.id=%s
+                WHERE a.id=%s AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
                 AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id)
             ''',(job['project_id'],aid)).fetchone()
             if not row: raise ValueError('引用素材已丢失')
@@ -52,8 +52,8 @@ def assets_by_ids(job, asset_ids):
         for aid in asset_ids:
             row = c.execute('''SELECT a.* FROM assets a
                 JOIN projects origin ON origin.id=a.project_id
-                JOIN projects target ON target.id=?
-                WHERE a.id=? AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
+                JOIN projects target ON target.id=%s
+                WHERE a.id=%s AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
                 AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id)
             ''', (job['project_id'], aid)).fetchone()
             if not row:
@@ -87,12 +87,12 @@ def download_file(url, ext, recoverable=False):
 
 def register(job,path,name=None,category=None,asset_source='generated'):
     with s.db() as c:
-        row=c.execute('SELECT status FROM jobs WHERE id=?',(job['id'],)).fetchone()
+        row=c.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
     if not row or row['status']=='cancelled': raise InterruptedError()
     aid=s.uid('asset-')
     source=Path(path)
     ext=source.suffix.lower()
-    target=s.ASSETS/(aid+ext)
+    target=s.asset_path(aid,ext)
     try:
         if source!=target: shutil.copyfile(source,target)
         mime=mimetypes.guess_type(target.name)[0] or 'application/octet-stream'
@@ -106,14 +106,13 @@ def register(job,path,name=None,category=None,asset_source='generated'):
         elif kind in ('audio','video'):
             metadata.update(probe(target))
         with s.db() as c:
-            c.execute('BEGIN IMMEDIATE')
-            state=c.execute('SELECT status FROM jobs WHERE id=?',(job['id'],)).fetchone()
+            state=c.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
             if not state or state['status']=='cancelled':raise InterruptedError('结果登记前任务已取消')
-            origin=c.execute('SELECT production_id FROM projects WHERE id=?',(job['project_id'],)).fetchone()
+            origin=c.execute('SELECT production_id FROM projects WHERE id=%s',(job['project_id'],)).fetchone()
             if not origin:raise ValueError('生成任务所属项目不存在')
             semantic=category or job.get('input',{}).get('asset_category') or ('shot' if kind in ('image','video') else 'other')
             if semantic not in {'character','scene','prop','shot','music','sfx','voice','reference','other'}:raise ValueError('生成素材分类无效')
-            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)',(aid,job['project_id'],name or source.name,kind,target.name,mime,s.dumps(metadata),time.time(),semantic,asset_source,origin['production_id']))
+            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(aid,job['project_id'],name or source.name,kind,target.name,mime,s.dumps(metadata),time.time(),semantic,asset_source,origin['production_id']))
     except BaseException:
         target.unlink(missing_ok=True)
         raise
