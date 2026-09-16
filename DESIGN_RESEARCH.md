@@ -85,7 +85,7 @@ flowchart TD
     B1[电脑 A 的浏览器] --> W[Web 服务与单用户登录]
     B2[电脑 B 的浏览器] --> W
     W --> API[项目 API / 任务 API / 素材 API]
-    API --> DB[(SQLite 项目与任务库)]
+    API --> DB[(PostgreSQL 项目与任务库)]
     API --> FS[主机素材目录]
     API --> Q[持久化队列与依赖调度]
     Q --> GPU[GPU 资源管理]
@@ -180,7 +180,7 @@ GPU 调度属于服务端；租约/锁防止不同浏览器的请求抢占同一
 
 建议前端：React + TypeScript + Vite + React Flow + Zustand。React Flow 用于自定义媒体节点、连线、选择、缩放与保存恢复；业务数据独立于节点坐标存储。
 
-建议后端：Python FastAPI + Pydantic + SQLite（WAL）+ 独立 worker 进程。首版单台 GPU 主机不必引入 Redis 集群。后续多 GPU/远程 worker 可更换队列后端，无需重写项目结构。
+当前后端：Python FastAPI + Pydantic + PostgreSQL + 独立 Worker 进程。P2 不引入 Redis 集群；多 Worker、租约与远程调度留给 P6。
 
 合成与导出：独立渲染接口，主打镜头拼接、基础字幕和音轨混合。可直接调用媒体处理引擎；需要复杂标题/动效模板时再加入独立的 HTML 合成能力。此阶段仅设计应用，不生成视频成品代码。
 
@@ -198,7 +198,7 @@ backend/workflows/         依赖与执行状态
 backend/providers/         本地和云端适配器
 backend/workers/           GPU 与导出任务
 backend/prompts/            独立编写的模板及模型规则
-data/studio.sqlite         项目和任务
+PostgreSQL                 项目、版本、任务和业务事件（P2 唯一主库）
 data/assets/               版本化素材
 data/exports/              导出文件
 ```

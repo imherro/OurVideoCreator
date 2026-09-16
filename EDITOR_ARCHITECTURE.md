@@ -2,7 +2,7 @@
 
 ## 数据所有权
 
-MyVideoCreator 继续拥有 Project、Asset、AI 工作流和任务队列。Twick 只提供浏览器编辑内核与实时播放器。媒体文件仍只存在于 SQLite `assets` 记录和 `data/assets`，编辑元素通过 `metadata.assetId` 与 `props.srcAssetId` 引用它。
+OurVideoCreator 继续拥有 Project、Asset、AI 工作流和任务队列。Twick 只提供浏览器编辑内核与实时播放器。媒体索引存在 PostgreSQL `assets` 表，私有文件存在 `data/assets`，编辑元素通过 `metadata.assetId` 与 `props.srcAssetId` 引用它。
 
 ```text
 AI 分镜 / 项目素材

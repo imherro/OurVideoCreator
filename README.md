@@ -1,6 +1,6 @@
 # 安影 · OurVideoCreator
 
-安影协作版 AI 视频创作工作室。当前处于多用户改造 P1 内部开发阶段：浏览器 Web 与持久任务 Worker 已分离，所有生成只调用显式配置的外部 Provider API。本阶段仍使用 SQLite 和共享工作室密码，不具备公网多用户安全条件。
+安影协作版 AI 视频创作工作室。当前处于多用户改造 P2 PostgreSQL 阶段：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。共享工作室密码仍是过渡方案，不具备公网多用户安全条件。
 
 ## 运行
 
@@ -8,10 +8,14 @@ Windows，Python 3.11+ 与 Node.js 20+：
 
 ```powershell
 .\Install-Studio.ps1
+$env:OVC_DATABASE_URL='postgresql+psycopg://用户名:密码@127.0.0.1:5432/our_video_creator'
+.\.venv\Scripts\python.exe -m alembic upgrade head
 .\Start-Studio.cmd
 ```
 
-`Start-Studio` 会启动两个独立进程：Web 和单实例 Worker。每个进程在实际数据目录写入带实例 ID、PID、创建时间、可执行文件和完整命令行的生命周期记录；实例 ID 同时绑定脚本所属工程根目录与实际数据目录。脚本从任何当前目录调用时都会在自身工程根加载后端，并核对返回的工程根；相对 `MVC_DATA_DIR` 也统一相对脚本工程根解析为绝对路径。启动与停止期间会把规范化后的绝对数据目录传给身份查询和新建子进程，完成或失败后再把调用者 PowerShell 中原有的 `MVC_DATA_DIR`、`PYTHONUTF8` 及工作目录原样恢复。脚本只会复用或停止能够完整证明属于当前实例的进程，端口上若是另一个实例会明确拒绝启动。也可以分别执行：
+`OVC_DATABASE_URL` 必须通过进程环境注入，仓库只展示占位示例，不保存真实密码。只接受 PostgreSQL DSN；缺失配置、SQLite DSN、数据库不可达或 Alembic 版本不匹配都会明确停止启动。Web 和 Worker 启动只检查数据库就绪状态，不会自动建表、升级、清空或覆盖数据。空数据库必须由运维显式执行 `python -m alembic upgrade head`。
+
+`Start-Studio` 会启动两个独立进程：Web 和单实例 Worker。每个进程在实际数据目录写入带实例 ID、PID、创建时间、可执行文件和完整命令行的生命周期记录；实例 ID 同时绑定脚本所属工程根目录、实际媒体目录和不含凭证的 PostgreSQL 数据库标识。脚本从任何当前目录调用时都会在自身工程根加载后端，并核对返回的工程根；相对 `MVC_DATA_DIR` 也统一相对脚本工程根解析为绝对路径。启动与停止期间会把规范化后的绝对数据目录传给身份查询和新建子进程，完成或失败后再把调用者 PowerShell 中原有的 `MVC_DATA_DIR`、`PYTHONUTF8`、`OVC_DATABASE_URL` 及工作目录原样恢复。脚本只会复用或停止能够完整证明属于当前实例的进程，端口上若是另一个实例会明确拒绝启动。也可以分别执行：
 
 ```powershell
 .\Start-Studio.ps1 -WebOnly
@@ -19,7 +23,7 @@ Windows，Python 3.11+ 与 Node.js 20+：
 .\Stop-Studio.ps1
 ```
 
-开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因实际数据目录中的 `worker.lock` 明确拒绝启动；多 Worker 要等 P6。
+开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁，多 Worker 要等 P6。
 
 首次部署后，可从能够访问工作室地址的浏览器设置工作室密码。P3 完成前只能在受控开发网络使用，不得公网部署。
 
@@ -63,7 +67,7 @@ Windows，Python 3.11+ 与 Node.js 20+：
 
 Replicate 模型平台也可作为云端服务添加。它能运行平台提供的官方模型，例如 Seedance、Kling、Veo、Flux、Imagen，以及填写 `owner/model:版本 ID` 的社区模型。每个服务配置选择一种用途并填写该模型的输入 JSON；`{{prompt}}`、`{{system_prompt}}`、`{{target_duration}}`、`{{image}}` 和 `{{images}}` 会在提交时替换。参考素材会作为 data URI 发送给该云端服务。Replicate 的输入和输出字段随模型而异，请在模型 API 页面核对输入模板与计费；取消按钮会同时请求取消远端 prediction。真实账号调用尚未在本机验收。
 
-火山方舟作为统一 Provider 接入：在“模型与服务”中点击“添加火山方舟”，保存一次 ARK API Key，再点击“保存并验证 Key”。服务端通过方舟 `/models` 验证 Key 并读取模型目录，不提交生成任务；验证成功后，文本、图片和视频模型均可从目录选择，也可手动填写自定义接入点 ID。每类模型旁的“检测”用于确认所选 ID 是否出现在方舟目录中，不产生图片或视频费用；目录存在不代表账号已经开通该模型，实际权限以首次生成结果为准。默认地址为 `https://ark.cn-beijing.volces.com/api/v3`。文本与分镜复用 OpenAI-compatible `/chat/completions`；Seedream 文生图及单张/多张参考图调用 `/images/generations`，参考图由服务端从当前项目素材库读取并转换为 data URI；视频统一使用 `doubao-seedance-2-5-260628` 调用 `/contents/generations/tasks`，Seedance 2.0 已从目录隐藏且禁止新任务提交。首尾帧分别以 `first_frame` / `last_frame` 角色发送，task id 会立即持久化，服务中断后只恢复查询原任务。启动时会把 Provider、项目和制作层仍在使用的 Seedance 2.0 配置迁移到 2.5，历史任务快照保持原样。媒体结果仍下载并登记到当前项目素材库。浏览器读取配置时只获得 `api_key_set`，不会取得完整 Key。当前尚不向 Seedance 发送一般参考图、参考音频或参考视频。
+火山方舟作为统一 Provider 接入：在“模型与服务”中点击“添加火山方舟”，保存一次 ARK API Key，再点击“保存并验证 Key”。服务端通过方舟 `/models` 验证 Key 并读取模型目录，不提交生成任务；验证成功后，文本、图片和视频模型均可从目录选择，也可手动填写自定义接入点 ID。每类模型旁的“检测”用于确认所选 ID 是否出现在方舟目录中，不产生图片或视频费用；目录存在不代表账号已经开通该模型，实际权限以首次生成结果为准。默认地址为 `https://ark.cn-beijing.volces.com/api/v3`。文本与分镜复用 OpenAI-compatible `/chat/completions`；Seedream 文生图及单张/多张参考图调用 `/images/generations`，参考图由服务端从当前项目素材库读取并转换为 data URI；视频统一使用 `doubao-seedance-2-5-260628` 调用 `/contents/generations/tasks`。首尾帧分别以 `first_frame` / `last_frame` 角色发送，task id 会立即持久化，服务中断后只恢复查询原任务。P2 不在应用启动时执行任何旧库数据迁移；媒体结果仍下载并登记到当前项目素材库。浏览器读取配置时只获得 `api_key_set`，不会取得完整 Key。当前尚不向 Seedance 发送一般参考图、参考音频或参考视频。
 
 RunningHub 也作为统一 Provider 接入：在“模型与服务”中点击“添加 RunningHub”，填写 Enterprise-Shared API Key 后保存并验证。验证读取账号类型和实时 LLM 目录，不发起付费生成；文本默认使用 RunningHub 的 OpenAI-compatible LLM 接口。图片配置 `seedream-v5-pro` 时会按有无参考图自动选择文生图或图生图端点，最多上传 10 张参考图；视频配置 Seedance 2.5 Token 时会按无参考、首帧、首尾帧、多图或固定对白音频参考自动选择对应端点。所有媒体任务在取得 taskId 后持久化并轮询 `/openapi/v2/query`，结果下载到项目素材库。RunningHub 当前未提供这些 Model API 任务的统一取消端点，因此取消只会停止本地等待，远端任务可能继续计费。
 
@@ -81,9 +85,9 @@ RunningHub 也作为统一 Provider 接入：在“模型与服务”中点击�
 
 ## 数据与队列
 
-`data/studio.sqlite` 保存项目、历史版本、任务和模型服务设置；`data/assets` 保存原始素材和生成结果。`data` 不进入 Git，备份时包含整个目录。API Key 仅在服务端保存，设置接口不回传密钥内容。配置文件与数据库需要按照本机用户权限保护。
+PostgreSQL 保存项目、历史版本、任务、业务事件和模型服务设置；`data/assets` 保存原始素材和生成结果。素材由最小 `StorageBackend` 边界管理，稳定 `assetId` 不随数据库连接或媒体目录变化。备份必须同时包含 PostgreSQL 数据库和私有媒体目录。P2 从空 PostgreSQL 数据库开始，不导入旧测试库、不复制旧 Key，也不提供 SQLite 双写或运行时切换。API Key 仅在服务端保存，设置接口不回传密钥内容。
 
-素材同时具有两个独立维度：`kind` 表示图片、视频、音频或字幕，`category` 表示角色、场景、道具、分镜、音乐、音效、人声、参考或其他；`source` 记录上传或系统生成。旧素材启动后无损迁移为 `category=other`、`source=uploaded`，文件仍保持 `data/assets/asset-uuid.ext`，分类变化不会移动或修改文件。素材库可组合筛选媒体类型与业务分类，上传时可指定分类，已有素材可直接重新归类。系统生成器可以通过任务上下文指定分类，为 Film Bible 的角色、场景和道具参考图预留接口。
+素材同时具有两个独立维度：`kind` 表示图片、视频、音频或字幕，`category` 表示角色、场景、道具、分镜、音乐、音效、人声、参考或其他；`source` 记录上传或系统生成。新素材文件保持 `data/assets/asset-uuid.ext`，分类变化不会移动或修改文件。素材库可组合筛选媒体类型与业务分类，上传时可指定分类，已有素材可直接重新归类。系统生成器可以通过任务上下文指定分类，为 Film Bible 的角色、场景和道具参考图预留接口。
 
 生成任务固化输入及服务配置；提交 ID 防止重复提交。当前只允许一个独立 Worker 进程；少量已验证 Provider 可在线程内并发，其他执行保持串行。取消状态不能被迟到的成功结果覆盖。Worker 重启将原运行任务标记为“待恢复”，Web 重启不修改任务状态。已取得 Maestro、ComfyUI 或视频网关任务编号时，可点击“恢复查询已有任务”，沿用提交时的服务配置查询和取回结果；没有编号时必须先核对上游状态，不自动重新提交。
 
@@ -99,9 +103,10 @@ python -m backend.worker_cli
 npm run dev
 npm run build
 npm test
+$env:OVC_TEST_ADMIN_URL='postgresql+psycopg://测试管理员@127.0.0.1:5432/postgres'
 python -m pytest -q
 ```
 
-开发浏览器使用 Vite 的 5178 端口，其 `/api` 代理到 7868；生产使用后端直接服务 `dist`。测试使用独立临时数据库，不设置实际工作室密码。
+开发浏览器使用 Vite 的 5178 端口，其 `/api` 代理到 7868；生产使用后端直接服务 `dist`。每次 pytest 会创建名称受限的独立 `ovc_test_*` PostgreSQL 数据库，预先执行 Alembic 迁移，并只允许删除当前活动的该测试目标；测试网络仅允许回环地址。
 
 完整设计与研究边界见 [DESIGN_RESEARCH.md](DESIGN_RESEARCH.md)。开发中状态与未验收项见 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)。
