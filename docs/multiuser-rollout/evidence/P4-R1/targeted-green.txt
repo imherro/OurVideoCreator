@@ -1,0 +1,22 @@
+UTC_START 2026-09-16T17:52:05.5179503Z
+e6c3edd95830d4c778fee357b8807d1443920a04
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+{"case": null, "submit": 400, "http_calls": 0}
+.{"case": 201, "submit": 400, "http_calls": 0}
+.{"case": 100, "rules": {"max_tokens": {"type": "integer", "min": 1, "max": 200}}, "frozen": {"max_tokens": 100}, "wire": [{"method": "POST", "path": "/v1/chat/completions", "has_auth": true, "correct_auth": true, "max_tokens": 100, "temperature": 0.6}]}
+.{"provider": "maestro", "save_status": 400, "http": []}
+.{"provider": "comfy", "save_status": 400, "http": []}
+.{"publish_status": 400, "error_type": null, "http": []}
+.{"provider": "maestro", "auth_mode": "none", "result": "image", "http": [{"method": "GET", "path": "/api/v1/models", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/defaults/test-maestro", "has_auth": false, "correct_auth": false}, {"method": "POST", "path": "/api/v1/generate", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/status/maestro-r1", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/uploads/result.png", "has_auth": false, "correct_auth": false}]}
+.{"provider": "comfy", "auth_mode": "none", "result": "image", "http": [{"method": "POST", "path": "/prompt", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/history/comfy-r1", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/view?filename=result.png&subfolder=&type=output", "has_auth": false, "correct_auth": false}]}
+....{"parameter": "temperature", "missing": 400, "frozen": {"temperature": 0}, "wire": [{"method": "POST", "path": "/v1/chat/completions", "has_auth": true, "correct_auth": true, "max_tokens": 4096, "temperature": 0}]}
+.{"parameter": "n", "missing": 400, "frozen": {"n": 2}, "wire": [{"method": "POST", "path": "/v1/images/generations", "has_auth": true, "correct_auth": true, "n": 2, "size": "1024x1024"}]}
+.{"parameter": "voice_type", "missing": 400, "frozen": {"voice_type": "only-allowed-voice"}, "wire": []}
+....
+17 passed in 43.87s
+EXIT_CODE 0
+UTC_END 2026-09-16T17:52:52.4338109Z

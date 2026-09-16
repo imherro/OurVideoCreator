@@ -1,0 +1,22 @@
+UTC_START 2026-09-16T17:47:09.7763199Z
+P4-R1 development worktree; not final committed evidence
+c7d6a88a06a01035fd44e45309414c05e061ab64
+........................................................................ [ 19%]
+........................................................................ [ 39%]
+........................................................................ [ 58%]
+........................................................................ [ 78%]
+........................................................................ [ 97%]
+........                                                                 [100%]
+============================== warnings summary ===============================
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  <LOCAL_USER>\AppData\Roaming\Python\Python314\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_p3_identity_acl.py::test_event01_02_live_sse_filters_tenants_and_stops_after_membership_and_session_revocation
+  <LOCAL_USER>\AppData\Roaming\Python\Python314\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+368 passed, 2 warnings in 578.47s (0:09:38)
+EXIT 0
+UTC_END 2026-09-16T17:56:51.6772569Z

@@ -1,0 +1,168 @@
+UTC_START 2026-09-16T17:51:10.5011400Z
+e6c3edd95830d4c778fee357b8807d1443920a04
+
+> my-video-creator@0.1.0 test
+> node --test tests/*.test.mjs
+
+✔ episode planner creates sixty stable plans and preserves existing edits (1.1861ms)
+✔ batch script generation includes only valid unique selected episodes (0.9411ms)
+✔ production lists are trimmed and deduplicated (0.3196ms)
+✔ art statuses are projections of canonical cards, versions, and references (1.3034ms)
+✔ production usage is presented as stable episode labels (0.8598ms)
+✔ asset adapter initializes protected media without a second metadata request (2.7765ms)
+✔ asset adapter reports media records that cannot form a valid clip (0.5512ms)
+✔ project assets append to a typed track and remain movable clips (1.0942ms)
+✔ asset batch queues missing roots and waits for parent approval before states (2.4863ms)
+✔ shot batches are incremental and video waits for a reviewed current frame (0.7915ms)
+✔ running work is skipped to prevent duplicate batch submissions (0.2193ms)
+✔ shot image batch blocks missing or unapproved film bible bindings (0.2359ms)
+✔ auto layout separates dependency lanes and orders shot image/video rows (17.7794ms)
+✔ auto layout is deterministic and preserves graph/content fields (0.5453ms)
+✔ character dialogue rows connect shots to current voice assets and jobs (2.056ms)
+✔ dialogue generated with an older voice version is shown as missing (0.3111ms)
+✔ orbit camera preserves distance and centers look target (5.3992ms)
+✔ saved scene round trip preserves camera and prompting information (3.2944ms)
+✔ domain actions move and trim media without losing the source in point (3.0189ms)
+✔ volume automation parser creates ordered local keyframes (0.9668ms)
+✔ domain actions validate source bounds and clamp media volume (1.0186ms)
+✔ visual fades also create a Twick fade animation for live preview (0.5791ms)
+✔ malformed persisted volume metadata is ignored safely (0.6156ms)
+✔ missing editor state starts as a fresh Twick project (1.7515ms)
+✔ persisted Twick media keeps the canonical MyVideoCreator asset id (0.585ms)
+✔ persisted asset ids rebind stale media URLs to the current project endpoint (0.2371ms)
+✔ a regenerated shot asset does not replace an existing timeline clip reference (0.2268ms)
+✔ legacy filter names migrate to Twick preview-compatible filter ids (0.1895ms)
+✔ editor resolution follows the project aspect ratio (0.29ms)
+✔ four bindings deterministically project to four managed edges and minimal nodes (18.4278ms)
+✔ binding changes replace projected edge while preserving dragged visual position (1.3433ms)
+✔ binding a state version replaces its parent entity edge instead of duplicating the scene (1.4357ms)
+✔ renaming an editable card keeps binding role labels synchronized (0.5856ms)
+✔ managed edge deletion is repaired from assetBindings (0.6961ms)
+✔ locked and deprecated versions are immutable and deprecated versions cannot bind (1.4564ms)
+✔ a bound deprecated version can be explicitly unbound but cannot bind again (0.6519ms)
+✔ film bible task progress explains automatic binding repair (1.3557ms)
+✔ completed film bible task reports repair counts from durable result (0.2041ms)
+✔ visual card override wins over the project image policy and inherit restores it (3.3235ms)
+✔ uploaded primary reference requires human locking and locked versions are immutable (1.6407ms)
+✔ state generation requires and sends the locked parent reference (0.8045ms)
+✔ generated primary reference preserves immutable job and parent provenance (0.5225ms)
+✔ persisted submission ownership recovers after reload and applies idempotently (0.4311ms)
+✔ late result from an older submission cannot replace the current generation (0.2496ms)
+✔ locked v1 forks immutable v2 without upgrading old shots or creating work (2.516ms)
+✔ impacted discovery is exact and selected upgrade preserves old media as stale (0.9692ms)
+✔ scene and sequence upgrades do not affect shots outside the explicit scope (0.3766ms)
+✔ referenced and immutable versions cannot be hard deleted; deprecated stays resolvable (0.5504ms)
+✔ visual cards use a reversible deletion marker without removing versions or bindings (0.2409ms)
+✔ style version changes mark generated shots stale without removing media (0.4191ms)
+✔ generation target resolves only explicit override or project policy (2.2731ms)
+✔ deleted project provider is invalid and never falls back silently (0.2937ms)
+✔ input edit invalidates all dependent results, preserves independent branch (2.1806ms)
+✔ new outputs invalidate previous downstream takes but preserve awaiting batch dependencies (0.5857ms)
+✔ compiled Film Bible prompt does not make its fresh image stale (0.2473ms)
+✔ compiled dialogue prompt does not make its fresh video stale (0.2133ms)
+✔ repairs persisted false stale from a compiled dialogue take but preserves real edits (0.3142ms)
+✔ removing an image reference removes its duplicate manual and edge sources (0.4085ms)
+✔ selecting a MiniMax first frame keeps narrative edges and invalidates the video branch (0.416ms)
+✔ AI storyboard produces an ordered Twick V1 with stable source links (2.8183ms)
+✔ initial edit preserves video original audio and adds configured looping music (0.4036ms)
+✔ initial edit accepts historical shots that only store pipeline video node ids (0.263ms)
+✔ initial edit rejects missing, stale, and overlong shot media (0.2255ms)
+✔ fixed character dialogue becomes an audio track and replaces generated video audio (0.5384ms)
+✔ initial edit uses only the latest take when dialogue is regenerated (1.3402ms)
+✔ task debug data removes secrets and separates the full prompt contract from parameters (2.0449ms)
+✔ task detail helpers create a new-window URL and stable elapsed time (0.3365ms)
+✔ creation paths require explicit published platform model policies (2.2624ms)
+✔ P1 removes embedded inference files and runtime controls (2.8078ms)
+✔ default UI exposes external providers without legacy local-model controls (2.3424ms)
+✔ video gateway errors describe external Provider behavior (2.5019ms)
+✔ panorama orientation maps center and poles correctly (1.8226ms)
+✔ bilinear sampling wraps panorama seam without black borders (0.7773ms)
+✔ voice uses published defaults and submits only published optional controls (2.0051ms)
+✔ shot dimensions respect published enums and frames never infer upstream model identity (0.6306ms)
+✔ production library groups and orders episode projects without duplicating state (1.9013ms)
+✔ project setup validates required fields and creates the reviewed API payload (2.0334ms)
+✔ Bible settings merge preserves visual versions, style version, and unknown keys (1.642ms)
+✔ ratio change invalidates top-level and pipeline-only shot nodes without deleting results (0.9515ms)
+✔ target duration changes only the episode planning target (0.2623ms)
+✔ video output setting invalidates video results while preserving assets (0.3113ms)
+✔ batch preparation repairs missing nodes without duplicating existing work (1.9329ms)
+✔ selected pipeline-only shot reuses its stable image and video nodes (1.6968ms)
+✔ shot nodes form the script to storyboard to image to video chain (1.3216ms)
+✔ importing storyboard shots creates the full canvas and preserves existing shot nodes (2.0607ms)
+✔ shot prompt edits update linked inputs and invalidate descendants (1.7946ms)
+✔ frame conversion respects different model lattices (0.3528ms)
+✔ canvas prompt edits update the canonical shot used by reference compilation (0.4123ms)
+✔ legacy node-only edits migrate once into canonical shot prompts (0.3353ms)
+✔ ordered clips use planned duration and flag incomplete or stale shots (2.3082ms)
+✔ episode source references update only the selected episode plan (2.8528ms)
+✔ SRT parser imports multiline captions with millisecond timing (2.2468ms)
+✔ SRT parser rejects invalid ranges (0.5613ms)
+✔ visible pre-action states require an image review (1.3574ms)
+✔ a new sensitive image take always needs a fresh review (0.3856ms)
+✔ table edits and reordering preserve canonical shot identity, bindings, and pipeline (2.8189ms)
+✔ audio edits invalidate only the pipeline video branch (0.3161ms)
+✔ reference visibility projects canonical bindings in character scene prop order (0.4746ms)
+✔ selected generation targets only explicit shots and manual creation performs no generation (0.4313ms)
+✔ task center projects durable jobs across episodes with ownership and model context (1.8786ms)
+✔ task center filters reuse the six persisted job states (0.5044ms)
+✔ production jobs are labelled and filtered independently from their storage episode (0.2901ms)
+✔ playhead crosses cuts and retains source trim offset (1.2277ms)
+✔ video prompt preview includes exact structured dialogue (1.3641ms)
+✔ an authored prompt that already contains every line is preserved (0.2466ms)
+✔ a shot without dialogue still exposes its final video prompt (0.1748ms)
+✔ video prompt preview states the effective generated duration (0.2943ms)
+✔ video workspace projects canonical shots into all production states (2.8217ms)
+✔ selected submission contains only explicit stable pipeline video nodes (1.0994ms)
+✔ batch review names count provider model and cloud use before submission (0.4812ms)
+✔ Ark end frame visibility follows the selected model capability, not provider type (0.2662ms)
+✔ fresh model catalog overrides a stale cached end-frame capability (0.2953ms)
+✔ Seedance dialogue requires the current locked voice take before paid submission (0.4702ms)
+✔ Seedance dialogue extends a short shot instead of blocking submission (0.4429ms)
+✔ locked dialogue never shortens the fixed project video duration (0.201ms)
+✔ project fixed duration overrides a shorter shot and remains visible as submitted duration (0.1608ms)
+✔ visual style presets offer distinct common choices and prompt descriptions (1.0311ms)
+✔ Doubao TTS 2.0 catalog exposes named presets while allowing custom ids (0.739ms)
+✔ guide blocks downstream work and recommends source first (0.9986ms)
+✔ guide requires locked primary references before shot images (0.2815ms)
+✔ guide asks for asset bindings when a film bible exists (0.1486ms)
+✔ guide advances from completed images to video (0.1562ms)
+✔ canvas-first script skips optional planning and becomes the recommended formal step (0.1455ms)
+✔ workflow shell exposes the production stages in order (1.0996ms)
+✔ workflow stage URL survives refresh and rejects unknown stages (0.5318ms)
+✔ workflow stages mount the existing workspace views (0.2135ms)
+✔ workflow stages separate production planning from episode making (0.2012ms)
+✔ global trash navigation requests fresh server state before display (0.2243ms)
+ℹ tests 128
+ℹ suites 0
+ℹ pass 128
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 853.3908
+TEST_EXIT 0
+
+> my-video-creator@0.1.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1827 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                         0.50 kB │ gzip:     0.36 kB
+dist/assets/EditorWorkspace-DzP7_-ja.css               25.67 kB │ gzip:     5.52 kB
+dist/assets/index-DPyfHbIC.css                        109.00 kB │ gzip:    21.15 kB
+dist/assets/internal-B6KRB6EV-BvBtLd70-KClykGxw.js     91.71 kB │ gzip:    29.95 kB
+dist/assets/index-CXhwwSX--SW4K-mAQ-BLqq3fxB.js       168.30 kB │ gzip:    58.50 kB
+dist/assets/DirectorStage-DXPFLjqH.js                 533.50 kB │ gzip:   134.97 kB
+dist/assets/index-DnJ4DnuO.js                         719.58 kB │ gzip:   221.86 kB
+dist/assets/EditorWorkspace-snITxyq_.js             3,912.43 kB │ gzip: 1,254.00 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.79s
+BUILD_EXIT 0
+UTC_END 2026-09-16T17:51:27.1371818Z

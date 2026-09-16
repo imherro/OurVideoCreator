@@ -1,0 +1,71 @@
+{
+  "algorithm": "SHA-256",
+  "normalization": "CRLF -> LF for Git text blobs",
+  "business_sha": "e6c3edd95830d4c778fee357b8807d1443920a04",
+  "files": [
+    {
+      "file": "ATTEMPT_HISTORY.md",
+      "sha256": "a3f26f8ea2b84f43d186af8159791b6ca0ed70b0e538915ce39985d1eaaa2967"
+    },
+    {
+      "file": "backend-full.txt",
+      "sha256": "26382222de3ff433b22de1d80aed1d675117d307c94f4cb41f1e9e5470c5cbca"
+    },
+    {
+      "file": "baseline-red.txt",
+      "sha256": "b63eabcd11ca8dd2dfd22cf4c86a1c7b223f362b3fbf7e59663ba97bba876d84"
+    },
+    {
+      "file": "browser-db-audit.json",
+      "sha256": "4afc839b979bd9a790163630325f52864842e33d91a2fe3e01c7cd26e42cd9ab"
+    },
+    {
+      "file": "browser-tool-trace.json",
+      "sha256": "3d6e8a736a67c511eddb0e83bb9aa774b2ea8a5c057417aa65d97bf281c2f832"
+    },
+    {
+      "file": "browser-web-access.txt",
+      "sha256": "e9a586e3b6d9ef49538565a42517c6ae21e9c67e81df059c3fd9cf6b464cd3e8"
+    },
+    {
+      "file": "development-full.txt",
+      "sha256": "94d2414cbc620303785ad6dc98f5bf73230914c54b35998dcb842695413e9b18"
+    },
+    {
+      "file": "export_browser_trace.py",
+      "sha256": "2567c2218ce63c2690fb9b6dc2dfb479e4b7d497dee0c8aed0a2cbd8e209206d"
+    },
+    {
+      "file": "finalize_evidence.py",
+      "sha256": "0522dab9f33fdcd573f6860da4b9c0c362416aff738c8aec564f126174ae7604"
+    },
+    {
+      "file": "frontend-test-build.txt",
+      "sha256": "7f1f9a9b82697a96a7990beb6cec2e5d23a98afa6eee2a40c2f0722fe5f0f9f3"
+    },
+    {
+      "file": "MATRIX.md",
+      "sha256": "b08817674b3345d52dd33b75218ecf6ac8f86d1e7b3082feeffa41c9ae79fa80"
+    },
+    {
+      "file": "provenance.json",
+      "sha256": "cd76688c12b326ad24fdda386edf6555efc8a66464be63ba897756ef67e3818d"
+    },
+    {
+      "file": "REPORT.md",
+      "sha256": "377c5241d69750a9c1230a0c0fff94933c28a9c1e8b7b23b566aebac146999be"
+    },
+    {
+      "file": "routes-compile.txt",
+      "sha256": "e43857c4e8fccad5121d8a71632fb49d266e5071a2a8f4bf9c6f7af546f9f572"
+    },
+    {
+      "file": "SUMMARY.json",
+      "sha256": "cc4e1c0a36331a344afda6551c3de48d5f8aa2c6746612932eb621d2c40efb4c"
+    },
+    {
+      "file": "targeted-green.txt",
+      "sha256": "5600ab16c0943895ae43686921e84212af41b2be129c1ca351d04be02303c9a3"
+    }
+  ]
+}

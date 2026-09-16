@@ -1,0 +1,42 @@
+UTC_START 2026-09-16T17:42:22.4783384Z
+c7d6a88a06a01035fd44e45309414c05e061ab64
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+{"case": null, "rules": {"max_tokens": {"type": "integer", "min": 1, "max": 200}}, "frozen": {}, "wire": [{"method": "POST", "path": "/v1/chat/completions", "has_auth": true, "correct_auth": true, "max_tokens": 4096, "temperature": 0.6}]}
+F{"case": 201, "submit": 400, "http_calls": 0}
+.{"case": 100, "rules": {"max_tokens": {"type": "integer", "min": 1, "max": 200}}, "frozen": {"max_tokens": 100}, "wire": [{"method": "POST", "path": "/v1/chat/completions", "has_auth": true, "correct_auth": true, "max_tokens": 100, "temperature": 0.6}]}
+.{"provider": "maestro", "save_status": 200, "http": [{"method": "GET", "path": "/api/v1/models", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/defaults/test-maestro", "has_auth": false, "correct_auth": false}, {"method": "POST", "path": "/api/v1/generate", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/status/maestro-r1", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/api/v1/uploads/result.png", "has_auth": false, "correct_auth": false}]}
+F{"provider": "comfy", "save_status": 200, "http": [{"method": "POST", "path": "/prompt", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/history/comfy-r1", "has_auth": false, "correct_auth": false}, {"method": "GET", "path": "/view?filename=result.png&subfolder=&type=output", "has_auth": false, "correct_auth": false}]}
+F{"publish_status": 200, "error_type": "UnidentifiedImageError", "http": [{"method": "POST", "path": "/v1/models/test/audio/predictions", "has_auth": true, "correct_auth": true}, {"method": "GET", "path": "/v1/predictions/replicate-audio-r1", "has_auth": true, "correct_auth": true}, {"method": "GET", "path": "/result.wav", "has_auth": false, "correct_auth": false}]}
+F
+================================== FAILURES ===================================
+_________ test_effective_text_parameters_match_published_limit[None] __________
+tests\test_p4_r1_regressions.py:157: in test_effective_text_parameters_match_published_limit
+    assert events[0]['max_tokens'] <= 200
+E   assert 4096 <= 200
+____ test_unsupported_native_key_mode_rejected_before_publication[maestro] ____
+tests\test_p4_r1_regressions.py:177: in test_unsupported_native_key_mode_rejected_before_publication
+    assert response.status_code == 400
+E   assert 200 == 400
+E    +  where 200 = <Response [200 OK]>.status_code
+_____ test_unsupported_native_key_mode_rejected_before_publication[comfy] _____
+tests\test_p4_r1_regressions.py:177: in test_unsupported_native_key_mode_rejected_before_publication
+    assert response.status_code == 400
+E   assert 200 == 400
+E    +  where 200 = <Response [200 OK]>.status_code
+______________ test_replicate_audio_not_publishable_or_callable _______________
+tests\test_p4_r1_regressions.py:195: in test_replicate_audio_not_publishable_or_callable
+    assert published.status_code == 400
+E   assert 200 == 400
+E    +  where 200 = <Response [200 OK]>.status_code
+=========================== short test summary info ===========================
+FAILED tests/test_p4_r1_regressions.py::test_effective_text_parameters_match_published_limit[None]
+FAILED tests/test_p4_r1_regressions.py::test_unsupported_native_key_mode_rejected_before_publication[maestro]
+FAILED tests/test_p4_r1_regressions.py::test_unsupported_native_key_mode_rejected_before_publication[comfy]
+FAILED tests/test_p4_r1_regressions.py::test_replicate_audio_not_publishable_or_callable
+4 failed, 2 passed in 26.88s
+EXIT 1
+UTC_END 2026-09-16T17:42:51.8878269Z

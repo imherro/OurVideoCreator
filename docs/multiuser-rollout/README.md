@@ -4,7 +4,7 @@
 
 已通过阶段：**P0、P1、P2、P3**
 
-状态：**P4 外部不通过；P4-R1 返修中**（三个 S2，P5 未授权）
+状态：**P4 首轮外部不通过；P4-R1 READY_FOR_REVIEW**（三个 S2 待复验，P5 未授权）
 
 当前阶段：**P4-R1 — 修复受限缺省参数、认证模式与发布用途的执行不一致**
 
@@ -64,6 +64,7 @@ P0 实际 base：`ade703cf20b66cfccc4520730747c0abf07c2158`
 - [`evidence/P4/REPORT.md`](evidence/P4/REPORT.md)（平台模型治理、独立 Worker 真实 UI 闭环及安全矩阵；最终业务 `3a73165f74520d0c15ec6f0750d7b2c105108744`，待外部验收）
 - [`reviews/P4/REVIEW.md`](reviews/P4/REVIEW.md)（P4 外部不通过原件；三个 S2，已有闭环与安全证据认可）
 - [`prompts/P4_R1_CODEX_PROMPT.md`](prompts/P4_R1_CODEX_PROMPT.md)（下载并完整读取的 P4-R1 原始提示词）
+- [`evidence/P4-R1/REPORT.md`](evidence/P4-R1/REPORT.md)（三个 S2 的真实红绿闭环；业务 `e6c3edd`，正式后端 368 passed、新浏览器 7028，待外部复验）
 
 ## 阶段边界
 

@@ -1,0 +1,1039 @@
+{
+  "source": "Actual Codex browser calls and returned output",
+  "business_sha": "e6c3edd95830d4c778fee357b8807d1443920a04",
+  "redaction": "Exact synthetic key and test password only",
+  "calls": 26,
+  "results": 26,
+  "entries": [
+    {
+      "utc": "2026-09-16T17:51:33.485Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad724622487d0bc49c16b3e49d6d7",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"var r1tab = await cua.createBrowserTab('1','http://127.0.0.2:7028',{visible:false});\",\"title\":\"打开 P4-R1 独立测试实例\"}",
+        "call_id": "call_PSxbtIpBustkwna2QPXn1zML",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581090.793239
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:34.186Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab58-6d2a-7f43-a7ed-ee9b8a8be169",
+        "call_id": "call_PSxbtIpBustkwna2QPXn1zML",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.6013 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/\".\n0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/\n\t1 container root\n\t\t2 image\n\t\t3 text 正在连接工作室\n\nThe focused UI element is 0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581094.1868668
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:36.920Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad727790887d0a27399e150f43e00",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"var r1raw = await p4browser.tabs.get('4'); var r1cdp = await r1raw.capabilities.get('cdp'); nodeRepl.write(await r1cdp.documentation()); await r1tab.getAXState();\",\"title\":\"准备独立页面的请求取证\"}",
+        "call_id": "call_yhBOTeBukwyAoEn6wcpfIOS4",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581094.373302
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:37.007Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab58-782f-75e2-b4cd-c69000956ac2",
+        "call_id": "call_yhBOTeBukwyAoEn6wcpfIOS4",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.0494 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/\".\n0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/\n\t1 container root\n\t\t2 container\n\t\t\t3 text 安影 STUDIO 01 / STORY 02 / FRAME 03 / MOTION\n\t\t\t4 heading 让一个念头， 成为一部短片。, Value: 1\n\t\t\t\t5 text 让一个念头，\n\t\t\t\t6 text 成为一部短片。\n\t\t\t7 text 你的故事，你的模型，你的工作室。\n\t\t\t8 image\n\t\t\t9 text 浏览器创作 · 外部模型 API\n\t\t10 container\n\t\t\t11 text YOUR CREATIVE SPACE\n\t\t\t12 heading 登录安影, Value: 2\n\t\t\t\t13 text 登录安影\n\t\t\t14 text 使用你的手机号和个人密码进入获权团队。 手机号\n\t\t\t15 text field (settable) 手机号\n\t\t\t16 text 个人密码\n\t\t\t17 text field (settable) 个人密码\n\t\t\t18 button 进入工作室\n\t\t\t\t19 image\n\t\t\t\t20 text 进入工作室\n\t\t\t21 button 我有邀请码\n\t\t\t22 button 使用重置链接\n\nThe focused UI element is 15 text field (settable) 手机号"
+          },
+          {
+            "type": "input_text",
+            "text": "# Tab Capability: cdp\nRaw Chrome DevTools Protocol access in browser for development use. Prefer higher-level Browser Use APIs. Navigate a fresh tab to its intended HTTP or HTTPS page before the first CDP command. Raw CDP access is scoped to the tab's current web origin. To observe an action, call `readEvents()` to capture `cursor`, perform the action, then read from that cursor with `afterSequence`. Continue from each returned cursor while `hasMore` is true; `truncated` means older events were evicted. Reuse the same filters while paging. Discover child target selectors from `Target.attachedToTarget` events. If you directly modify page content or browser state through CDP, outside ordinary navigation or UI interaction, and leave that change in place, tell the user what changed in the final response.\n\n```ts\nconst capability = await tab.capabilities.get(\"cdp\");\n\ntype CdpEventsOptions = {\n  afterSequence?: number; // Return events after this cursor; omit to start at the current position.\n  limit?: number; // Maximum number of events to return, from 1 to 1000.\n  methods?: Array<string>; // Return only these CDP event methods; must not be empty.\n  target?: CdpTarget; // Filter by child target, including buffered events after it detaches.\n  timeoutMs?: number; // Wait up to this many milliseconds for the first match.\n};\n\ntype CdpCommandParams = Record<string, unknown>;\n\ntype CdpSendOptions = {\n  target?: CdpTarget; // An attached child target; omit to send the command to the tab itself.\n  timeoutMs?: number; // Maximum command wait in milliseconds.\n};\n\ntype CdpTarget = { sessionId: string; targetId?: never } | { sessionId?: never; targetId: string };\n\ninterface CdpTabCapability {\n  readEvents(options?: CdpEventsOptions): Promise<{ cursor: number; events: Array<{ method: string; params?: Record<string, unknown>; sequence: number; source: { extensionId?: string; sessionId?: string; tabId?: number; targetId?: string } }>; hasMore: boolean; truncated: boolean }>; // Read buffered CDP events, optionally waiting for the first match.\n  send(method: string, params?: CdpCommandParams, options?: CdpSendOptions): Promise<unknown>; // Send a permitted CDP command to this tab or an attached child target.\n}\n```\n"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581097.0071383
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:46.979Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad72de5cc87d09fc9d633f97c7507",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1cdp.send('Network.enable',{}); var r1cursor=(await r1cdp.readEvents()).cursor; var r1net=[]; var r1collect=async()=>{let e=await r1cdp.readEvents({afterSequence:r1cursor,methods:['Network.responseReceived'],limit:1000});r1cursor=e.cursor;for(let v of e.events){let p=v.params;if(p.response.url.includes('/api/')){let x={utc:new Date().toISOString(),path:new URL(p.response.url).pathname,status:p.response.status,mime:p.response.mimeType}; if(p.response.mimeType.includes('json')){try{let b=await r1cdp.send('Network.getResponseBody',{requestId:p.requestId});x.canary_hit=String(b.body).includes('[REDACTED_SYNTHETIC_INPUT]');x.body_checked=true;}catch{ x.body_checked=false;}}r1net.push(x);}}nodeRepl.write({events:e.events.length,truncated:e.truncated,hasMore:e.hasMore,api:r1net.slice(-12)});}; await r1raw.playwright.getByRole('textbox',{name:'手机号',exact:true}).fill('+8613800000000'); await r1raw.playwright.getByRole('textbox',{name:'个人密码',exact:true}).fill('[REDACTED_SYNTHETIC_INPUT]'); await r1raw.playwright.getByRole('button',{name:'进入工作室',exact:true}).click(); await r1tab.getAXState();\",\"title\":\"使用合成管理员登录隔离环境\"}",
+        "call_id": "call_WuiuKlNk7OOXwNi3beMctjQS",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581097.71509
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:47.450Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab58-a0fa-7192-9407-9e9661f73354",
+        "call_id": "call_WuiuKlNk7OOXwNi3beMctjQS",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4566 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/\".\n0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/\n\t1 container root\n\t\t2 container\n\t\t\t3 text 安影 STUDIO 01 / STORY 02 / FRAME 03 / MOTION\n\t\t\t4 heading 让一个念头， 成为一部短片。, Value: 1\n\t\t\t\t5 text 让一个念头，\n\t\t\t\t6 text 成为一部短片。\n\t\t\t7 text 你的故事，你的模型，你的工作室。\n\t\t\t8 image\n\t\t\t9 text 浏览器创作 · 外部模型 API\n\t\t10 container\n\t\t\t11 text YOUR CREATIVE SPACE\n\t\t\t12 heading 登录安影, Value: 2\n\t\t\t\t13 text 登录安影\n\t\t\t14 text 使用你的手机号和个人密码进入获权团队。 手机号\n\t\t\t15 text field (settable) 手机号\n\t\t\t16 text 个人密码\n\t\t\t17 text field (settable) 个人密码\n\t\t\t18 button (disabled) 进入工作室\n\t\t\t\t23 image\n\t\t\t\t20 text 进入工作室\n\t\t\t21 button 我有邀请码\n\t\t\t22 button 使用重置链接\n\nThe focused UI element is 0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581107.4500544
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:56.536Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad73baad487d0b3a2eddcd42b87ce",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1tab.getAXState(); await r1collect();\",\"title\":\"确认管理员登录结果并读取请求状态\"}",
+        "call_id": "call_YB4ah1QbQk2KJGxzQNEhtw7a",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581114.759422
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:56.883Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab58-c5d3-7542-8d05-3906aaa85180",
+        "call_id": "call_YB4ah1QbQk2KJGxzQNEhtw7a",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.3346 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=overview\".\n0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=overview\n\t1 container root\n\t\t2 container\n\t\t\t3 button 返回安影项目概览\n\t\t\t\t4 text 安影\n\t\t\t\t5 text STUDIO\n\t\t\t6 pop up button (collapsed, settable) Description: 切换团队, Value: Test Workspace, Secondary Actions: Expand\n\t\t\t\t7 menu\n\t\t\t\t\t8 (selected) Test Workspace\n\t\t\t9 button 项目 · P4 UI acceptance, Help: 打开当前项目设置\n\t\t\t\t10 image\n\t\t\t\t11 text 项目 · \n\t\t\t\t12 text P4 UI acceptance\n\t\t\t\t13 image\n\t\t\t14 container 制作流程\n\t\t\t\t15 button 概览, Help: 项目进度与下一步\n\t\t\t\t16 button 01 原著 ready, Help: 原始文本与素材\n\t\t\t\t\t17 text 01\n\t\t\t\t\t18 text 原著\n\t\t\t\t\t19 container ready\n\t\t\t\t20 button 02 改编策划 blocked, Help: 改编方向与结构\n\t\t\t\t\t21 text 02\n\t\t\t\t\t22 text 改编策划\n\t\t\t\t\t23 container blocked\n\t\t\t\t24 button 03 剧本 blocked, Help: 剧本生成与修订\n\t\t\t\t\t25 text 03\n\t\t\t\t\t26 text 剧本\n\t\t\t\t\t27 container blocked\n\t\t\t\t28 container 切换当前 Production 的制作集\n\t\t\t\t\t29 text 当前集\n\t\t\t\t\t30 pop up button (collapsed, settable) Description: 当前集, Value: EP01 · P4 UI acceptance, Secondary Actions: Expand\n\t\t\t\t\t\t31 menu\n\t\t\t\t\t\t\t32 (selected) EP01 · P4 UI acceptance\n\t\t\t\t\t33 image\n\t\t\t\t34 button 04 分镜规划 blocked, Help: 拆解镜头并绑定视觉资产\n\t\t\t\t\t35 text 04\n\t\t\t\t\t36 text 分镜规划\n\t\t\t\t\t37 container blocked\n\t\t\t\t38 button 05 塑角造景 blocked, Help: 确认本集需要的角色、场景与道具\n\t\t\t\t\t39 text 05\n\t\t\t\t\t40 text 塑角造景\n\t\t\t\t\t41 container blocked\n\t\t\t\t42 button 06 分镜图 blocked, Help: 生成和审核镜头首帧\n\t\t\t\t\t43 text 06\n\t\t\t\t\t44 text 分镜图\n\t\t\t\t\t45 container blocked\n\t\t\t\t46 button 07 视频 ready, Help: 镜头视频生成\n\t\t\t\t\t47 text 07\n\t\t\t\t\t48 text 视频\n\t\t\t\t\t49 container ready\n\t\t\t\t50 button 08 剪辑 unstarted, Help: 时间线与多轨剪辑\n\t\t\t\t\t51 text 08\n\t\t\t\t\t52 text 剪辑\n\t\t\t\t\t53 container unstarted\n\t\t\t\t54 button ADV 高级画布, Help: 完整节点工作流\n\t\t\t\t\t55 text ADV\n\t\t\t\t\t56 text 高级画布\n\t\t\t57 button Description: 打开作品设置, Help: 作品设置\n\t\t\t\t58 image\n\t\t\t59 button Description: 保存项目, Help: 保存 Ctrl+S\n\t\t\t\t60 image\n\t\t\t61 button T, Help: 团队与账号\n\t\t62 container 全局导航\n\t\t\t63 button 项目\n\t\t\t\t64 image\n\t\t\t\t65 text 项目\n\t\t\t66 button 资产中心\n\t\t\t\t67 image\n\t\t\t\t68 text 资产中心\n\t\t\t69 button 任务 0\n\t\t\t\t70 image\n\t\t\t\t71 text 任务\n\t\t\t72 button 回收站\n\t\t\t\t73 image\n\t\t\t\t74 text 回收站\n\t\t\t75 button 设置\n\t\t\t\t76 image\n\t\t\t\t77 text 设置\n\t\t78 container\n\t\t\t79 text 项目概览 16:9 · 电影写实 · 15  秒 PRODUCTION WORKFLOW\n\t\t\t80 heading P4 UI acceptance, Value: 1\n\t\t\t\t81 text P4 UI acceptance\n\t\t\t82 container\n\t\t\t\t83 text 16:9  ·  电影写实  · 目标  15  秒\n\t\t\t84 button 继续制作\n\t\t\t\t85 image\n\t\t\t\t86 text 继续制作\n\t\t\t87 button 剧本 0份\n\t\t\t\t88 image\n\t\t\t\t89 text 剧本\n\t\t\t\t90 container\n\t\t\t\t\t91 text 0 份\n\t\t\t92 button 视觉资产 0项\n\t\t\t\t93 image\n\t\t\t\t94 text 视觉资产\n\t\t\t\t95 container\n\t\t\t\t\t96 text 0 项\n\t\t\t97 button 分镜 0镜\n\t\t\t\t98 image\n\t\t\t\t99 text 分镜\n\t\t\t\t100 container\n\t\t\t\t\t101 text 0 镜\n\t\t\t102 button 视频 0条\n\t\t\t\t103 image\n\t\t\t\t104 text 视频\n\t\t\t\t105 container\n\t\t\t\t\t106 text 0 条\n\t\t\t107 container\n\t\t\t\t108 text NEXT STEP\n\t\t\t\t109 heading 导入原著并提取事件, Value: 2\n\t\t\t\t\t110 text 导入原著并提取事件\n\t\t\t\t111 text 改编策划需要可追溯的原著事件。\n\t\t\t\t112 button 打开下一阶段\n\t\t\t113 container\n\t\t\t\t114 text RUNNING\n\t\t\t\t115 heading 当前没有执行中的任务, Value: 2\n\t\t\t\t\t116 text 当前没有执行中的任务\n\t\t\t\t117 text 生成任务继续在主机运行，关闭当前页面不会中断。\n\t\t\t\t118 button 基于画布创作\n\t\t\t\t\t119 image\n\t\t\t\t\t120 text 基于画布创作\n\nThe focused UI element is 0 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=overview"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 18,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:51:56.778Z',\n      path: '/api/settings',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.785Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.792Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.800Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.807Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.813Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.820Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.828Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.834Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.841Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.848Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.856Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser notifications:\n\nWebMCP tools are available in tab 4:\n\n```json\n[{\"name\":\"read_studio_project\",\"title\":\"读取当前视频项目\",\"description\":\"读取当前工作室项目的节点和分镜，不执行生成。\",\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"untrustedContentHint\":true},\"origin\":\"http://127.0.0.2:7028\",\"pageUrl\":\"http://127.0.0.2:7028/?stage=overview\"},{\"name\":\"stage_studio_nodes\",\"title\":\"准备创作节点\",\"description\":\"批量创建待编辑的文本、分镜、图像或视频节点。不提交模型任务，不产生云端费用。\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"nodes\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":20,\"items\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"text\",\"storyboard\",\"image\",\"video\"]},\"prompt\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"}},\"required\":[\"kind\",\"prompt\"],\"additionalProperties\":false}}},\"required\":[\"nodes\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":false,\"untrustedContentHint\":true},\"origin\":\"http://127.0.0.2:7028\",\"pageUrl\":\"http://127.0.0.2:7028/?stage=overview\"}]\n```\n"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581116.8838592
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:59.339Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad73e4f8887d0b39436d8406a7a01",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1tab.goto('http://127.0.0.2:7028/admin'); await r1tab.getAXState();\",\"title\":\"检查平台配置表单\"}",
+        "call_id": "call_ITAq5B6PR4euDtnO8QCQi2AE",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581117.064658
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:51:59.665Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab58-d0b1-7973-b6b5-f1372ca5d67a",
+        "call_id": "call_ITAq5B6PR4euDtnO8QCQi2AE",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.2268 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin\n\t2 container root\n\t\t3 image\n\t\t4 text 正在连接工作室\n\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser notifications:\n\nWebMCP tools are no longer available in tab 4.\n"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581119.6650982
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:17.367Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad75089d487d09cf6cee1ee613f51",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1tab.getAXState(); await r1collect();\",\"title\":\"读取模型配置页加载完成状态\"}",
+        "call_id": "call_SehuG6GUnzmPeHQEnhdzfEfe",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581135.487349
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:17.607Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-16c7-7ef2-9cbb-32de4202e04f",
+        "call_id": "call_SehuG6GUnzmPeHQEnhdzfEfe",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.1272 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin\n\t2 container root\n\t\t3 container\n\t\t\t4 text PLATFORM ADMIN\n\t\t\t5 heading 平台管理, Value: 1\n\t\t\t\t6 text 平台管理\n\t\t\t7 link Description: 返回工作室, Value: 127.0.0.2:7028/\n\t\t\t8 button 退出\n\t\t9 container 平台模型配置\n\t\t\t10 heading 平台模型与服务, Value: 2\n\t\t\t\t11 text 平台模型与服务\n\t\t\t12 text 仅平台管理员配置服务与 Key。普通成员只使用已发布模型。保存和检查不会发起生成。\n\t\t\t13 text 模型密钥服务未就绪：首次保存需要部署 OVC_PROVIDER_MASTER_KEY；已有配置请核对主密钥。账号管理不受影响。\n\t\t\t14 heading Provider 与凭证, Value: 3\n\t\t\t\t15 text Provider 与凭证\n\t\t\t16 button 新建 Provider\n\t\t\t17 container\n\t\t\t\t18 text 服务名称\n\t\t\t\t19 text field (settable) 服务名称\n\t\t\t\t20 text 协议类型\n\t\t\t\t21 pop up button (collapsed, settable) 协议类型, Value: openai, Secondary Actions: Expand\n\t\t\t\t\t22 menu\n\t\t\t\t\t\t23 (selected) openai\n\t\t\t\t\t\t24 volcengine_ark\n\t\t\t\t\t\t25 volcengine_speech\n\t\t\t\t\t\t26 runninghub\n\t\t\t\t\t\t27 hc_atom\n\t\t\t\t\t\t28 replicate\n\t\t\t\t\t\t29 minimax\n\t\t\t\t\t\t30 comfy\n\t\t\t\t\t\t31 maestro\n\t\t\t\t\t\t32 video_api\n\t\t\t\t33 text 服务基础地址\n\t\t\t\t34 text field (settable) 服务基础地址\n\t\t\t\t35 text 认证方式\n\t\t\t\t36 pop up button (collapsed, settable) 认证方式, Value: API Key, Secondary Actions: Expand\n\t\t\t\t\t37 menu\n\t\t\t\t\t\t38 (selected) API Key\n\t\t\t\t\t\t39 无认证（仅明确支持的私有服务）\n\t\t\t\t40 text 新 API Key\n\t\t\t\t41 text field (settable) 新 API Key\n\t\t\t\t42 checkbox (settable, integer) Description: 启用新调用, Value: 1\n\t\t\t\t43 button (collapsed) 非秘密协议选项（JSON）, Secondary Actions: Expand\n\t\t\t\t\t44 text 非秘密协议选项（JSON）\n\t\t\t\t45 button 保存 Provider\n\t\t\t46 heading 发布平台模型, Value: 3\n\t\t\t\t47 text 发布平台模型\n\t\t\t48 button 新建模型\n\t\t\t49 text 请先保存 Provider，再发布模型。\n\t\t\t50 container\n\t\t\t\t51 text 模型显示名称\n\t\t\t\t52 text field (settable) 模型显示名称\n\t\t\t\t53 text 所属 Provider\n\t\t\t\t54 pop up button (collapsed, settable) 所属 Provider, Value: 请选择服务, Secondary Actions: Expand\n\t\t\t\t\t55 menu\n\t\t\t\t\t\t56 (selected) 请选择服务\n\t\t\t\t57 text 模型用途\n\t\t\t\t58 pop up button (collapsed, settable) 模型用途, Value: 文本, Secondary Actions: Expand\n\t\t\t\t\t59 menu\n\t\t\t\t\t\t60 (selected) 文本\n\t\t\t\t\t\t61 图片\n\t\t\t\t\t\t62 视频\n\t\t\t\t\t\t63 语音\n\t\t\t\t64 text 上游模型标识（仅管理员）\n\t\t\t\t65 text field (settable) 上游模型标识（仅管理员）\n\t\t\t\t66 text 能力（JSON）\n\t\t\t\t67 text entry area (settable) 能力（JSON）, Value: {}\n\t\t\t\t68 text 允许参数规则（JSON）\n\t\t\t\t69 text entry area (settable) 允许参数规则（JSON）, Value: {}\n\t\t\t\t70 text 默认参数（JSON）\n\t\t\t\t71 text entry area (settable) 默认参数（JSON）, Value: {}\n\t\t\t\t72 text 仅允许规则中列出的参数；每个受限参数都须提供合法默认值或由用户提交，缺省不会使用适配器的隐藏默认值。支持 integer/number/string/boolean/strings 及 min/max/enum/max_length。\n\t\t\t\t73 checkbox (settable, integer) Description: 发布到普通模型目录, Value: 0\n\t\t\t\t74 checkbox (settable, integer) Description: 启用模型, Value: 1\n\t\t\t\t75 checkbox (settable, integer) Description: 设为该用途默认模型, Value: 0\n\t\t\t\t76 button (disabled) 保存模型\n\t\t77 container\n\t\t\t78 heading 注册邀请, Value: 2\n\t\t\t\t79 text 注册邀请\n\t\t\t80 text 原始令牌只显示一次，不写入日志。\n\t\t\t81 button 创建邀请\n\t\t82 container\n\t\t\t83 heading 用户, Value: 2\n\t\t\t\t84 text 用户\n\t\t\t85 text 重置令牌仅显示一次，请通过受控渠道交给本人。 Test Administrator +8613800000000  ·  user-test-admin-1dd81416ce2f4313bbe9c60a1342753a platform_admin\n\t\t\t86 button 签发重置\n\t\t\t87 button (disabled) 停用\n\t\t\t88 text P4 UI Manager +8613800000001  ·  p4-ui-manager-0b97fd3499694edca2397db892a1d88b user\n\t\t\t89 button 签发重置\n\t\t\t90 button 停用\n\t\t91 container\n\t\t\t92 heading 创建团队并指定 owner, Value: 2\n\t\t\t\t93 text 创建团队并指定 owner\n\t\t\t94 text field (settable)\n\t\t\t95 text field (settable)\n\t\t\t96 button 创建\n\t\t\t97 text Test Workspace workspace-test-e8e4c0f49ae5456280871b1fb1f3af9e owner ·  Test Administrator  ·  user-test-admin-1dd81416ce2f4313bbe9c60a1342753a\n\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 9,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:51:56.820Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.828Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.834Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.841Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.848Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.856Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.453Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.460Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.467Z',\n      path: '/api/admin/users',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.474Z',\n      path: '/api/admin/workspaces',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581137.6071117
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:28.577Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad75a4bb887d092ff9b433c73d342",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('textbox',{name:'服务名称',exact:true}).fill('R1 Maestro native'); await r1raw.playwright.getByRole('combobox',{name:'协议类型',exact:true}).selectOption('maestro'); await r1raw.playwright.getByRole('textbox',{name:'服务基础地址',exact:true}).fill('http://127.0.0.1:6955'); await r1tab.getAXState();\",\"title\":\"核对 Maestro 仅无认证的表单行为\"}",
+        "call_id": "call_d8ZJLywEJtQyaz4juOaDvPRb",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581145.203621
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:28.755Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-4252-78a3-acb0-610be214b8df",
+        "call_id": "call_d8ZJLywEJtQyaz4juOaDvPRb",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.1654 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 40-41\n~\t\t\t\t19 text field (settable) 服务名称, Value: R1 Maestro native\n~\t\t\t\t21 pop up button (collapsed, settable) 协议类型, Value: maestro, Secondary Actions: Expand\n~\t\t\t\t\t\t23 openai\n~\t\t\t\t\t\t31 (selected) maestro\n~\t\t\t\t34 text field (settable) 服务基础地址, Value: http://127.0.0.1:6955\n~\t\t\t\t36 pop up button (collapsed, settable) 认证方式, Value: 无认证（仅明确支持的私有服务）, Secondary Actions: Expand\n~\t\t\t\t\t\t38 (disabled) API Key\n~\t\t\t\t\t\t39 (selected) 无认证（仅明确支持的私有服务）\n+\t\t\t\t98 text 当前 Maestro/Comfy 仅接通无认证 API；不接受 API Key。私有地址仍需部署精确出站例外，旧 Key 模式必须显式改为无认证后保存。\nThe focused UI element is 34 text field (settable) 服务基础地址, Value: http://127.0.0.1:6955"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581148.75498
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:31.133Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad75dd6c087d0893259fea6ff2ce7",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'保存 Provider',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"保存明确无认证的 Maestro 测试配置\"}",
+        "call_id": "call_ZwuOc5CgkAnzUEChhKtVJuge",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581148.95469
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:31.583Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-4d5e-7122-a9ba-72a3916c43ec",
+        "call_id": "call_ZwuOc5CgkAnzUEChhKtVJuge",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4343 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n+\t\t\t99 text Provider 已保存；Key 不回显。上游鉴权与实际生成尚未验证。\n~\t\t\t16 button (disabled) 新建 Provider\n+\t\t\t\t100 checkbox (settable, integer) Description: 替换 Key（不选则保持原凭证）, Value: 0\n~\t\t\t\t45 button (disabled) 保存 Provider\n+\t\t\t\t101 button (disabled) 检查已保存配置（不生成）\n+\t\t\t102 button (collapsed) 凭证版本与吊销, Secondary Actions: Expand\n+\t\t\t\t103 text 凭证版本与吊销\n~\t\t\t48 button (disabled) 新建模型\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 3,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:51:56.841Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.848Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.856Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.453Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.460Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.467Z',\n      path: '/api/admin/users',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.474Z',\n      path: '/api/admin/workspaces',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.508Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.516Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581151.582986
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:37.071Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad762b78887d08282a5418151b46e",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'新建 Provider',exact:true}).click(); await r1raw.playwright.getByRole('textbox',{name:'服务名称',exact:true}).fill('R1 Comfy native'); await r1raw.playwright.getByRole('combobox',{name:'协议类型',exact:true}).selectOption('comfy'); await r1raw.playwright.getByRole('textbox',{name:'服务基础地址',exact:true}).fill('http://127.0.0.1:6955'); await r1tab.getAXState();\",\"title\":\"核对 Comfy 认证选项与提示\"}",
+        "call_id": "call_7H4136Jw6q3O9M7xUw7FOOF3",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581151.791904
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:37.515Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-648b-7811-bfaa-2a5ce9fc982f",
+        "call_id": "call_7H4136Jw6q3O9M7xUw7FOOF3",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4315 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 13, 49, 98, 100-103\n+\t\t\t100 text R1 Maestro native\n+\t\t\t101 container\n+\t\t\t\t102 text 启用  · 版本  1  ·  凭证已配置\n+\t\t\t103 button 编辑 R1 Maestro native\n+\t\t\t\t104 text 编辑 \n+\t\t\t\t105 text R1 Maestro native\n~\t\t\t16 button 新建 Provider\n~\t\t\t\t19 text field (settable) 服务名称, Value: R1 Comfy native\n~\t\t\t\t21 pop up button (collapsed, settable) 协议类型, Value: comfy, Secondary Actions: Expand\n~\t\t\t\t\t\t30 (selected) comfy\n~\t\t\t\t\t\t31 maestro\n+\t\t\t\t106 text 当前 Maestro/Comfy 仅接通无认证 API；不接受 API Key。私有地址仍需部署精确出站例外，旧 Key 模式必须显式改为无认证后保存。\n~\t\t\t\t45 button 保存 Provider\n~\t\t\t48 button 新建模型\n+\t\t\t\t\t\t107 R1 Maestro native\n~\t\t\t\t76 button 保存模型\nThe focused UI element is 34 text field (settable) 服务基础地址, Value: http://127.0.0.1:6955"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581157.515401
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:39.961Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad766bdb487d08b3389ea538d2235",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'保存 Provider',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"验证 Comfy 无认证配置保存\"}",
+        "call_id": "call_I1cgB8on9jYgGab8pNk1GfC3",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581157.831806
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:40.387Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-6fc3-7441-a045-0ebdf815c6be",
+        "call_id": "call_I1cgB8on9jYgGab8pNk1GfC3",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4147 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 99\n+\t\t\t108 text Provider 已保存；Key 不回显。上游鉴权与实际生成尚未验证。\n+\t\t\t109 text R1 Comfy native\n+\t\t\t110 button 编辑 R1 Comfy native\n+\t\t\t\t111 checkbox (settable, integer) Description: 替换 Key（不选则保持原凭证）, Value: 0\n+\t\t\t\t112 button 检查已保存配置（不生成）\n+\t\t\t113 button (collapsed) 凭证版本与吊销, Secondary Actions: Expand\n+\t\t\t\t114 text 凭证版本与吊销\n+\t\t\t\t\t\t115 R1 Comfy native\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 3,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:52:17.453Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.460Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.467Z',\n      path: '/api/admin/users',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.474Z',\n      path: '/api/admin/workspaces',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.508Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.516Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.309Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.317Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.324Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581160.387843
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:45.196Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7697b9487d08e899d7badf7435e",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'新建 Provider',exact:true}).click(); await r1raw.playwright.getByRole('textbox',{name:'服务名称',exact:true}).fill('R1 Replicate'); await r1raw.playwright.getByRole('combobox',{name:'协议类型',exact:true}).selectOption('replicate'); await r1raw.playwright.getByRole('textbox',{name:'服务基础地址',exact:true}).fill('http://127.0.0.1:6955/v1'); await r1raw.playwright.getByRole('textbox',{name:'新 API Key',exact:true}).fill('[REDACTED_SYNTHETIC_INPUT]'); await r1raw.playwright.getByRole('button',{name:'保存 Provider',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"创建仅连接本机 fake 的 Replicate 测试配置\"}",
+        "call_id": "call_Qc4GCCLCJIK86lnRXPHZxtXU",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581160.624732
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:45.965Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-858c-7040-8a17-8f305830c466",
+        "call_id": "call_Qc4GCCLCJIK86lnRXPHZxtXU",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.7563 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 105-106, 108, 111-114\n~\t\t\t103 button (disabled) 编辑 R1 Maestro native\n~\t\t\t\t104 text 编辑  R1 Maestro native\n+\t\t\t116 container\n+\t\t\t\t117 text 启用  · 版本  1  ·  凭证已配置\n~\t\t\t110 button (disabled) 编辑 R1 Comfy native\n+\t\t\t\t118 text 编辑  R1 Comfy native\n~\t\t\t16 button (disabled) 新建 Provider\n~\t\t\t\t19 text field (settable) 服务名称, Value: R1 Replicate\n~\t\t\t\t21 pop up button (collapsed, settable) 协议类型, Value: replicate, Secondary Actions: Expand\n~\t\t\t\t\t\t28 (selected) replicate\n~\t\t\t\t\t\t30 comfy\n~\t\t\t\t34 text field (settable) 服务基础地址, Value: http://127.0.0.1:6955/v1\n~\t\t\t\t36 pop up button (collapsed, settable) 认证方式, Value: API Key, Secondary Actions: Expand\n~\t\t\t\t\t\t38 (selected) API Key\n~\t\t\t\t\t\t39 无认证（仅明确支持的私有服务）\n+\t\t\t\t119 text 新 API Key\n+\t\t\t\t120 text field (settable) 新 API Key\n~\t\t\t\t45 button (disabled) 保存 Provider\n~\t\t\t48 button (disabled) 新建模型\n~\t\t\t\t76 button (disabled) 保存模型\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 1,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:52:17.460Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.467Z',\n      path: '/api/admin/users',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.474Z',\n      path: '/api/admin/workspaces',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.508Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.516Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.309Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.317Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.324Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:45.901Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581165.9649792
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:50.187Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad76f16fc87d0a07d69b8952ed255",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('textbox',{name:'模型显示名称',exact:true}).fill('R1 unsupported audio'); await r1raw.playwright.getByRole('combobox',{name:'所属 Provider',exact:true}).selectOption({label:'R1 Replicate'}); await r1raw.playwright.getByRole('combobox',{name:'模型用途',exact:true}).selectOption('audio'); await r1raw.playwright.getByRole('textbox',{name:'上游模型标识（仅管理员）',exact:true}).fill('test/audio'); await r1raw.playwright.getByRole('checkbox',{name:'发布到普通模型目录',exact:true}).check(); await r1tab.getAXState();\",\"title\":\"验证 Replicate 音频用途的明确提示\"}",
+        "call_id": "call_YBGSkVFNXghusXfE7eIWmcGH",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581166.272688
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:50.700Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-980c-7f40-8e54-41048cca7dc6",
+        "call_id": "call_YBGSkVFNXghusXfE7eIWmcGH",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4981 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 64, 119-120\n+\t\t\t119 text Provider 已保存；Key 不回显。上游鉴权与实际生成尚未验证。\n~\t\t\t103 button 编辑 R1 Maestro native\n~\t\t\t\t104 text 编辑 \n+\t\t\t\t120 text R1 Maestro native\n~\t\t\t110 button 编辑 R1 Comfy native\n~\t\t\t\t118 text 编辑 \n+\t\t\t\t121 text R1 Comfy native\n+\t\t\t122 text R1 Replicate\n+\t\t\t123 container\n+\t\t\t\t124 text 启用  · 版本  1  ·  凭证已配置\n+\t\t\t125 button 编辑 R1 Replicate\n+\t\t\t\t126 text 编辑 \n+\t\t\t\t127 text R1 Replicate\n~\t\t\t16 button 新建 Provider\n+\t\t\t\t128 checkbox (settable, integer) Description: 替换 Key（不选则保持原凭证）, Value: 0\n~\t\t\t\t45 button 保存 Provider\n+\t\t\t\t129 button 检查已保存配置（不生成）\n+\t\t\t130 button (collapsed) 凭证版本与吊销, Secondary Actions: Expand\n+\t\t\t\t131 text 凭证版本与吊销\n~\t\t\t48 button 新建模型\n~\t\t\t\t52 text field (settable) 模型显示名称, Value: R1 unsupported audio\n~\t\t\t\t54 pop up button (collapsed, settable) 所属 Provider, Value: R1 Replicate, Secondary Actions: Expand\n~\t\t\t\t\t\t56 请选择服务\n+\t\t\t\t\t\t132 (selected) R1 Replicate\n~\t\t\t\t58 pop up button (collapsed, settable) 模型用途, Value: 语音, Secondary Actions: Expand\n~\t\t\t\t\t\t60 文本\n~\t\t\t\t\t\t63 (selected) 语音\n+\t\t\t\t133 text Replicate 当前仅接通文本、图片和视频；语音用途未接通，服务端会拒绝发布。 上游模型标识（仅管理员）\n~\t\t\t\t65 text field (settable) 上游模型标识（仅管理员）, Value: test/audio\n~\t\t\t\t73 checkbox (settable, integer) Description: 发布到普通模型目录, Value: 1\n~\t\t\t\t76 button 保存模型\nThe focused UI element is 73 checkbox (settable, integer) Description: 发布到普通模型目录, Value: 1"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581170.700779
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:59.140Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7772a8c87d0b613b0cee290e479",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'保存模型',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"验证 Replicate 音频发布被服务端拒绝\"}",
+        "call_id": "call_l7uuzgdsJa5uklUax0A7dusW",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581171.040901
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:52:59.578Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-baba-7442-911f-dcb9de0a5d08",
+        "call_id": "call_l7uuzgdsJa5uklUax0A7dusW",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4251 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 119\n+\t\t\t134 text Provider 不支持该模型用途\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 3,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.508Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.516Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.309Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.317Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.324Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:45.901Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.498Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.506Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.513Z',\n      path: '/api/admin/models',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581179.5789275
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:04.936Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad77df16087d0bbac4d8ea1d1f7d7",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'新建 Provider',exact:true}).click(); await r1raw.playwright.getByRole('textbox',{name:'服务名称',exact:true}).fill('R1 Text'); await r1raw.playwright.getByRole('textbox',{name:'服务基础地址',exact:true}).fill('http://127.0.0.1:6955/v1'); await r1raw.playwright.getByRole('textbox',{name:'新 API Key',exact:true}).fill('[REDACTED_SYNTHETIC_INPUT]'); await r1raw.playwright.getByRole('button',{name:'保存 Provider',exact:true}).click(); await r1tab.getAXState();\",\"title\":\"建立受限参数的文本测试服务\"}",
+        "call_id": "call_QVWbGql4ArpJrx3wlkH2kfsX",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581179.827006
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:05.661Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab59-d27d-7b31-899e-431e2f42d53f",
+        "call_id": "call_QVWbGql4ArpJrx3wlkH2kfsX",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.7124 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 120-121, 127-131\n~\t\t\t134 text Provider 已保存；Key 不回显。上游鉴权与实际生成尚未验证。\n~\t\t\t103 button (disabled) 编辑 R1 Maestro native\n~\t\t\t\t104 text 编辑  R1 Maestro native\n~\t\t\t110 button (disabled) 编辑 R1 Comfy native\n~\t\t\t\t118 text 编辑  R1 Comfy native\n~\t\t\t125 button (disabled) 编辑 R1 Replicate\n~\t\t\t\t126 text 编辑  R1 Replicate\n~\t\t\t16 button (disabled) 新建 Provider\n~\t\t\t\t19 text field (settable) 服务名称, Value: R1 Text\n~\t\t\t\t21 pop up button (collapsed, settable) 协议类型, Value: openai, Secondary Actions: Expand\n~\t\t\t\t\t\t23 (selected) openai\n~\t\t\t\t\t\t28 replicate\n+\t\t\t\t135 checkbox (settable, integer) Description: 替换 Key（不选则保持原凭证）, Value: 0\n~\t\t\t\t45 button (disabled) 保存 Provider\n+\t\t\t\t136 button (disabled) 检查已保存配置（不生成）\n+\t\t\t137 button (collapsed) 凭证版本与吊销, Secondary Actions: Expand\n+\t\t\t\t138 text 凭证版本与吊销\n~\t\t\t48 button (disabled) 新建模型\n~\t\t\t\t76 button (disabled) 保存模型\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581185.6613512
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:16.290Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7879f8487d0add23342c13b2026",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'新建模型',exact:true}).click(); await r1raw.playwright.getByRole('textbox',{name:'模型显示名称',exact:true}).fill('R1 bounded text'); await r1raw.playwright.getByRole('combobox',{name:'所属 Provider',exact:true}).selectOption({label:'R1 Text'}); await r1raw.playwright.getByRole('textbox',{name:'上游模型标识（仅管理员）',exact:true}).fill('test-text'); await r1raw.playwright.getByRole('textbox',{name:'允许参数规则（JSON）',exact:true}).fill('{\\\"max_tokens\\\":{\\\"type\\\":\\\"integer\\\",\\\"min\\\":1,\\\"max\\\":200}}'); await r1raw.playwright.getByRole('checkbox',{name:'发布到普通模型目录',exact:true}).check(); await r1raw.playwright.getByRole('checkbox',{name:'设为该用途默认模型',exact:true}).check(); await r1raw.playwright.getByRole('button',{name:'保存模型',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"发布无默认值的受限文本模型以验证省略参数拒绝\"}",
+        "call_id": "call_VntxuqOKEDWE96oAmPM1Eeoi",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581190.393888
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:17.655Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-0157-76f1-8de5-07cc1ae477da",
+        "call_id": "call_VntxuqOKEDWE96oAmPM1Eeoi",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 1.3491 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 133-134\n+\t\t\t139 text 模型已保存并发布；普通用户可在目录中选择可用模型。\n+\t\t\t140 text R1 Text\n+\t\t\t141 container\n+\t\t\t\t142 text 启用  · 版本  1  ·  凭证已配置\n+\t\t\t143 button (disabled) 编辑 R1 Text\n+\t\t\t\t144 text 编辑  R1 Text\n~\t\t\t\t52 text field (settable) 模型显示名称, Value: R1 bounded text\n~\t\t\t\t54 pop up button (collapsed, settable) 所属 Provider, Value: R1 Text, Secondary Actions: Expand\n~\t\t\t\t\t\t132 R1 Replicate\n+\t\t\t\t\t\t145 (selected) R1 Text\n~\t\t\t\t58 pop up button (disabled, collapsed, settable) 模型用途, Value: 文本, Secondary Actions: Expand\n~\t\t\t\t\t\t60 (selected) 文本\n~\t\t\t\t\t\t63 语音\n+\t\t\t\t146 text 上游模型标识（仅管理员）\n~\t\t\t\t65 text field (settable) 上游模型标识（仅管理员）, Value: test-text\n~\t\t\t\t69 text entry area (settable) 允许参数规则（JSON）, Value: {\"max_tokens\":{\"type\":\"integer\",\"min\":1,\"max\":200}}\n~\t\t\t\t75 checkbox (settable, integer) Description: 设为该用途默认模型, Value: 1\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 4,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.309Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.317Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.324Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:45.901Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.498Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.506Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.513Z',\n      path: '/api/admin/models',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.558Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.568Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.576Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.584Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581197.6555347
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:20.071Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad78eec1887d09123307e771e9aa4",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'退出',exact:true}).click(); await r1tab.getAXState();\",\"title\":\"切换到普通获权测试账号\"}",
+        "call_id": "call_2X2XlCwBXPhKc3MnkNHAdbRE",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581197.887454
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:20.435Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-0c33-75a2-a530-d753589fb6ca",
+        "call_id": "call_2X2XlCwBXPhKc3MnkNHAdbRE",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.3530 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin\n\t2 container root\n\t\t3 container\n\t\t\t4 text 安影 STUDIO 01 / STORY 02 / FRAME 03 / MOTION\n\t\t\t5 heading 让一个念头， 成为一部短片。, Value: 1\n\t\t\t\t6 text 让一个念头，\n\t\t\t\t7 text 成为一部短片。\n\t\t\t8 text 你的故事，你的模型，你的工作室。\n\t\t\t9 image\n\t\t\t10 text 浏览器创作 · 外部模型 API\n\t\t11 container\n\t\t\t12 text YOUR CREATIVE SPACE\n\t\t\t13 heading 登录安影, Value: 2\n\t\t\t\t14 text 登录安影\n\t\t\t15 text 使用你的手机号和个人密码进入获权团队。 手机号\n\t\t\t16 text field (settable) 手机号\n\t\t\t17 text 个人密码\n\t\t\t18 text field (settable) 个人密码\n\t\t\t19 button 进入工作室\n\t\t\t\t20 image\n\t\t\t\t21 text 进入工作室\n\t\t\t22 button 我有邀请码\n\t\t\t23 button 使用重置链接\n\nThe focused UI element is 16 text field (settable) 手机号"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581200.4359076
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:23.812Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad791c67487d0bdf882cc299ab850",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('textbox',{name:'手机号',exact:true}).fill('+8613800000001'); await r1raw.playwright.getByRole('textbox',{name:'个人密码',exact:true}).fill('[REDACTED_SYNTHETIC_INPUT]'); await r1raw.playwright.getByRole('button',{name:'进入工作室',exact:true}).click(); await r1tab.getAXState();\",\"title\":\"普通账号登录以验证服务端参数拒绝\"}",
+        "call_id": "call_RCaNPTtYML8or44jdORl0zBO",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581200.671334
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:24.239Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-1b0f-7cc1-983a-53a7dada779f",
+        "call_id": "call_RCaNPTtYML8or44jdORl0zBO",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4124 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/admin\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin\n\t2 container root\n\t\t3 heading 无权访问, Value: 1\n\t\t\t4 text 无权访问\n\t\t5 link Description: 返回工作室, Value: 127.0.0.2:7028/\n\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/admin"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581204.2393184
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:27.516Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7964f7887d0bd7d116f24af2057",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('link',{name:'返回工作室',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"进入普通用户工作室\"}",
+        "call_id": "call_28Yl3EwoGAIX6s03ikJwjeo6",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581204.627859
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:27.905Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-2961-76a0-9b85-351d16fdeb26",
+        "call_id": "call_28Yl3EwoGAIX6s03ikJwjeo6",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.3716 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/\n\t2 container root\n\t\t3 image\n\t\t4 text 正在连接工作室\n\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 12,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:53:17.568Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.576Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.584Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:27.736Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.745Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.754Z',\n      path: '/api/auth/logout',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.764Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.778Z',\n      path: '/api/auth/login',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.786Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.793Z',\n      path: '/api/admin/users',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.803Z',\n      path: '/api/admin/workspaces',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.813Z',\n      path: '/api/admin/invitations',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    }\n  ]\n}"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser notifications:\n\nWebMCP tools are available in tab 4:\n\n```json\n[{\"name\":\"read_studio_project\",\"title\":\"读取当前视频项目\",\"description\":\"读取当前工作室项目的节点和分镜，不执行生成。\",\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":true,\"untrustedContentHint\":true},\"origin\":\"http://127.0.0.2:7028\",\"pageUrl\":\"http://127.0.0.2:7028/?stage=overview\"},{\"name\":\"stage_studio_nodes\",\"title\":\"准备创作节点\",\"description\":\"批量创建待编辑的文本、分镜、图像或视频节点。不提交模型任务，不产生云端费用。\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"nodes\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":20,\"items\":{\"type\":\"object\",\"properties\":{\"kind\":{\"type\":\"string\",\"enum\":[\"text\",\"storyboard\",\"image\",\"video\"]},\"prompt\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"}},\"required\":[\"kind\",\"prompt\"],\"additionalProperties\":false}}},\"required\":[\"nodes\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":false,\"untrustedContentHint\":true},\"origin\":\"http://127.0.0.2:7028\",\"pageUrl\":\"http://127.0.0.2:7028/?stage=overview\"}]\n```\n"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581207.9050195
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:42.696Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7a5881087d09c4338926387f9aa",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'ADV 高级画布',exact:true}).click(); await r1tab.getAXState();\",\"title\":\"打开带受限模型的文本节点\"}",
+        "call_id": "call_UaAiHSPoDWq47OWhLqPQ7jLj",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581220.205784
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:46.025Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-7029-73f1-bb36-e764c0114f7d",
+        "call_id": "call_UaAiHSPoDWq47OWhLqPQ7jLj",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 3.3154 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\n1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=canvas\n\t2 container root\n\t\t3 container\n\t\t\t4 button 返回安影项目概览\n\t\t\t\t5 text 安影\n\t\t\t\t6 text STUDIO\n\t\t\t7 pop up button (collapsed, settable) Description: 切换团队, Value: Test Workspace, Secondary Actions: Expand\n\t\t\t\t8 menu\n\t\t\t\t\t9 (selected) Test Workspace\n\t\t\t10 button 项目 · P4 UI acceptance, Help: 打开当前项目设置\n\t\t\t\t11 image\n\t\t\t\t12 text 项目 · \n\t\t\t\t13 text P4 UI acceptance\n\t\t\t\t14 image\n\t\t\t15 container 制作流程\n\t\t\t\t16 button 概览, Help: 项目进度与下一步\n\t\t\t\t17 button 01 原著 ready, Help: 原始文本与素材\n\t\t\t\t\t18 text 01\n\t\t\t\t\t19 text 原著\n\t\t\t\t\t20 container ready\n\t\t\t\t21 button 02 改编策划 blocked, Help: 改编方向与结构\n\t\t\t\t\t22 text 02\n\t\t\t\t\t23 text 改编策划\n\t\t\t\t\t24 container blocked\n\t\t\t\t25 button 03 剧本 blocked, Help: 剧本生成与修订\n\t\t\t\t\t26 text 03\n\t\t\t\t\t27 text 剧本\n\t\t\t\t\t28 container blocked\n\t\t\t\t29 container 切换当前 Production 的制作集\n\t\t\t\t\t30 text 当前集\n\t\t\t\t\t31 pop up button (collapsed, settable) Description: 当前集, Value: EP01 · P4 UI acceptance, Secondary Actions: Expand\n\t\t\t\t\t\t32 menu\n\t\t\t\t\t\t\t33 (selected) EP01 · P4 UI acceptance\n\t\t\t\t\t34 image\n\t\t\t\t35 button 04 分镜规划 blocked, Help: 拆解镜头并绑定视觉资产\n\t\t\t\t\t36 text 04\n\t\t\t\t\t37 text 分镜规划\n\t\t\t\t\t38 container blocked\n\t\t\t\t39 button 05 塑角造景 blocked, Help: 确认本集需要的角色、场景与道具\n\t\t\t\t\t40 text 05\n\t\t\t\t\t41 text 塑角造景\n\t\t\t\t\t42 container blocked\n\t\t\t\t43 button 06 分镜图 blocked, Help: 生成和审核镜头首帧\n\t\t\t\t\t44 text 06\n\t\t\t\t\t45 text 分镜图\n\t\t\t\t\t46 container blocked\n\t\t\t\t47 button 07 视频 ready, Help: 镜头视频生成\n\t\t\t\t\t48 text 07\n\t\t\t\t\t49 text 视频\n\t\t\t\t\t50 container ready\n\t\t\t\t51 button 08 剪辑 unstarted, Help: 时间线与多轨剪辑\n\t\t\t\t\t52 text 08\n\t\t\t\t\t53 text 剪辑\n\t\t\t\t\t54 container unstarted\n\t\t\t\t55 button ADV 高级画布, Help: 完整节点工作流\n\t\t\t\t\t56 text ADV\n\t\t\t\t\t57 text 高级画布\n\t\t\t58 button Description: 打开当前集设置, Help: 当前集设置\n\t\t\t\t59 image\n\t\t\t60 button Description: 保存项目, Help: 保存 Ctrl+S\n\t\t\t\t61 image\n\t\t\t62 button P, Help: 团队与账号\n\t\t63 container 全局导航\n\t\t\t64 button 项目\n\t\t\t\t65 image\n\t\t\t\t66 text 项目\n\t\t\t67 button 资产中心\n\t\t\t\t68 image\n\t\t\t\t69 text 资产中心\n\t\t\t70 button 任务 0\n\t\t\t\t71 image\n\t\t\t\t72 text 任务\n\t\t\t73 button 回收站\n\t\t\t\t74 image\n\t\t\t\t75 text 回收站\n\t\t76 container\n\t\t\t77 text 高级画布 16:9 · 电影写实 · 15  秒\n\t\t\t78 button 添加节点\n\t\t\t\t79 image\n\t\t\t\t80 text 添加节点\n\t\t\t81 button 提示词\n\t\t\t\t82 image\n\t\t\t\t83 text 提示词\n\t\t\t84 button 历史\n\t\t\t\t85 image\n\t\t\t\t86 text 历史\n\t\t\t87 button 自动排列, Help: 按剧本、分镜、视觉资产、分镜图和视频自动排列\n\t\t\t\t88 image\n\t\t\t\t89 text 自动排列\n\t\t\t90 container 批量生成\n\t\t\t\t91 button 生成全部资产 0, Help: 智能生成缺失的资产参考图；0 项尚未满足条件\n\t\t\t\t\t92 image\n\t\t\t\t\t93 text 生成全部资产\n\t\t\t\t\t94 text 0\n\t\t\t\t95 button 全部分镜图 0, Help: 智能生成缺失或过期的分镜图；0 项尚未满足条件\n\t\t\t\t\t96 image\n\t\t\t\t\t97 text 全部分镜图\n\t\t\t\t\t98 text 0\n\t\t\t\t99 button 全部视频 0, Help: 智能生成已有合格首帧的镜头视频；0 项尚未满足条件\n\t\t\t\t\t100 image\n\t\t\t\t\t101 text 全部视频\n\t\t\t\t\t102 text 0\n\t\t\t103 button 高级运行\n\t\t\t\t104 image\n\t\t\t\t105 text 高级运行\n\t\t\t106 container\n\t\t\t\t107 container\n\t\t\t\t\t108 container\n\t\t\t\t\t\t109 image\n\t\t\t\t\t\t110 text P4 text UI\n\t\t\t\t\t\t111 text 未配置\n\t\t\t\t\t\t112 image\n\t\t\t\t\t\t113 text 从一个故事开始\n\t\t\t\t\t\t114 text 准备创作\n\t\t\t\t\t\t115 text 选择以编辑 →\n\t\t\t\t\t116 container\n\t\t\t\t\t\t117 image\n\t\t\t\t\t\t118 text P4 image UI\n\t\t\t\t\t\t119 text 未配置\n\t\t\t\t\t\t120 image\n\t\t\t\t\t\t121 text 描绘故事的第一个瞬间\n\t\t\t\t\t\t122 text 准备创作\n\t\t\t\t\t\t123 text 选择以编辑 →\n\t\t\t\t124 image\n\t\t\t\t125 container Control Panel\n\t\t\t\t\t126 button Zoom In\n\t\t\t\t\t\t127 image\n\t\t\t\t\t128 button Zoom Out\n\t\t\t\t\t\t129 image\n\t\t\t\t\t130 button Fit View\n\t\t\t\t\t\t131 image\n\t\t\t\t132 image Mini Map\n\t\t\t\t133 link Description: React Flow attribution, Value: reactflow.dev/?utm_source=attribution\n\nThe focused UI element is 55 button ADV 高级画布, Help: 完整节点工作流"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581226.0252435
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:49.347Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7abe53c87d0bb849b3ceee23e15",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByText('P4 text UI',{exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"检查普通用户的模型参数输入\"}",
+        "call_id": "call_t2yDY8y6dh5BJ3U33uRS0tZp",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581226.295972
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:49.947Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-7f7b-7e33-9fa9-3934e3415f4c",
+        "call_id": "call_t2yDY8y6dh5BJ3U33uRS0tZp",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.5817 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n+\t\t134 container\n+\t\t\t135 text 剧本 设置\n+\t\t\t136 button 关闭属性\n+\t\t\t\t137 image\n+\t\t\t138 container\n+\t\t\t\t139 text 节点名称\n+\t\t\t\t140 text field (settable) 节点名称, Value: P4 text UI\n+\t\t\t141 text 创作描述\n+\t\t\t142 button 模板\n+\t\t\t\t143 image\n+\t\t\t\t144 text 模板\n+\t\t\t145 text entry area (settable) 合成验收内容\n+\t\t\t146 container\n+\t\t\t\t147 button (collapsed) 阶段规则 · 可编辑, Secondary Actions: Expand\n+\t\t\t\t\t148 text 阶段规则 · 可编辑\n+\t\t\t149 text 平台模型\n+\t\t\t150 button 刷新目录\n+\t\t\t\t151 image\n+\t\t\t\t152 text 刷新目录\n+\t\t\t153 pop up button (collapsed, settable) Description: 平台模型, Value: 请选择平台模型, Secondary Actions: Expand\n+\t\t\t\t154 menu\n+\t\t\t\t\t155 (selected) 请选择平台模型\n+\t\t\t\t\t156 R1 bounded text\n+\t\t\t157 button (collapsed) 历史生成 · 0, Secondary Actions: Expand\n+\t\t\t\t158 text 历史生成 · \n+\t\t\t\t159 text 0\n+\t\t\t160 button 复制节点\n+\t\t\t\t161 image\n+\t\t\t162 button 移除节点\n+\t\t\t\t163 image\n+\t\t\t164 button 开始生成\n+\t\t\t\t165 image\n+\t\t\t\t166 text 开始生成\nThe focused UI element is 108 container"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 23,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:53:49.789Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.796Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.805Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.815Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.826Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.834Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.843Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.851Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.861Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.868Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.877Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.885Z',\n      path: '/api/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581229.9476647
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:52.493Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7af363c87d0881f2771b2e3c525",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('combobox',{name:'平台模型',exact:true}).selectOption({label:'R1 bounded text'}); await r1tab.getAXState();\",\"title\":\"选择模型且保持 max_tokens 未填写\"}",
+        "call_id": "call_mqBZDAMM35UpHH3KOY4zJS9m",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581230.174905
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:52.831Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-8abf-7653-a245-9f82f9505fb4",
+        "call_id": "call_mqBZDAMM35UpHH3KOY4zJS9m",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.1943 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~\t\t\t\t\t\t111 text 外部 API\n~\t\t\t153 pop up button (collapsed, settable) Description: 平台模型, Value: R1 bounded text, Secondary Actions: Expand\n~\t\t\t\t\t155 请选择平台模型\n~\t\t\t\t\t156 (selected) R1 bounded text\n+\t\t\t167 text 不支持参考图\n+\t\t\t168 container\n+\t\t\t\t169 text max_tokens\n+\t\t\t\t170 stepper (settable) max_tokens\nThe focused UI element is 108 container"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581232.8310788
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:57.483Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7b432dc87d0949261e211605d79",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'开始生成',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"验证缺少受限参数时普通生成请求被拒绝\"}",
+        "call_id": "call_JRXlKROsgkND022zASnJKaLa",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581233.676444
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:53:57.971Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-9ed3-7c32-8086-0ef366bf8b19",
+        "call_id": "call_JRXlKROsgkND022zASnJKaLa",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.4727 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~\t\t\t\t91 button (disabled) 生成全部资产 0, Help: 智能生成缺失的资产参考图；0 项尚未满足条件\n~\t\t\t\t95 button (disabled) 全部分镜图 0, Help: 智能生成缺失或过期的分镜图；0 项尚未满足条件\n~\t\t\t\t99 button (disabled) 全部视频 0, Help: 智能生成已有合格首帧的镜头视频；0 项尚未满足条件\n~\t\t\t103 button (disabled) 高级运行\n~\t\t\t164 button (disabled) 开始生成\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=canvas"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 6,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:53:49.843Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.851Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.861Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.868Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.877Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.885Z',\n      path: '/api/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.870Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.877Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.885Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.893Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.900Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.908Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581237.971681
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:05.857Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7bcf08487d0ad850c61b87853f6",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1tab.getAXState(); await r1collect();\",\"title\":\"确认缺失参数错误显示且请求为 400\"}",
+        "call_id": "call_RhtLmXQTrFOYGoNLDEdftqEF",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581242.874379
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:06.024Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-be48-7141-9736-defa17279bd1",
+        "call_id": "call_RhtLmXQTrFOYGoNLDEdftqEF",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.1530 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~\t\t\t\t91 button 生成全部资产 0, Help: 智能生成缺失的资产参考图；0 项尚未满足条件\n~\t\t\t\t95 button 全部分镜图 0, Help: 智能生成缺失或过期的分镜图；0 项尚未满足条件\n~\t\t\t\t99 button 全部视频 0, Help: 智能生成已有合格首帧的镜头视频；0 项尚未满足条件\n~\t\t\t103 button 高级运行\n~\t\t\t164 button 开始生成\n+\t\t171 container\n+\t\t\t172 image\n+\t\t\t173 text 缺少平台受限参数，请填写或由管理员设置合法默认值：max_tokens（开发调试：http://127.0.0.2:7028/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs）\n+\t\t\t174 button 关闭错误\n+\t\t\t\t175 image\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=canvas"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 6,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:53:57.870Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.877Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.885Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.893Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.900Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.908Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.968Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.976Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.983Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.990Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.997Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:06.004Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581246.0246334
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:09.473Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7bfb37887d0ae0d76da852baa24",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1raw.playwright.getByRole('button',{name:'关闭错误',exact:true}).click(); await r1raw.playwright.getByRole('spinbutton',{name:'max_tokens',exact:true}).fill('100'); await r1raw.playwright.getByRole('button',{name:'开始生成',exact:true}).click(); await r1tab.getAXState(); await r1collect();\",\"title\":\"填写合法值并验证独立 Worker 生成\"}",
+        "call_id": "call_778Mycfcfgbpj4CjDKXnkkDK",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581246.583462
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:10.241Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5a-cec1-78e1-ba67-bc19c51b01c2",
+        "call_id": "call_778Mycfcfgbpj4CjDKXnkkDK",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.7572 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 171-175\n~\t\t\t\t91 button (disabled) 生成全部资产 0, Help: 智能生成缺失的资产参考图；0 项尚未满足条件\n~\t\t\t\t95 button (disabled) 全部分镜图 0, Help: 智能生成缺失或过期的分镜图；0 项尚未满足条件\n~\t\t\t\t99 button (disabled) 全部视频 0, Help: 智能生成已有合格首帧的镜头视频；0 项尚未满足条件\n~\t\t\t103 button (disabled) 高级运行\n~\t\t\t\t170 stepper (settable, integer) max_tokens, Value: 100\n~\t\t\t164 button (disabled) 开始生成\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=canvas"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 6,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:54:05.968Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.976Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.983Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.990Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.997Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:06.004Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.143Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.149Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.156Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.163Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.171Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.176Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581250.2416444
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:29.232Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7d3520887d088005912a39357df",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"await r1tab.getAXState(); await r1collect(); nodeRepl.write({r1_browser_summary:{total_api:r1net.length,checked_json:r1net.filter(x=>x.body_checked).length,unreadable_json:r1net.filter(x=>x.body_checked===false).length,canary_hits:r1net.filter(x=>x.canary_hit).length}});\",\"title\":\"确认合法生成完成及浏览器扫描范围\"}",
+        "call_id": "call_o2WorBBra8CSuDCZW5GO1xdl",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581265.955287
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:29.492Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5b-19f4-7471-bd20-7995af68c25c",
+        "call_id": "call_o2WorBBra8CSuDCZW5GO1xdl",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.2479 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "Browser tab: 4, Title: \"安影 · AI 视频工作室\", URL: \"http://127.0.0.2:7028/?stage=canvas\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\nRemoved element IDs: 112-113, 115\n~\t\t\t\t91 button 生成全部资产 0, Help: 智能生成缺失的资产参考图；0 项尚未满足条件\n~\t\t\t\t95 button 全部分镜图 0, Help: 智能生成缺失或过期的分镜图；0 项尚未满足条件\n~\t\t\t\t99 button 全部视频 0, Help: 智能生成已有合格首帧的镜头视频；0 项尚未满足条件\n~\t\t\t103 button 高级运行\n+\t\t\t\t\t\t171 text P4 浏览器文本闭环成功。[REDACTED]\n~\t\t\t\t\t\t114 text 已完成\n+\t\t\t\t\t\t172 image\n+\t\t\t173 container\n+\t\t\t\t174 button (expanded) 剧本正文, Secondary Actions: Collapse\n+\t\t\t\t\t175 text 剧本正文\n+\t\t\t\t176 text entry area (settable)\n+\t\t\t\t177 button\n+\t\t\t\t\t178 image\n~\t\t\t157 button (collapsed) 历史生成 · 1, Secondary Actions: Expand\n~\t\t\t\t159 text 1\n~\t\t\t164 button 重新生成\n~\t\t\t\t166 text 重新生成\nThe focused UI element is 1 AXWebArea 安影 · AI 视频工作室, URL: 127.0.0.2:7028/?stage=canvas"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  events: 22,\n  truncated: false,\n  hasMore: false,\n  api: [\n    {\n      utc: '2026-09-16T17:54:29.399Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.405Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.412Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.419Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.425Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.431Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.438Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.445Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.452Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.459Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.465Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.473Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    }\n  ]\n}{\n  r1_browser_summary: {\n    total_api: 110,\n    checked_json: 99,\n    unreadable_json: 9,\n    canary_hits: 0\n  }\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581269.4924595
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:37.876Z",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_01d36fc9715a49da016aaad7db31a887d090b9530e3da07423",
+        "name": "js",
+        "namespace": "mcp__cua_repl",
+        "arguments": "{\"code\":\"nodeRepl.write({r1_network_evidence:r1net,scope:'JSON response bodies only; nine unavailable after navigation; two SSE responses not body-scanned; no raw credentials or cookies exported'}); await r1tab.markHandoff();\",\"title\":\"保存真实浏览器安全投影及检查范围\"}",
+        "call_id": "call_OqHTcf4BZ7WjZc5ts5IxBzAg",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581271.87243
+        }
+      }
+    },
+    {
+      "utc": "2026-09-16T17:54:37.972Z",
+      "payload": {
+        "type": "function_call_output",
+        "id": "fco_01a0ab5b-3b14-7143-8986-161936b21843",
+        "call_id": "call_OqHTcf4BZ7WjZc5ts5IxBzAg",
+        "output": [
+          {
+            "type": "input_text",
+            "text": "Wall time: 0.0188 seconds\nOutput:"
+          },
+          {
+            "type": "input_text",
+            "text": "{\n  r1_network_evidence: [\n    {\n      utc: '2026-09-16T17:51:56.741Z',\n      path: '/api/auth/login',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.749Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.756Z',\n      path: '/api/productions',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.763Z',\n      path: '/api/events',\n      status: 200,\n      mime: 'text/event-stream'\n    },\n    {\n      utc: '2026-09-16T17:51:56.763Z',\n      path: '/api/projects',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.769Z',\n      path: '/api/system',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.778Z',\n      path: '/api/settings',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.785Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.792Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.800Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.807Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.813Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.820Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.828Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.834Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.841Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.848Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:51:56.856Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.453Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.460Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.467Z',\n      path: '/api/admin/users',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.474Z',\n      path: '/api/admin/workspaces',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.480Z',\n      path: '/api/admin/invitations',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:17.487Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.508Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.516Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:31.524Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.309Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.317Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:40.324Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:45.901Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.498Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.506Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:52:59.513Z',\n      path: '/api/admin/models',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.558Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.568Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.576Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:17.584Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:27.736Z',\n      path: '/api/admin/model-providers',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.745Z',\n      path: '/api/admin/models',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.754Z',\n      path: '/api/auth/logout',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.764Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.778Z',\n      path: '/api/auth/login',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.786Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.793Z',\n      path: '/api/admin/users',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.803Z',\n      path: '/api/admin/workspaces',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:27.813Z',\n      path: '/api/admin/invitations',\n      status: 403,\n      mime: 'application/json',\n      body_checked: false\n    },\n    {\n      utc: '2026-09-16T17:53:49.711Z',\n      path: '/api/auth/status',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.720Z',\n      path: '/api/productions',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.728Z',\n      path: '/api/projects',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.737Z',\n      path: '/api/events',\n      status: 200,\n      mime: 'text/event-stream'\n    },\n    {\n      utc: '2026-09-16T17:53:49.737Z',\n      path: '/api/system',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.745Z',\n      path: '/api/settings',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.754Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.761Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.767Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.775Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.781Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.789Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.796Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.805Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.815Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.826Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.834Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.843Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.851Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.861Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.868Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.877Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:49.885Z',\n      path: '/api/models',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.870Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.877Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.885Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.893Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.900Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:53:57.908Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.968Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 400,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.976Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.983Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.990Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:05.997Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:06.004Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.143Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.149Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.156Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.163Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.171Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:10.176Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.335Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.342Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.348Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.355Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.361Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.368Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.374Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/visual-usage',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.380Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/adaptation',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.387Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/assets',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.393Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a/jobs',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.399Z',\n      path: '/api/productions/production-7bbf694135704fe38a43a9e86988c46f/scripts',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    {\n      utc: '2026-09-16T17:54:29.405Z',\n      path: '/api/projects/project-a6f7d27a488247b696a83a3f0373f34a',\n      status: 200,\n      mime: 'application/json',\n      canary_hit: false,\n      body_checked: true\n    },\n    ... 10 more items\n  ],\n  scope: 'JSON response bodies only; nine unavailable after navigation; two SSE responses not body-scanned; no raw credentials or cookies exported'\n}"
+          }
+        ],
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "01a0ab4e-a0cf-7813-953e-d9c9751aa785",
+          "create_time": 1789581277.972625
+        }
+      }
+    }
+  ]
+}

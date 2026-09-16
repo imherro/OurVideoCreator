@@ -1,0 +1,373 @@
+{
+  "utc": "2026-09-16T17:55:11.215376+00:00",
+  "projection": "No credentials, auth headers, cookies, password hashes, DSN or ciphertext values",
+  "database_name": "ovc_test_30648_e2d41809730f",
+  "postgres_version": {
+    "server_version": "18.6"
+  },
+  "project_id": "project-a6f7d27a488247b696a83a3f0373f34a",
+  "processes": {
+    "harness": 30648,
+    "web": 16764,
+    "worker": 28788
+  },
+  "web_url": "http://127.0.0.2:7028",
+  "ordinary": [
+    {
+      "id": "p4-ui-manager-0b97fd3499694edca2397db892a1d88b",
+      "platform_role": "user",
+      "workspace_role": "member",
+      "production_role": "manager"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "job-edb894a5420447378a1320fa36a53f11",
+      "kind": "text",
+      "status": "succeeded",
+      "provider_job_id": null,
+      "created": 1789581250.540838,
+      "finished": 1789581252.2172632,
+      "actor_user_id": "p4-ui-manager-0b97fd3499694edca2397db892a1d88b",
+      "model_id": "model-9e00f52412ac4e3dba1bf610b982ea15",
+      "model_version_id": "model-version-45d7cdb3d5014e51b2c4bc23e55c559a",
+      "config_version_id": "provider-config-43c6fbd34bff492b91a0094c1891f492",
+      "credential_version_id": "credential-5d0e7864e06f41c9815d7ab42031c545",
+      "parameters": {
+        "max_tokens": 100
+      }
+    }
+  ],
+  "audit": [
+    {
+      "id": 4,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-82693b7c798446408daed95a4f80b5fa",
+      "actor_user_id": "user-test-admin-1dd81416ce2f4313bbe9c60a1342753a",
+      "created": 1789581151.3434284,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-a06cf4ca4fd44595b3aa15dd3404876c",
+        "credential_version_id": "credential-5857a74667c54333a3f58aabebb61449"
+      }
+    },
+    {
+      "id": 5,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-02b0675268154ae0a6f5adcc8778d515",
+      "actor_user_id": "user-test-admin-1dd81416ce2f4313bbe9c60a1342753a",
+      "created": 1789581160.1349168,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-e3d4415a94a948f19b7027923978cc16",
+        "credential_version_id": "credential-38352cd19abf488a9ef351d3aba37f31"
+      }
+    },
+    {
+      "id": 6,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-e8d368a6e5b04cc8bfd955e0824ee2f6",
+      "actor_user_id": "user-test-admin-1dd81416ce2f4313bbe9c60a1342753a",
+      "created": 1789581165.8394551,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-2f7228fd723340e1bde3cc65150edc50",
+        "credential_version_id": "credential-ed6f9c67bd5d49359cdc1d4d0bfba932"
+      }
+    },
+    {
+      "id": 7,
+      "action": "model_provider.save",
+      "target_type": "model_provider",
+      "target_id": "provider-ab1eac410c5b4873886fa9a21e880278",
+      "actor_user_id": "user-test-admin-1dd81416ce2f4313bbe9c60a1342753a",
+      "created": 1789581185.5189767,
+      "payload": {
+        "enabled": true,
+        "key_replaced": true,
+        "config_version_id": "provider-config-43c6fbd34bff492b91a0094c1891f492",
+        "credential_version_id": "credential-5d0e7864e06f41c9815d7ab42031c545"
+      }
+    },
+    {
+      "id": 8,
+      "action": "platform_model.save",
+      "target_type": "platform_model",
+      "target_id": "model-9e00f52412ac4e3dba1bf610b982ea15",
+      "actor_user_id": "user-test-admin-1dd81416ce2f4313bbe9c60a1342753a",
+      "created": 1789581197.3719537,
+      "payload": {
+        "default": true,
+        "enabled": true,
+        "published": true,
+        "provider_id": "provider-ab1eac410c5b4873886fa9a21e880278",
+        "model_version_id": "model-version-45d7cdb3d5014e51b2c4bc23e55c559a"
+      }
+    }
+  ],
+  "credentials_metadata": [
+    {
+      "id": "credential-5857a74667c54333a3f58aabebb61449",
+      "provider_id": "provider-82693b7c798446408daed95a4f80b5fa",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 268
+    },
+    {
+      "id": "credential-38352cd19abf488a9ef351d3aba37f31",
+      "provider_id": "provider-02b0675268154ae0a6f5adcc8778d515",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 268
+    },
+    {
+      "id": "credential-ed6f9c67bd5d49359cdc1d4d0bfba932",
+      "provider_id": "provider-e8d368a6e5b04cc8bfd955e0824ee2f6",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 312
+    },
+    {
+      "id": "credential-5d0e7864e06f41c9815d7ab42031c545",
+      "provider_id": "provider-ab1eac410c5b4873886fa9a21e880278",
+      "key_id": "p4-browser-isolated",
+      "state": "current",
+      "ciphertext_length": 312
+    }
+  ],
+  "table_scan": [
+    {
+      "table": "alembic_version",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "assets",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "audit_events",
+      "rows": 9,
+      "canary_hits": 0
+    },
+    {
+      "table": "auth_rate_limits",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "deleted_items",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "episode_script_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "episode_scripts",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "events",
+      "rows": 6,
+      "canary_hits": 0
+    },
+    {
+      "table": "invitations",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "job_private",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "jobs",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_catalog",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_defaults",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_providers",
+      "rows": 4,
+      "canary_hits": 0
+    },
+    {
+      "table": "model_versions",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "password_reset_tokens",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "production_members",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "production_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "productions",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "projects",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_library_state",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_template_revisions",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "prompt_templates",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_asset_groups",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_asset_mappings",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_config_versions",
+      "rows": 4,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_credential_versions",
+      "rows": 4,
+      "canary_hits": 0
+    },
+    {
+      "table": "provider_keyring",
+      "rows": 1,
+      "canary_hits": 0
+    },
+    {
+      "table": "revisions",
+      "rows": 4,
+      "canary_hits": 0
+    },
+    {
+      "table": "sessions",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "settings",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_chapters",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_documents",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "source_events",
+      "rows": 0,
+      "canary_hits": 0
+    },
+    {
+      "table": "users",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "workspace_members",
+      "rows": 2,
+      "canary_hits": 0
+    },
+    {
+      "table": "workspaces",
+      "rows": 1,
+      "canary_hits": 0
+    }
+  ],
+  "log_scan": [
+    {
+      "file": "web.stderr.log",
+      "canary_hit": false,
+      "bytes": 202
+    },
+    {
+      "file": "web.stdout.log",
+      "canary_hit": false,
+      "bytes": 15196
+    },
+    {
+      "file": "worker.stderr.log",
+      "canary_hit": false,
+      "bytes": 0
+    },
+    {
+      "file": "worker.stdout.log",
+      "canary_hit": false,
+      "bytes": 190
+    }
+  ],
+  "fake_counts": {
+    "text": 1,
+    "submit": 0,
+    "poll": 0,
+    "download": 0,
+    "wrong_auth": 0
+  },
+  "fake_calls": [
+    {
+      "utc": "2026-09-16T17:51:23.243266+00:00",
+      "event": "started-no-calls"
+    },
+    {
+      "utc": "2026-09-16T17:54:12.059363+00:00",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "account": "UI-A",
+      "status": 200
+    }
+  ]
+}

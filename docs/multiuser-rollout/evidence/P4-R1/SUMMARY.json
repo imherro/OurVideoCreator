@@ -1,0 +1,72 @@
+{
+  "status": "READY_FOR_REVIEW",
+  "external_acceptance": "pending",
+  "business_sha": "e6c3edd95830d4c778fee357b8807d1443920a04",
+  "base": "c7d6a88a06a01035fd44e45309414c05e061ab64",
+  "backend": {
+    "passed": 368,
+    "exit_code": 0,
+    "utc_start": "2026-09-16T17:51:00.1323846Z",
+    "utc_end": "2026-09-16T18:00:31.1632704Z",
+    "result": "368 passed, 2 warnings in 568.06s (0:09:28)"
+  },
+  "targeted": {
+    "passed": 17,
+    "seconds": 43.87,
+    "exit_code": 0
+  },
+  "red": {
+    "failed": 4,
+    "passed": 2,
+    "exit_code": 1,
+    "runtime_sha": "c7d6a88a06a01035fd44e45309414c05e061ab64"
+  },
+  "frontend": {
+    "passed": 128,
+    "failed": 0,
+    "skipped": 0,
+    "exit_code": 0,
+    "build_exit": 0,
+    "modules": 1827
+  },
+  "routes": {
+    "registered": 99,
+    "api": 96,
+    "classified": 96,
+    "unclassified": 0,
+    "exit_code": 0
+  },
+  "compile_exit": 0,
+  "browser": {
+    "calls": 26,
+    "results": 26,
+    "observed_api_responses": 110,
+    "checked_json": 99,
+    "unreadable_json": 9,
+    "unscanned_sse_responses": 2,
+    "canary_hits": 0,
+    "database_tables": 37,
+    "database_rows": 49,
+    "database_canary_hits": 0,
+    "logs": 4,
+    "log_hits": 0,
+    "fake_counts": {
+      "text": 1,
+      "submit": 0,
+      "poll": 0,
+      "download": 0,
+      "wrong_auth": 0
+    },
+    "exit_code": null
+  },
+  "not_run": [
+    "real paid Provider",
+    "public deployment",
+    "large concurrency",
+    "new audio synthesis wire probe"
+  ],
+  "warnings": [
+    "websockets legacy/server deprecations",
+    "Vite chunk >500k"
+  ]
+}
