@@ -13,7 +13,8 @@ $studioPython=Join-Path $studioRoot '.venv\Scripts\python.exe'
 if(-not (Test-Path -LiteralPath $studioPython)){ $studioPython=(Get-Command python).Source }
 $env:PYTHONUTF8='1'
 . (Join-Path $studioRoot 'Studio-Process.ps1')
-$studioIdentity=Get-StudioIdentity $studioPython $studioRoot
+$env:MVC_DATA_DIR=Resolve-StudioDataDirectory $studioRoot
+$studioIdentity=Get-StudioIdentity $studioPython $studioRoot $env:MVC_DATA_DIR
 $studioData=[string]$studioIdentity.data_dir
 $studioLogs=Join-Path $studioData 'logs'
 New-Item -ItemType Directory -Path $studioLogs -Force | Out-Null

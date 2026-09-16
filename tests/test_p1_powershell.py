@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import shutil
 import socket
 import subprocess
 import time
@@ -167,6 +168,135 @@ def test_powershell_scripts_own_only_their_instance(tmp_path):
         for data_dir in (data_a, data_b):
             try:
                 run('Stop-Studio.ps1', data_dir)
+            except Exception:
+                pass
+        for pid in owned_pids:
+            if process_alive(pid):
+                subprocess.run(
+                    ['taskkill.exe', '/PID', str(pid), '/T', '/F'],
+                    capture_output=True, creationflags=CREATE_FLAGS,
+                )
+
+
+def copy_script_project(destination):
+    destination.mkdir()
+    shutil.copytree(
+        ROOT/'backend', destination/'backend',
+        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'),
+    )
+    for name in ('Studio-Process.ps1', 'Start-Studio.ps1', 'Stop-Studio.ps1'):
+        shutil.copy2(ROOT/name, destination/name)
+    (destination/'dist').mkdir()
+    (destination/'dist'/'index.html').write_text('<!doctype html><title>P1-R2</title>', encoding='utf-8')
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='PowerShell lifecycle is Windows-only')
+@pytest.mark.parametrize('data_mode', ['unset', 'absolute', 'relative'])
+def test_absolute_script_path_targets_its_own_project_from_any_cwd(tmp_path, data_mode):
+    project_a, project_b = tmp_path/'project-a', tmp_path/'project-b'
+    ordinary = tmp_path/'ordinary-cwd'
+    copy_script_project(project_a)
+    copy_script_project(project_b)
+    ordinary.mkdir()
+    owned_pids = set()
+    transcript = []
+
+    if data_mode == 'unset':
+        data_value_a = data_value_b = None
+        data_a, data_b = project_a/'data', project_b/'data'
+        start_a_cwd, start_b_cwd, stop_b_cwd = project_a, ordinary, project_a
+    elif data_mode == 'absolute':
+        data_a, data_b = tmp_path/'absolute-a', tmp_path/'absolute-b'
+        data_value_a, data_value_b = str(data_a), str(data_b)
+        start_a_cwd, start_b_cwd, stop_b_cwd = ordinary, project_a, project_b
+    else:
+        data_value_a = data_value_b = 'relative-data'
+        data_a, data_b = project_a/'relative-data', project_b/'relative-data'
+        start_a_cwd, start_b_cwd, stop_b_cwd = project_b, project_b, project_a
+
+    def invoke(project_root, script, data_value, cwd, *arguments, expected=0):
+        env = {
+            **os.environ,
+            'PYTHONUTF8': '1',
+            'NO_PROXY': '127.0.0.1,localhost',
+        }
+        if data_value is None:
+            env.pop('MVC_DATA_DIR', None)
+        else:
+            env['MVC_DATA_DIR'] = data_value
+        invocation = len(transcript) + 1
+        stdout_path = tmp_path/f'{data_mode}-{invocation}.stdout.log'
+        stderr_path = tmp_path/f'{data_mode}-{invocation}.stderr.log'
+        command = [
+            POWERSHELL, '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', str((project_root/script).resolve()), *map(str, arguments),
+        ]
+        with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
+            result = subprocess.run(
+                command, cwd=cwd, env=env, stdout=stdout, stderr=stderr,
+                creationflags=CREATE_FLAGS, timeout=30,
+            )
+        entry = {
+            'project': project_root.name,
+            'script': script,
+            'cwd': str(cwd),
+            'data_value': data_value,
+            'arguments': list(map(str, arguments)),
+            'returncode': result.returncode,
+            'stdout': decode_output(stdout_path.read_bytes()),
+            'stderr': decode_output(stderr_path.read_bytes()),
+        }
+        transcript.append(entry)
+        assert result.returncode == expected, json.dumps(entry, ensure_ascii=False)
+        return entry
+
+    def remember(data_dir, role):
+        record = read_record(data_dir, role)
+        owned_pids.add(int(record['pid']))
+        return record
+
+    port_a, port_b = free_port(), free_port()
+    try:
+        invoke(project_a, 'Start-Studio.ps1', data_value_a, start_a_cwd,
+               '-Port', port_a, '-NoBrowser')
+        web_a, worker_a = remember(data_a, 'web'), remember(data_a, 'worker')
+        a_records_before = {
+            role: (data_a/f'{role}.process.json').read_bytes()
+            for role in ('web', 'worker')
+        }
+
+        invoke(project_b, 'Start-Studio.ps1', data_value_b, start_b_cwd,
+               '-Port', port_b, '-NoBrowser')
+        web_b, worker_b = remember(data_b, 'web'), remember(data_b, 'worker')
+        assert web_a['instance_id'] != web_b['instance_id']
+        assert worker_a['instance_id'] != worker_b['instance_id']
+        assert web_b['project_root'].casefold() == str(project_b.resolve()).casefold()
+        assert worker_b['data_dir'].casefold() == str(data_b.resolve()).casefold()
+
+        invoke(project_b, 'Stop-Studio.ps1', data_value_b, stop_b_cwd)
+        assert wait_stopped(web_b['pid']) and wait_stopped(worker_b['pid'])
+        assert process_alive(web_a['pid']) and process_alive(worker_a['pid'])
+        for role in ('web', 'worker'):
+            assert (data_a/f'{role}.process.json').read_bytes() == a_records_before[role]
+
+        invoke(project_a, 'Stop-Studio.ps1', data_value_a, ordinary)
+        assert wait_stopped(web_a['pid']) and wait_stopped(worker_a['pid'])
+        print(json.dumps({
+            'data_mode': data_mode,
+            'project_a_records_unchanged_while_stopping_b': True,
+            'project_a_pids': [web_a['pid'], worker_a['pid']],
+            'project_b_pids': [web_b['pid'], worker_b['pid']],
+            'project_b_root': web_b['project_root'],
+            'project_b_data': worker_b['data_dir'],
+            'transcript': transcript,
+        }, ensure_ascii=False))
+    finally:
+        for project_root, data_value, cwd in (
+            (project_b, data_value_b, ordinary),
+            (project_a, data_value_a, ordinary),
+        ):
+            try:
+                invoke(project_root, 'Stop-Studio.ps1', data_value, cwd)
             except Exception:
                 pass
         for pid in owned_pids:

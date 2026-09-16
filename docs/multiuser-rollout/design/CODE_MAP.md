@@ -8,7 +8,7 @@
 | `backend/worker.py:19` `Worker` | 独立单 Worker 进程默认创建 4 个领取线程；Ark/豆包语音可并发，其他路径受 `serial_execution_lock` 串行；进程级锁禁止第二 Worker | P1 已由 `backend.worker_cli` 独立启动；P6 多 Worker lease/fencing |
 | `backend/runtime.py`、`inference/` | P1 已删除内置 llama/Maestro 启动、GPU/权重环境和模型安装代码 | 删除目标；Maestro 仅保留外部 HTTP 适配器 |
 | `backend/process_lock.py` | 单机进程锁 | P1 保留为过渡或移除；不能作为 P6 正确性依据 |
-| `backend/instance_identity.py` / `Studio-Process.ps1` | 用工程根目录 + 实际数据目录生成实例 ID；生命周期记录校验角色、PID、创建时间、可执行文件和完整命令行 | P1-R1 补强本机进程所有权；P7 部署加固 |
+| `backend/instance_identity.py` / `Studio-Process.ps1` | 用脚本工程根 + 实际数据目录生成实例 ID；身份查询受控切换到目标根并核对返回根，相对数据目录也按该根绝对化；生命周期记录校验角色、PID、创建时间、可执行文件和完整命令行 | P1-R1/P1-R2 补强本机进程所有权；P7 部署加固 |
 | `Start-Studio.ps1` / `Stop-Studio.ps1` | 分别管理 Web 与 Worker；只复用/停止可证明属于当前实例的进程，支持 `-WebOnly` / `-WorkerOnly` | P1 已拆分；P1-R1 所有权校验；P7 部署加固 |
 | `Install-Studio.ps1` | 安装 Python/Node 依赖并构建 | P1/P7 移除推理假设、补部署路径 |
 

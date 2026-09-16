@@ -1,11 +1,33 @@
 Set-StrictMode -Version Latest
 
-function Get-StudioIdentity([string]$Python,[string]$Root){
-    $identityJson=& $Python -m backend.instance_identity 2>&1
+function Resolve-StudioDataDirectory([string]$Root){
+    $targetRoot=[IO.Path]::GetFullPath($Root)
+    $configured=[Environment]::GetEnvironmentVariable('MVC_DATA_DIR')
+    if([string]::IsNullOrWhiteSpace($configured)){
+        return [IO.Path]::GetFullPath((Join-Path $targetRoot 'data'))
+    }
+    if([IO.Path]::IsPathRooted($configured)){
+        return [IO.Path]::GetFullPath($configured)
+    }
+    return [IO.Path]::GetFullPath((Join-Path $targetRoot $configured))
+}
+
+function Get-StudioIdentity([string]$Python,[string]$Root,[string]$DataDir){
+    $targetRoot=[IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar,[IO.Path]::AltDirectorySeparatorChar)
+    $targetData=[IO.Path]::GetFullPath($DataDir).TrimEnd([IO.Path]::DirectorySeparatorChar,[IO.Path]::AltDirectorySeparatorChar)
+    Push-Location -LiteralPath $targetRoot
+    try{$identityJson=& $Python -m backend.instance_identity 2>&1}
+    finally{Pop-Location}
     if($LASTEXITCODE -ne 0){throw "Unable to determine studio identity: $identityJson"}
     $identity=$identityJson | ConvertFrom-Json
     if(-not $identity.instance_id -or -not $identity.project_root -or -not $identity.data_dir){
         throw 'Studio identity response is incomplete.'
+    }
+    if(-not [string]::Equals([string]$identity.project_root,$targetRoot,[StringComparison]::OrdinalIgnoreCase)){
+        throw 'Studio identity project_root does not match the script project root.'
+    }
+    if(-not [string]::Equals([string]$identity.data_dir,$targetData,[StringComparison]::OrdinalIgnoreCase)){
+        throw 'Studio identity data_dir does not match the normalized script data directory.'
     }
     return $identity
 }

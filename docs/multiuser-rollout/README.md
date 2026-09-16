@@ -6,7 +6,7 @@
 
 状态：**PASSED**（外部复验绑定 `b957e39405522baf8ae7e3052b2938941e75b00b`）
 
-当前阶段：**P1-R1 已完成开发并处于 READY_FOR_REVIEW**
+当前阶段：**P1-R1 外部复验未通过，P1-R2 修复中**
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 
