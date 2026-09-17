@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { deriveVideoProductionRows, selectedVideoNodeIds, validateVideoSubmission, videoSubmissionSummary } from "../src/videoProduction.ts";
+
+const videoWorkspace = readFileSync(new URL("../src/pages/VideoProductionWorkspace.tsx", import.meta.url), "utf8");
+const workspaceStyles = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
 
 const providers = [
   { id: "video-model", name: "火山方舟", kind: "video", local: false, type: "volcengine_ark" },
@@ -142,6 +146,13 @@ test("locked dialogue never shortens the fixed project video duration", () => {
   const rows = deriveVideoProductionRows(document, [...assets, voiceAsset], jobs, providers, capabilities);
   assert.equal(rows[0].effectiveDuration, 12);
   assert.equal(rows[0].submissionDuration, 12);
+});
+
+test("long video shot context remains fully readable instead of being ellipsized", () => {
+  assert.match(videoWorkspace, /className="video-shot-context"/);
+  assert.match(workspaceStyles, /\.video-shot-context\{flex-wrap:wrap;align-items:flex-start;gap:6px 12px;min-width:0;line-height:1\.6\}/);
+  assert.match(workspaceStyles, /\.video-shot-context span\{[^}]*overflow:visible;[^}]*text-overflow:clip;[^}]*white-space:pre-wrap;overflow-wrap:anywhere\}/);
+  assert.match(workspaceStyles, /\.video-shot-context small\{[^}]*max-width:100%;white-space:normal;overflow-wrap:anywhere\}/);
 });
 
 test("project fixed duration overrides a shorter shot and remains visible as submitted duration", () => {

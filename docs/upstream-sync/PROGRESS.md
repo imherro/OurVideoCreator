@@ -479,3 +479,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 协作版团队切换、制作流程、当前分集选择、作品/分集设置、保存状态和对象协作入口全部保留；没有把作品名和 Episode 标题混为一个可写字段，也没有改变权限、草稿或保存逻辑。`FolderOpen` 仍用于引用类型、回收站原著/剧本等其他位置，只删除已无使用的主文件 `ChevronDown` 导入。
 
 定向 `workflow_shell + production_navigation + episode_transition`：**12 passed / 0 failed**，新增契约断言验证按钮行为/无障碍名称及协作控件仍存在。全量 `npm test`：**283 passed / 0 failed / 0 skipped，1639.84ms**。`npm run build` tsc/Vite exit0，Vite **7.41秒**，主产物 `assets/index-iU3-9m7N.js`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
+
+## UPSTREAM-SYNC-33：长镜头描述完整换行
+
+按冻结上游 `247d314` 的界面缺陷修复。协作版视频工作区仍把镜头动作和右侧机位/时长摘要强制为单行并截断省略，长文本无法读全。现在摘要容器允许换行并顶端对齐；镜头动作保留作者换行且可在任意长词/连续文本处分行，机位与时长摘要也可收缩、换行，不能越出卡片。
+
+本批只覆盖 `VideoProductionWorkspace` 已有 `video-shot-context` 的显示，不修改镜头动作、Video Prompt、机位、计划/提交时长数据，不改变保存、候选、任务提交或 Provider 参数。采用后置同等选择器覆盖旧单行规则，明确恢复 `overflow:visible` / `text-overflow:clip`，避免旧省略声明继续生效。
+
+定向 `video_production + motion_reference + video_dialogue`：**21 passed / 0 failed**；新增契约断言验证组件实际使用目标选择器、动作文本 `pre-wrap/anywhere` 和摘要 `normal/anywhere`。全量 `npm test`：**284 passed / 0 failed / 0 skipped，1654.32ms**。`npm run build` tsc/Vite exit0，Vite **7.69秒**，产物 `assets/index-O6uBJ7K5.js` / `assets/index-DaU2Z3_n.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
