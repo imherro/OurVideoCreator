@@ -13,7 +13,7 @@ test('voice uses published defaults and submits only published optional controls
 });
 
 test('shot dimensions respect published enums and frames never infer upstream model identity',()=>{
- assert.deepEqual(shotParameters('image',{rules:{resolution:{type:'string',enum:['1024x1024']}}},{resolution:'1024x1024'},{},'9:16'),{resolution:'1024x1024'});
+ assert.throws(()=>shotParameters('image',{rules:{resolution:{type:'string',enum:['1024x1024']}}},{resolution:'1024x1024'},{},'9:16'),/画幅/);
  assert.deepEqual(shotParameters('video',{id:'minimax_h3',rules:{}},{},{duration:8}),{});
  assert.deepEqual(shotParameters('image',{rules:{resolution:{type:'string'}}},{},{},'2:1'),{resolution:'1024x512'});
  const model={rules:{frames:{type:'integer'}},capabilities:{fps:24,min_frames:124,frame_step:17,max_frames:345}};

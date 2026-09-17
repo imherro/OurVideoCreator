@@ -4122,7 +4122,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                   newNode(
                   "image",
                   "生成 360 度等距柱状全景环境图，2:1 画幅，完整覆盖四周环境，上下分别为天空与地面，左右边缘连续，地平线位于画面中线，无文字。场景：",
-                  {parameters:shotParameters('image',model,defaults.parameters,{},'2:1')},
+                  {image_purpose:'panorama',parameters:shotParameters('image',model,defaults.parameters,{},'2:1')},
                 );}}
                 onOpenArt={(versionId) => {
                   setVisualFocus(versionId);

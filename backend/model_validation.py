@@ -214,11 +214,55 @@ def model_definition(body, config, kind):
     return value
 
 
+def image_parameters(definition, result, document, node_id):
+    """Derive only published controls, including images outside shot objects."""
+    ratio = document.get('ratio')
+    node = next((n for n in document.get('nodes', []) if n.get('id') == node_id), {})
+    # An explicit, saved panorama node is not an episode opening frame. Do not
+    # infer this from prompt text or from caller-supplied submission metadata.
+    if (node.get('data') or {}).get('image_purpose') == 'panorama':
+        ratio = '2:1'
+    recommended = {'21:9':'2048x864', '16:9':'2048x1152', '4:3':'2048x1536',
+                   '1:1':'2048x2048', '3:4':'1536x2048', '9:16':'1152x2048', '2:1':'1024x512'}.get(ratio)
+    if not recommended:
+        return result
+    rules = definition['rules']
+    for name in ('ratio', 'aspect_ratio'):
+        if name in rules:
+            try: validate_parameter(ratio, rules[name])
+            except ValueError as exc: raise ValueError('平台模型不支持当前项目画幅，请调整已发布模型或项目规格') from exc
+            result[name] = ratio
+    for name in ('size', 'resolution'):
+        rule = rules.get(name)
+        if not rule or rule['type'] != 'string':
+            continue
+        values = rule.get('enum', [])
+        # resolution may mean a quality tier (2k/4k), not width x height.
+        if name == 'resolution' and (re.fullmatch(r'\d+(?:k|p)', str(result.get(name, '')), re.IGNORECASE)
+                or (values and not any(re.fullmatch(r'\d+x\d+', str(v)) for v in values))):
+            continue
+        try:
+            validate_parameter(recommended, rule)
+            result[name] = recommended
+            continue
+        except ValueError:
+            pass
+        current = str(result.get(name, ''))
+        match = re.fullmatch(r'(\d+)x(\d+)', current)
+        a, b = map(int, ratio.split(':'))
+        if match and int(match[2]) > 0 and abs(int(match[1]) / int(match[2]) / (a / b) - 1) <= .02:
+            continue  # Keep an already validated alternative within platform limits.
+        raise ValueError('平台允许的图像尺寸与项目画幅不一致；请调整模型尺寸规则或项目规格')
+    return result
+
+
 def shot_parameters(definition, submitted, kind, document, node_id, *, complete=True):
     """Recompute linked-shot controls from canonical state and frozen model rules."""
     # Canonical shot controls may fill missing fields. Require completeness only
     # after that derivation, before freezing or making any external request.
     result = parameters(definition, submitted, complete=False)
+    if kind == 'image':
+        result = image_parameters(definition, result, document, node_id)
     shot = next((item for item in document.get('shots', [])
                  if item.get(kind + 'Node') == node_id
                  or (item.get('pipeline') or {}).get(kind + 'NodeId') == node_id), None)
@@ -231,12 +275,6 @@ def shot_parameters(definition, submitted, kind, document, node_id, *, complete=
         duration = fixed if isinstance(fixed, (int,float)) and 4 <= fixed <= 30 else float(shot['duration'])
         count = minimum + math.floor((duration * caps['fps'] - minimum) / step + .5) * step
         result['frames'] = min(minimum + (maximum - minimum) // step * step, max(minimum, count))
-    if kind == 'image':
-        name = 'resolution' if 'resolution' in rules else 'size' if 'size' in rules else None
-        size = {'21:9':'2048x864', '16:9':'2048x1152', '4:3':'2048x1536',
-                '1:1':'2048x2048', '3:4':'1536x2048', '9:16':'1152x2048'}.get(document.get('ratio'))
-        if name and size and rules[name]['type'] == 'string' and ('enum' not in rules[name] or size in rules[name]['enum']):
-            result[name] = size
     return parameters(definition, result, complete=complete)
 
 
