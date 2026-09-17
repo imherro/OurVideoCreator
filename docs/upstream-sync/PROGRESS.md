@@ -503,3 +503,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 本批只改变批量栏布局与语义标记。全选仍写入当前镜头的稳定 UID，提交仍只调用 `generate(selected)`；未选择或工作区忙碌时继续禁用。没有扩大跨集选择、对象权限、任务准入或 Provider 调用范围，也没有自动提交任务。
 
 定向 `storyboard_workspace`：**6 passed / 0 failed**；新增契约断言验证浮动布局、宽窄屏内容避让、显式 UID 选择提交及禁用条件。全量 `npm test`：**286 passed / 0 failed / 0 skipped，1610.39ms**。`npm run build` tsc/Vite exit0，Vite **7.68秒**，产物 `assets/index-CqhTs9qD.js` / `assets/index-CNbrRJBI.css`，保留既有大 chunk 警告。`git diff --check` 通过。本批纯前端，没有新增 API、依赖、数据库迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
+
+## UPSTREAM-SYNC-36：视频批量操作浮动
+
+按冻结上游 `887f1da` 的批量操作需求适配。视频工作区批量栏固定在视口右下角，宽屏为其预留右侧空间，窄屏预留底部空间；滚动逐镜视频列表时仍能看到全选、已选数量和“生成所选视频”。批量栏增加 `role=group` 与“批量生成视频”无障碍名称。
+
+本批保留协作版更严格的两段式流程：浮动按钮只打开提交前复核，复核继续显示任务数量、Provider、模型和公网 API 数量，并在存在未就绪或运行中镜头时禁止确认；最终只提交明确选中的稳定 UID。没有移动协作版动作参考编辑器，没有扩大跨集选择、对象权限或服务端任务准入，也没有自动提交或调用 Provider。
+
+定向 `video_production`：**14 passed / 0 failed**；新增契约断言同时验证浮动布局、宽窄屏内容避让、显式选择、复核入口和阻断后的确认提交。全量 `npm test`：**287 passed / 0 failed / 0 skipped，1375.25ms**。`npm run build` tsc/Vite exit0，Vite **6.94秒**，产物 `assets/index-B1TiYTRo.js` / `assets/index-Cq0dIKPe.css`，保留既有大 chunk 警告。`git diff --check` 通过。本批纯前端，没有新增 API、依赖、数据库迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。

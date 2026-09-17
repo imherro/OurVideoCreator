@@ -71,6 +71,16 @@ test("batch review names count provider model and cloud use before submission", 
   assert.deepEqual(summary.groups, [{ providerId: "video-model", providerName: "火山方舟", modelId: "video-model", count: 2, cloud: true }]);
 });
 
+test("video batch actions float but still require explicit selection review", () => {
+  assert.match(videoWorkspace, /className="video-selection-bar" role="group" aria-label="批量生成视频"/);
+  assert.match(videoWorkspace, /setSelected\(event\.target\.checked \? identities : \[\]\)/);
+  assert.match(videoWorkspace, /disabled=\{props\.busy \|\| !selected\.length\} onClick=\{\(\) => setReviewing\(true\)\}/);
+  assert.match(videoWorkspace, /disabled=\{props\.busy \|\| !!submissionBlockers\.length\} onClick=\{\(\) => void submit\(selected\)\}/);
+  assert.match(workspaceStyles, /\.video-production-workspace \.video-selection-bar\{position:fixed;top:auto;right:18px;bottom:28px;z-index:12;/);
+  assert.match(workspaceStyles, /@media\(min-width:1200px\)\{\.video-production-workspace:has\(\.video-selection-bar\)\{padding-right:202px\}\}/);
+  assert.match(workspaceStyles, /@media\(max-width:1199px\)\{\.video-production-workspace:has\(\.video-selection-bar\)\{padding-bottom:170px\}/);
+});
+
 test("Ark end frame visibility follows the selected model capability, not provider type", () => {
   const { document, jobs } = fixture();
   const withoutCapability = deriveVideoProductionRows(document, assets, jobs, providers);

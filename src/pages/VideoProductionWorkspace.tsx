@@ -61,7 +61,7 @@ export function VideoProductionWorkspace(props: Props) {
         {(["all","ready","generating","failed","stale","complete"] as const).map((value) => <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{value === "all" ? "全部" : statusLabels[value]} <b>{value === "all" ? rows.length : rows.filter((row) => row.status === value).length}</b></button>)}
       </div></div>
     </header>
-    {!!rows.length && <div className="video-selection-bar">
+    {!!rows.length && <div className="video-selection-bar" role="group" aria-label="批量生成视频">
       <label className="check-label"><input type="checkbox" checked={selected.length === rows.length} onChange={(event) => setSelected(event.target.checked ? identities : [])}/>全选 {rows.length} 镜</label>
       <span>已选 {selected.length} 镜</span>
       <button className="primary compact" disabled={props.busy || !selected.length} onClick={() => setReviewing(true)}><Film size={15}/>生成所选视频</button>
