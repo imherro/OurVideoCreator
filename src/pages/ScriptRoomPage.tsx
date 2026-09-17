@@ -8,7 +8,7 @@ type Value = Record<string, any>;
 
 export function ScriptRoomPage({
   productionId, currentEpisodeNo, providers, defaultTarget, refreshKey = 0, request, notify, report, onChanged, onSelectEpisode, onEnterEpisode,
-  store,actorId,canManage,canEdit,
+  store,actorId,canManage,canEdit,onAddEpisode,
 }: {
   productionId: string; currentEpisodeNo: number; providers: Value[]; defaultTarget?: Value; refreshKey?: number;
   store:OwnedContentDrafts;actorId:string;canManage:boolean;canEdit:boolean;
@@ -17,6 +17,7 @@ export function ScriptRoomPage({
   onChanged: (projectId?: string) => void | Promise<void>;
   onSelectEpisode: (episodeNo: number) => void | Promise<void>;
   onEnterEpisode: (episodeNo: number) => void | Promise<void>;
+  onAddEpisode?:()=>void;
 }) {
   const [items, setItems] = useState<Value[]>([]);
   const [chapters, setChapters] = useState<Value[]>([]);
@@ -139,7 +140,7 @@ export function ScriptRoomPage({
       <button className="primary" disabled={busy || !canManage || entry?.state!=='saved' || draft?.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
     </div></header>
     <div className="script-room-layout">
-      <aside className="script-episode-list"><header><b>分集</b><small>勾选后批量生成</small></header>{items.map((value) => <div className={active === value.episodeNo ? "active" : ""} key={value.episodeNo}>
+      <aside className="script-episode-list"><header><b>分集</b>{onAddEpisode&&<button disabled={busy||!canEdit} onClick={onAddEpisode}>新增一集</button>}<small>勾选后批量生成</small></header>{items.map((value) => <div className={active === value.episodeNo ? "active" : ""} key={value.episodeNo}>
         <input type="checkbox" disabled={value.plan?.status!=='approved'} checked={selected.has(value.episodeNo)} onChange={(e) => setSelected((current) => { const next = new Set(current); e.target.checked ? next.add(value.episodeNo) : next.delete(value.episodeNo); return next; })} />
         <button onClick={() => run(async () => { await onSelectEpisode(value.episodeNo); await selectEpisode(value.episodeNo); })}><b>EP{String(value.episodeNo).padStart(2, "0")}</b><span>{value.episodeTitle}</span><small className={displayedStatus(value)}>{STATUS_LABELS[displayedStatus(value)]}</small></button>
       </div>)}</aside>

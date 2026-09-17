@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ScriptRoomPage} from '../src/pages/ScriptRoomPage';
 import {ProjectSetupDialog} from '../src/pages/ProjectSetupDialog';
+import {EpisodeSetupDialog} from '../src/pages/EpisodeSetupDialog';
 import {OwnedContentDrafts} from '../src/ownedContentDrafts';
 import '../src/style.css';
 const store=new OwnedContentDrafts('script');
@@ -27,9 +28,12 @@ async function request(path:string,options?:RequestInit){
  throw new Error('隔离页禁止此请求：'+path);
 }
 function App(){const [setup,setSetup]=useState(true),[active,setActive]=useState(1),[notice,setNotice]=useState('只有内存Mock，无业务库/供应商'),[mode,setMode]=useState('');
+ const [adding,setAdding]=useState(false);
  return <main><p role="status">{notice} · 起点：{mode}</p><p id="assist-counter">辅助提交 0 次</p>{setup?<ProjectSetupDialog providers={[]} localModels={[]} onCreate={async draft=>{setMode(draft.creationMode);setSetup(false)}}/>:
   <ScriptRoomPage productionId="mock" currentEpisodeNo={active} providers={[{id:'mock-text',kind:'text',name:'隔离 Mock 文本模型'}]} defaultTarget={{model_id:'mock-text'}} store={store} actorId="me" canManage canEdit request={request}
-   notify={setNotice} report={error=>setNotice(String(error))} onChanged={()=>{}} onSelectEpisode={setActive} onEnterEpisode={no=>setNotice('进入分镜规划 EP'+no)}/>}
+   notify={setNotice} report={error=>setNotice(String(error))} onChanged={()=>{}} onSelectEpisode={setActive} onEnterEpisode={no=>setNotice('进入分镜规划 EP'+no)} onAddEpisode={()=>setAdding(true)}/>}
+ {adding&&<EpisodeSetupDialog name="隔离作品" next={3} defaultMode={mode} onClose={()=>setAdding(false)}
+   onCreate={async(title,nextMode)=>{setNotice(`新增请求：${title} · ${nextMode} · 不调用AI`);setAdding(false);}}/>}
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

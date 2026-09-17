@@ -192,6 +192,7 @@ import { CollaborationClient } from "./collaborationClient";
 import { CollaborationPanel } from "./CollaborationPanel";
 import { reconcileTimelineEdit } from "./editor/legacyTimeline";
 import { ProjectSetupDialog } from "./pages/ProjectSetupDialog";
+import { EpisodeSetupDialog } from "./pages/EpisodeSetupDialog";
 import {
   applyRatioChange,
   applyTargetDuration,
@@ -723,6 +724,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   const [editorExportTimeline, setEditorExportTimeline] = useState<EditorDocument["timeline"] | undefined>();
   const [booted, setBooted] = useState(false);
   const [projectSetupOpen, setProjectSetupOpen] = useState(false);
+  const [episodeSetupProduction,setEpisodeSetupProduction]=useState<ProductionSummary|null>(null);
   const [projectSetupKey, setProjectSetupKey] = useState(0);
   const [projectSettingsTab, setProjectSettingsTab] = useState<"production" | "episode">("production");
   const [productionNameDraft, setProductionNameDraft] = useState("");
@@ -1654,15 +1656,21 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         : `已新建作品“${productionName}”并进入 EP01`,
     );
   }
-  async function createEpisode(production: ProductionSummary, title: string) {
+  async function createEpisode(production: ProductionSummary, title: string, creationMode:'direct'|'adaptation') {
     await prepareProjectSwitch();
     const episode = await api(
       `/productions/${production.id}/episodes`,
-      send("POST", { title }),
+      send("POST", { title,creation_mode:creationMode }),
     );
-    await refreshProductionHierarchy();
-    await openProject(episode.id);
-    setNotice(`已在“${production.name}”中新建 EP${String(episode.episode_no).padStart(2, "0")}`);
+    // Creation succeeded: close before fallible refresh/navigation to avoid a
+    // second creation when the user retries after a navigation error.
+    setEpisodeSetupProduction(null);
+    try{
+      await refreshProductionHierarchy();
+      activateWorkflowStage(creationMode==='direct'?'script':'source','replace');
+      await openProject(episode.id);
+      setNotice(`已在“${production.name}”中新建 EP${String(episode.episode_no).padStart(2, "0")}`);
+    }catch(error){report(error);}
   }
   async function renameProduction(name: string) {
     if (!project) return;
@@ -2658,6 +2666,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   };
   return (
     <div className="studio-shell">
+      {episodeSetupProduction&&<EpisodeSetupDialog name={episodeSetupProduction.name}
+        next={Math.max(0,...episodesForProduction(projects,episodeSetupProduction.id).map(item=>item.episode_no))+1}
+        defaultMode={episodeSetupProduction.id===project.production_id?((doc as Any).creationMode||'direct'):'direct'}
+        onClose={()=>setEpisodeSetupProduction(null)} onCreate={(title,mode)=>createEpisode(episodeSetupProduction,title,mode)}/>}
       {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
         key={projectSetupKey}
         providers={config.models}
@@ -2909,6 +2921,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "script" ? (
           <ScriptRoomPage
+            onAddEpisode={()=>{const production=productions.find(item=>item.id===project.production_id);if(production)setEpisodeSetupProduction(production);}}
             store={scriptDrafts.current} actorId={session.user.id}
             canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
@@ -3980,11 +3993,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 currentEpisodeId={project.id}
                 onCreateProduction={openProjectSetup}
                 onOpenProjectSettings={() => { setProjectSettingsTab("production"); setPanel("projectInfo"); }}
-                onCreateEpisode={(production) => {
-                  const next = episodesForProduction(projects, production.id).length + 1;
-                  const title = window.prompt(`在“${production.name}”中新增 EP${String(next).padStart(2, "0")}，可填写集名：`, `第 ${String(next).padStart(2, "0")} 集`);
-                  if (title !== null) createEpisode(production, title).catch(report);
-                }}
+                onCreateEpisode={setEpisodeSetupProduction}
                 onOpenEpisode={(episode) => openProject(episode.id).catch(report)}
                 onDeleteEpisode={(episode) => deleteProject(episode.id === project.id ? { ...episode, name: project.name } : episode).catch(report)}
               />
