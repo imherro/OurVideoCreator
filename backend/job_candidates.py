@@ -51,6 +51,9 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
         raise HTTPException(409,'改编规划已变化，请刷新后重新提交')
     if kind=='adaptation':
         identity.require_production(c,collab.live_principal(c),production_id,'manager')
+        if marker.get('mode')=='episode':
+            from .episode_plans import freeze_target
+            return freeze_target(c,pid,body,production)
         from .adaptation import protected_episode_nos
         if protected_episode_nos(c,production_id,lock=True):
             raise HTTPException(409,'已有分集采纳视频，不能整体重新生成改编策划')
@@ -80,6 +83,10 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
 def adaptation_value(job,generated):
     """Pure validation against the submitted source IDs, never live writes."""
     from .adaptation import validate_adaptation_bundle
+    marker=job['input'].get('adaptation_generation') or {}
+    if marker.get('mode')=='episode':
+        from .episode_plans import validate_result
+        return {'episodePlan':validate_result(generated,marker['episodeNo'],marker['targetDuration'],marker['sourceChapterIds'])}
     bundle=validate_adaptation_bundle(generated,generated=True)
     marker=job['input'].get('adaptation_generation') or {}
     if bundle['adaptationPlan']['format']!=marker.get('format'):
@@ -236,6 +243,11 @@ def adopt(pid:str,jid:str,body:Adopt):
             c.execute('UPDATE episode_scripts SET metadata=%s WHERE project_id=%s',(s.dumps(metadata),row['id']))
             latest=owned.load(c,job['production_id'],'script',row['id'])
             owned.notify(c,latest,'candidate.adopt');result=owned.public(latest)
+        elif kind=='adaptation' and job['input']['adaptation_generation'].get('mode')=='episode':
+            from .episode_plans import adopt_candidate
+            result=adopt_candidate(c,job,production)
+            for p in c.execute('SELECT id FROM projects WHERE production_id=%s',(job['production_id'],)):
+                s.event(p['id'],{'type':'production','revision':result['revision']},connection=c)
         elif kind=='adaptation':
             from .adaptation import protected_episode_nos
             if protected_episode_nos(c,job['production_id'],lock=True):

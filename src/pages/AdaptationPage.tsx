@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, RefreshCw, Save, Sparkles } from "lucide-react";
 import {
   DURATION_OPTIONS,
@@ -33,6 +33,7 @@ export function AdaptationPage({
   const [active, setActive] = useState(1);
   const [busy, setBusy] = useState(false);
   const [savedContent,setSavedContent]=useState('');
+  const episodeSubmission=useRef<{key:string;id:string}|null>(null);
   const textProviders = useMemo(
     () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
@@ -92,6 +93,17 @@ export function AdaptationPage({
     setDraft(value);setSavedContent(planningContent(value));onRevision(value.revision);
     notify(action==='review'?'本集规划已提交审核':'本集规划已批准，其他集状态保持');
   }
+  async function generateEpisode(){
+    if(!draft||planningContent(draft)!==savedContent)throw new Error('请先保存本集规划和原著引用');
+    if(!textProviders.some(item=>item.id===providerId))throw new Error('请选择已发布的平台文本模型');
+    const key=JSON.stringify([productionId,projectId,active,draft.revision,providerId]);
+    if(!episodeSubmission.current||episodeSubmission.current.key!==key)
+      episodeSubmission.current={key,id:crypto.randomUUID()};
+    await request(`/productions/${productionId}/adaptation/episodes/${active}/generate`,{
+      method:'POST',body:JSON.stringify({project_id:projectId,model_id:providerId,submission_id:episodeSubmission.current.id})});
+    episodeSubmission.current=null;
+    notify('本集规划任务已提交；结果在任务中心作为候选，明确采纳后才更新本集，并仍需审核');
+  }
   async function generate() {
     if (!draft) return;
     const provider = textProviders.find((item) => item.id === providerId);
@@ -140,6 +152,8 @@ export function AdaptationPage({
         {plan&&<div className="settings-actions"><span>{STATUS_LABELS[plan.status]||plan.status}</span>
           <button disabled={busy||dirty} onClick={()=>run(()=>transitionEpisode('review'))}>本集提交审核</button>
           <button disabled={busy||dirty||plan.status!=='review'} onClick={()=>run(()=>transitionEpisode('approve'))}>批准本集规划</button>
+          <button disabled={busy||dirty||!providerId||!plan.sourceChapterRefs.length} onClick={()=>run(generateEpisode)}>AI 生成本集规划候选</button>
+          <small>使用下方平台文本模型，可能产生费用；不会自动采纳或改写其他集。</small>
           {dirty&&<small>有未保存修改，请先保存草稿。</small>}</div>}
         {plan ? <div className="episode-plan-editor"><div className="domain-fields">
           <label>一句话梗概<textarea rows={2} value={plan.logline} onChange={(e) => setPlan({ logline: e.target.value })} /></label>

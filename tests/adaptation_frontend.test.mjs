@@ -29,3 +29,13 @@ test('single episode review uses saved revision and cannot discard dirty edits',
   assert.match(page,/批准本集规划/);
   assert.match(page,/fieldset disabled=\{busy\}/);
 });
+
+test('single plan generation submits a candidate with a stable uncertain-retry identifier',()=>{
+  const page=readFileSync(new URL('../src/pages/AdaptationPage.tsx',import.meta.url),'utf8');
+  const action=page.slice(page.indexOf('async function generateEpisode'),page.indexOf('async function generate()'));
+  assert.match(action,/adaptation\/episodes\/\$\{active\}\/generate/);
+  assert.match(action,/submission_id:episodeSubmission.current.id/);
+  assert.match(action,/episodeSubmission.current=null/);
+  assert.doesNotMatch(action,/\/adopt|setDraft\(/);
+  assert.match(page,/AI 生成本集规划候选/);
+});

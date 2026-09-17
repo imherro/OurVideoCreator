@@ -79,7 +79,10 @@ export function taskShotLabel(row: TaskCenterRow) {
     const title = String(row.job.input?.prompt || "").match(/^章节标题：([^\n]+)/)?.[1]?.trim();
     return title ? `原著事件提取 · ${title}` : "原著事件提取";
   }
-  if (row.job.input?.stage === "adaptation_generation") return "整部作品改编策划";
+  if (row.job.input?.stage === "adaptation_generation") {
+    const marker=row.job.input?.adaptation_generation;
+    return marker?.mode==='episode'?`EP${String(marker.episodeNo).padStart(2,'0')} 单集规划`:'整部作品改编策划';
+  }
   if (!row.shot) return row.node?.data?.label || row.job.node_id || "未关联节点";
   const raw = row.shot.shot_id || row.shot.id || row.shot.uid;
   return `SHOT ${String(raw || "").replace(/^shot[-_ ]?/i, "") || "?"}`;

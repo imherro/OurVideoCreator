@@ -10,6 +10,10 @@ const episodes = [
   { id: "ep-1", production_id: "prod", episode_no: 1, episode_title: "第一集", name: "第一集" },
   { id: "ep-2", production_id: "prod", episode_no: 2, episode_title: "第二集", name: "第二集" },
 ];
+
+test('single episode planning is not labeled as whole production regeneration',()=>{
+  assert.equal(taskShotLabel({job:{input:{stage:'adaptation_generation',adaptation_generation:{mode:'episode',episodeNo:2}}}}),'EP02 单集规划');
+});
 const documents = {
   "ep-1": {
     nodes: [{ id: "video-1", data: { model_id: "video-model" } }],

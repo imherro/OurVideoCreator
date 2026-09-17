@@ -1317,6 +1317,10 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if old['input_hash']!=job_admission.fingerprint(pid,body,target,original):
             raise HTTPException(409,'同一提交标识不能对应不同输入、对象版本或分配')
         return s.unpack(old)
+    if (body.input.get('adaptation_generation') or {}).get('mode')=='episode':
+        active=c.execute("SELECT id FROM jobs WHERE production_id=%s AND node_id=%s AND status IN ('queued','running') LIMIT 1",
+            (owner['production_id'],body.node_id)).fetchone()
+        if active:raise HTTPException(409,'本集规划已有任务排队或运行中')
     if body.input.get('source_event_extraction') is not None:
         active=c.execute("""SELECT id FROM jobs WHERE production_id=%s AND node_id=%s
             AND kind='text' AND status IN ('queued','running') LIMIT 1""",
@@ -2019,6 +2023,23 @@ def review_episode_plan(production_id:str,episode_no:int,body:RevisionAction):
 @app.post('/api/productions/{production_id}/adaptation/episodes/{episode_no}/approve')
 def approve_episode_plan(production_id:str,episode_no:int,body:RevisionAction):
     return transition_adaptation(production_id,body.revision,'approved',episode_no)
+
+@app.post('/api/productions/{production_id}/adaptation/episodes/{episode_no}/generate')
+def generate_episode_plan(production_id:str,episode_no:int,body:TextGenerationCreate):
+    from .owned_content import production_scope
+    from .episode_plans import frozen_input
+    with s.db() as c:
+        job_admission.lock(c)
+        production_scope(c,production_id,'manager',write=True)
+        c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
+        project=collaboration.project_scope(c,body.project_id,'editor')
+        if project['production_id']!=production_id:raise HTTPException(422,'任务分集不属于当前作品')
+        value=frozen_input(c,body.project_id,episode_no)
+        value.update(model_id=body.model_id,allow_cloud=body.allow_cloud)
+        result=create_job_record(c,body.project_id,JobCreate(node_id=f'adaptation-episode:{production_id}:{episode_no}',
+            kind='text',submission_id=body.submission_id,input=value),entrypoint='adaptation')
+        s.event(body.project_id,{'type':'job','id':result['id']},connection=c)
+    return result
 
 @app.post('/api/productions/{production_id}/adaptation/generate')
 def generate_adaptation(production_id:str,body:TextGenerationCreate):

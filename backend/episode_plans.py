@@ -77,3 +77,70 @@ def continuity_context(connection,project_id,episode_no):
         item['episodeNo']==episode_no-1 and 'script' in item for item in previous),
         'filmBible':{key:copy.deepcopy(bible.get(key) or {}) for key in ('story','continuity')},
         'lockedAssets':sorted(locked,key=lambda item:str(item['id']))}
+
+
+def frozen_input(connection,project_id,episode_no):
+    """Caller holds production UPDATE and manager authorization; never provider I/O."""
+    from fastapi import HTTPException
+    from psycopg.errors import LockNotAvailable
+    from .adaptation import adaptation_fingerprint,source_snapshot,source_fingerprint
+    state=read_project_state(connection,project_id);production_id=state['project']['production_id']
+    context=state['production_context']
+    if type(episode_no) is not int:raise HTTPException(422,'分集编号必须为整数')
+    plan=next((p for p in context['episodePlans'] if p['episodeNo']==episode_no),None)
+    if not plan:raise HTTPException(404,'分集规划不存在')
+    if episode_no in protected_episode_nos(connection,production_id,lock=True):
+        raise HTTPException(409,'本集已有采纳视频，不能重新生成规划')
+    try:
+        connection.execute('''SELECT sc.id FROM source_chapters sc JOIN source_documents d ON d.id=sc.source_id
+            WHERE d.production_id=%s ORDER BY sc.id FOR SHARE OF sc NOWAIT''',(production_id,)).fetchall()
+        connection.execute('''SELECT sc.project_id FROM episode_scripts sc JOIN projects p ON p.id=sc.project_id
+            WHERE p.production_id=%s AND p.episode_no<%s ORDER BY sc.project_id FOR SHARE OF sc NOWAIT''',
+            (production_id,episode_no)).fetchall()
+    except LockNotAvailable:
+        raise HTTPException(409,'原著或前集正在保存，请稍后重试') from None
+    all_sources=source_snapshot(connection,production_id)
+    sources=[item for item in all_sources if item['chapterId'] in set(plan['sourceChapterRefs'])]
+    if not sources:raise HTTPException(422,'请先选择原著章节并完成事件提取')
+    continuity=continuity_context(connection,project_id,episode_no)
+    dependencies={'adaptation':adaptation_fingerprint(context),'sources':source_fingerprint(all_sources),'continuity':continuity}
+    marker={'mode':'episode','productionId':production_id,'episodeNo':episode_no,
+        'adaptationFingerprint':dependencies['adaptation'],'dependencyFingerprint':source_fingerprint(dependencies),
+        'sourceChapterIds':sorted({item['chapterId'] for item in sources}),'targetDuration':plan['targetDuration']}
+    prompt=(f'只生成EP{episode_no:02d}，不得重写其他集。\n'
+        +'作品故事骨架与策略：'+json.dumps(context['adaptationPlan'],ensure_ascii=False)
+        +'\n本集固定规格：'+json.dumps(plan,ensure_ascii=False)
+        +'\n前集与锁定视觉（只读，必须承接而非重演）：'+json.dumps(continuity,ensure_ascii=False)
+        +'\n本集原著事件：'+json.dumps(sources,ensure_ascii=False))
+    return {'stage':'adaptation_generation','prompt':prompt,'system_prompt':SYSTEM_PROMPT,
+        'response_schema':copy.deepcopy(SCHEMA),'schema_version':'episode-plan/v1',
+        'adaptation_generation':marker,'continuity_context':continuity}
+
+
+def freeze_target(connection,project_id,body,production):
+    from fastapi import HTTPException
+    marker=body.input['adaptation_generation'];number=marker.get('episodeNo')
+    if body.node_id!=f'adaptation-episode:{production["id"]}:{number}':raise HTTPException(422,'单集规划目标不匹配')
+    current=frozen_input(connection,project_id,number)
+    if marker.get('dependencyFingerprint')!=current['adaptation_generation']['dependencyFingerprint']:
+        raise HTTPException(409,'单集规划依赖已变化，请重新提交')
+    body.input.update(current)  # Rebuild prompt, schema and allowed IDs even for generic jobs.
+    return {'target':{'kind':'adaptation','id':production['id'],'revision':production['revision'],'assignment_epoch':0}}
+
+
+def adopt_candidate(connection,job,production):
+    from fastapi import HTTPException
+    from .adaptation import _persist_production_context,_stale_scripts
+    from .production_context import normalize_production_context
+    marker=job['input']['adaptation_generation']
+    current=frozen_input(connection,job['project_id'],marker['episodeNo'])
+    if marker['dependencyFingerprint']!=current['adaptation_generation']['dependencyFingerprint']:
+        raise HTTPException(409,'原著、前集或规划已变化，不能采纳旧单集候选')
+    candidate=job['result']['adaptation']['episodePlan']
+    value=validate_result({key:candidate[key] for key in FIELDS},marker['episodeNo'],marker['targetDuration'],marker['sourceChapterIds'])
+    context=normalize_production_context(json.loads(production['shared_context']))
+    context['episodePlans']=[value if p['episodeNo']==marker['episodeNo'] else p for p in context['episodePlans']]
+    _stale_scripts(connection,job['production_id'],episode_nos=[marker['episodeNo']])
+    revision=_persist_production_context(connection,production,context)
+    from .adaptation import adaptation_bundle
+    return {'revision':revision,**adaptation_bundle(context)}
