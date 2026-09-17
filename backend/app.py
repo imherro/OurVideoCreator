@@ -1965,7 +1965,7 @@ def save_adaptation(production_id:str,body:AdaptationSave):
         for pid in targets:s.event(pid,{'type':'production','revision':revision},connection=c)
     return {**bundle,'revision':revision}
 
-def transition_adaptation(production_id,expected_revision,target):
+def transition_adaptation(production_id,expected_revision,target,episode_no=None):
     from .owned_content import production_scope
     from .adaptation import _persist_production_context,adaptation_bundle,validate_adaptation_bundle,validate_approval_ready,protected_episode_nos
     with s.db() as c:
@@ -1974,11 +1974,22 @@ def transition_adaptation(production_id,expected_revision,target):
         if not row:raise HTTPException(404,'Production 不存在')
         production_scope(c,production_id,'manager')
         if row['revision']!=expected_revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
-        if protected_episode_nos(c,production_id,lock=True):
+        protected=protected_episode_nos(c,production_id,lock=True)
+        if protected and (episode_no is None or episode_no in protected):
             raise HTTPException(409,'已有分集采纳视频，不能整体变更审核状态；请只审核新增分集')
         context=normalize_production_context(json.loads(row['shared_context']))
         bundle=adaptation_bundle(context)
-        if target=='review':
+        if episode_no is not None:
+            from .adaptation import validate_source_references
+            plan=next((item for item in bundle['episodePlans'] if item['episodeNo']==episode_no),None)
+            if plan is None:raise HTTPException(404,'分集规划不存在')
+            if not plan['sourceChapterRefs'] or any(not str(plan.get(key) or '').strip()
+                for key in ('logline','coreConflict','hook','cliffhanger')):
+                raise ValueError('请先完成本集规划及原著章节引用并保存')
+            validate_source_references(c,production_id,plan['sourceChapterRefs'])
+            if target=='approved' and plan['status']!='review':raise ValueError('请先将本集规划提交审核')
+            plan['status']=target
+        elif target=='review':
             validate_adaptation_bundle(bundle)
             bundle['adaptationPlan']['status']='review'
             for plan in bundle['episodePlans']:plan['status']='review'
@@ -2000,6 +2011,14 @@ def review_adaptation(production_id:str,body:RevisionAction):
 @app.post('/api/productions/{production_id}/adaptation/approve')
 def approve_adaptation(production_id:str,body:RevisionAction):
     return transition_adaptation(production_id,body.revision,'approved')
+
+@app.post('/api/productions/{production_id}/adaptation/episodes/{episode_no}/review')
+def review_episode_plan(production_id:str,episode_no:int,body:RevisionAction):
+    return transition_adaptation(production_id,body.revision,'review',episode_no)
+
+@app.post('/api/productions/{production_id}/adaptation/episodes/{episode_no}/approve')
+def approve_episode_plan(production_id:str,episode_no:int,body:RevisionAction):
+    return transition_adaptation(production_id,body.revision,'approved',episode_no)
 
 @app.post('/api/productions/{production_id}/adaptation/generate')
 def generate_adaptation(production_id:str,body:TextGenerationCreate):

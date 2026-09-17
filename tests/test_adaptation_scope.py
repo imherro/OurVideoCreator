@@ -1,10 +1,22 @@
 import copy
 from tests.test_adaptation import adaptation_client, setup_production, save_and_approve, owned_revision
+from tests.test_p5_object_transactions import team,admin,clients,clear_auth_rate_limits
 
 
 def save_bundle(client,root,value):
     return client.put(root+'/adaptation',json={key:value[key] for key in
         ('revision','adaptationPlan','episodePlans','monetizationPlan')})
+
+
+def test_episode_plan_review_requires_manager(team):
+    root='/api/productions/'+team['production']
+    current=team['admin'].get(root+'/adaptation').json()
+    for actor in (team['a'],team['viewer']):
+        for action in ('review','approve'):
+            response=actor.post(root+'/adaptation/episodes/1/'+action,json={'revision':current['revision']})
+            assert response.status_code==403,response.text
+    assert team['admin'].get(root+'/adaptation').json()==current
+    assert team['admin'].post(root+'/adaptation/episodes/999/review',json={'revision':current['revision']}).status_code==404
 
 
 def approved_script(client,root,number,chapter):
@@ -105,3 +117,15 @@ def test_manual_plans_preserve_episode_with_accepted_canonical_video(adaptation_
         result=save_bundle(client,root,current)
         assert result.status_code==409,result.text
     assert client.get(root+'/adaptation').json()==current
+    path=root+'/adaptation/episodes/2'
+    assert client.post(path+'/approve',json={'revision':current['revision']}).status_code==400
+    reviewed=client.post(path+'/review',json={'revision':current['revision']})
+    assert reviewed.status_code==200,reviewed.text
+    assert reviewed.json()['episodePlans'][0]==current['episodePlans'][0]
+    assert reviewed.json()['adaptationPlan']==current['adaptationPlan']
+    assert client.post(path+'/approve',json={'revision':current['revision']}).status_code==409
+    approved=client.post(path+'/approve',json={'revision':reviewed.json()['revision']})
+    assert approved.status_code==200,approved.text
+    assert approved.json()['episodePlans'][1]['status']=='approved'
+    assert approved.json()['episodePlans'][0]==current['episodePlans'][0]
+    assert client.post(root+'/adaptation/episodes/1/review',json={'revision':approved.json()['revision']}).status_code==409

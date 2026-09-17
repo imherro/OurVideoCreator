@@ -17,6 +17,7 @@ const storyGroups = [
   ["storyArc", "故事弧", [["opening", "开局"], ["development", "发展"], ["turningPoint", "转折"], ["climax", "高潮"], ["ending", "结局"]]],
   ["adaptationStrategy", "改编策略", [["audience", "目标受众"], ["tone", "基调"], ["changes", "改编取舍"], ["constraints", "保留约束"]]],
 ] as const;
+const planningContent=(value:Value)=>JSON.stringify([value.adaptationPlan,value.episodePlans,value.monetizationPlan]);
 
 export function AdaptationPage({
   productionId, projectId, providers, defaultTarget, refreshKey = 0, request, notify, report, onRevision, onOpenSource,
@@ -31,6 +32,7 @@ export function AdaptationPage({
   const [chapters, setChapters] = useState<Value[]>([]);
   const [active, setActive] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [savedContent,setSavedContent]=useState('');
   const textProviders = useMemo(
     () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
@@ -46,6 +48,7 @@ export function AdaptationPage({
       request(`/productions/${productionId}/chapters`),
     ]);
     setDraft(value);
+    setSavedContent(planningContent(value));
     onRevision(value.revision);
     setChapters(sourceChapters);
     setActive((current) => Math.min(Math.max(1, current), Math.max(1, value.episodePlans.length)));
@@ -73,13 +76,21 @@ export function AdaptationPage({
       method: "PUT",
       body: JSON.stringify({ revision: draft.revision, adaptationPlan: draft.adaptationPlan, episodePlans: draft.episodePlans, monetizationPlan: draft.monetizationPlan }),
     });
-    setDraft(value); onRevision(value.revision); notify("改编策划已保存为草稿");
+    setDraft(value);setSavedContent(planningContent(value)); onRevision(value.revision); notify("改编策划已保存");
   }
   async function transition(action: "review" | "approve") {
     if (!draft) return;
+    if(planningContent(draft)!==savedContent)throw new Error('请先保存改编草稿，再审核已保存版本');
     const value = await request(`/productions/${productionId}/adaptation/${action}`, { method: "POST", body: JSON.stringify({ revision: draft.revision }) });
-    setDraft(value); onRevision(value.revision);
+    setDraft(value);setSavedContent(planningContent(value)); onRevision(value.revision);
     notify(action === "review" ? "改编策划已提交审核" : "改编策划已批准，可以生成逐集剧本");
+  }
+  async function transitionEpisode(action:'review'|'approve'){
+    if(!draft||planningContent(draft)!==savedContent)throw new Error('请先保存草稿，再审核当前集');
+    const value=await request(`/productions/${productionId}/adaptation/episodes/${active}/${action}`,
+      {method:'POST',body:JSON.stringify({revision:draft.revision})});
+    setDraft(value);setSavedContent(planningContent(value));onRevision(value.revision);
+    notify(action==='review'?'本集规划已提交审核':'本集规划已批准，其他集状态保持');
   }
   async function generate() {
     if (!draft) return;
@@ -94,6 +105,7 @@ export function AdaptationPage({
       body: JSON.stringify({ revision: draft.revision, adaptationPlan: draft.adaptationPlan, episodePlans, monetizationPlan: draft.monetizationPlan }),
     });
     setDraft({ ...saved, sourceEventCount: draft.sourceEventCount });
+    setSavedContent(planningContent(saved));
     onRevision(saved.revision);
     await request(`/productions/${productionId}/adaptation/generate`, {
       method: "POST",
@@ -104,15 +116,16 @@ export function AdaptationPage({
   if (!draft) return <div className="loading"><RefreshCw className="spin" />加载改编策划…</div>;
   const plan: EpisodePlan | undefined = draft.episodePlans.find((item: EpisodePlan) => item.episodeNo === active);
   const format = draft.adaptationPlan.format;
-  return <section className="adaptation-page workflow-domain-page">
+  const dirty=planningContent(draft)!==savedContent;
+  return <fieldset disabled={busy} style={{border:0,padding:0,margin:0,minWidth:0}}><section className="adaptation-page workflow-domain-page">
     <header className="domain-header">
       <div><span className="eyebrow">ADAPTATION</span><h1>改编工作台</h1><p>原著事件 → 故事骨架 → 改编策略 → 分集规划。所有 AI 结果都需要人工批准。</p></div>
       <div className="settings-actions">
         <span className={`workflow-status ${draft.adaptationPlan.status}`}>{STATUS_LABELS[draft.adaptationPlan.status] || draft.adaptationPlan.status}</span>
         <button disabled={busy} onClick={() => run(load)}><RefreshCw size={15} />刷新</button>
         <button disabled={busy} onClick={() => run(save)}><Save size={15} />保存草稿</button>
-        <button disabled={busy} onClick={() => run(() => transition("review"))}>提交审核</button>
-        <button className="primary" disabled={busy || draft.adaptationPlan.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
+        <button disabled={busy||dirty} onClick={() => run(() => transition("review"))}>提交审核</button>
+        <button className="primary" disabled={busy || dirty || draft.adaptationPlan.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
       </div>
     </header>
     <div className="adaptation-layout"><main className="adaptation-main">
@@ -124,6 +137,10 @@ export function AdaptationPage({
       </div><button onClick={() => setDraft((current) => current && ({ ...current, episodePlans: createEpisodePlans(current.adaptationPlan.format.episodeCount, current.adaptationPlan.format.targetDuration, current.episodePlans) }))}>按规格建立 / 调整分集规划</button></article>
       {storyGroups.map(([key, title, fields]) => <article className="domain-card" key={key}><h2>{title}</h2><div className="domain-fields">{fields.map(([field, label]) => <label key={field}>{label}<textarea rows={2} value={draft.adaptationPlan[key]?.[field] || ""} onChange={(e) => setStory(key, field, e.target.value)} /></label>)}</div></article>)}
       <article className="domain-card"><div className="domain-card-heading"><div><h2>分集规划</h2><small>{draft.episodePlans.length} 集 · 当前 EP{String(active).padStart(2, "0")}</small></div></div>
+        {plan&&<div className="settings-actions"><span>{STATUS_LABELS[plan.status]||plan.status}</span>
+          <button disabled={busy||dirty} onClick={()=>run(()=>transitionEpisode('review'))}>本集提交审核</button>
+          <button disabled={busy||dirty||plan.status!=='review'} onClick={()=>run(()=>transitionEpisode('approve'))}>批准本集规划</button>
+          {dirty&&<small>有未保存修改，请先保存草稿。</small>}</div>}
         {plan ? <div className="episode-plan-editor"><div className="domain-fields">
           <label>一句话梗概<textarea rows={2} value={plan.logline} onChange={(e) => setPlan({ logline: e.target.value })} /></label>
           <label>核心冲突<textarea rows={2} value={plan.coreConflict} onChange={(e) => setPlan({ coreConflict: e.target.value })} /></label>
@@ -137,7 +154,7 @@ export function AdaptationPage({
       <MonetizationEditor draft={draft} setDraft={setDraft} />
     </main><aside className="episode-plan-list"><h3>分集导航</h3>{draft.episodePlans.map((item: EpisodePlan) => <button key={item.episodeNo} className={active === item.episodeNo ? "active" : ""} onClick={() => setActive(item.episodeNo)}><span>EP{String(item.episodeNo).padStart(2, "0")}</span><small className={item.status}>{STATUS_LABELS[item.status] || item.status}</small></button>)}</aside></div>
     <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => setProviderId(e.target.value)}><option value="" disabled>请选择平台模型</option>{textProviders.map((item) => <option key={item.id} value={item.id}>外部 API · {item.name}</option>)}</select></label>{!textProviders.length&&<p className="error">暂无可用平台文本模型，请联系管理员。</p>}{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
-  </section>;
+  </section></fieldset>;
 }
 
 function MonetizationEditor({ draft, setDraft }: { draft: Value; setDraft: (value: Value) => void }) {
