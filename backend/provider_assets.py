@@ -43,7 +43,7 @@ def valid_signature(asset_id: str, expires: int, supplied: str, method: str = 'G
     return hmac.compare_digest(signature(asset_id, expires, signed_method, purpose), str(supplied or ''))
 
 
-def public_asset_url(provider: dict, asset_id: str, ttl: int = DEFAULT_TTL) -> str:
+def public_asset_base(provider: dict) -> str:
     section = (provider.get('parameters') or {}).get('video') or {}
     base = str(
         section.get('public_base_url')
@@ -53,7 +53,12 @@ def public_asset_url(provider: dict, asset_id: str, ttl: int = DEFAULT_TTL) -> s
     parsed = urlparse(base)
     if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.username:
         raise ValueError('请在幻场 AI 设置中填写安影的公网访问地址，例如 https://vc.goroc.com')
-    validate_url(base,resolve=True)
+    validate_url(base, resolve=True)
+    return base
+
+
+def public_asset_url(provider: dict, asset_id: str, ttl: int = DEFAULT_TTL) -> str:
+    base = public_asset_base(provider)
     expires = int(time.time()) + max(60, min(int(ttl), DEFAULT_TTL))
     purpose = 'provider-input'
     token = signature(asset_id, expires, 'GET', purpose)

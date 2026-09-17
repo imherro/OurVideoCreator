@@ -272,7 +272,25 @@ def generate_video(worker, job, provider):
         remote = job.get('provider_job_id')
         if not remote:
             dialogue_reference = bool(job['input'].get('dialogue_audio'))
-            if dialogue_reference:
+            if (job['input'].get('generation_mode') or {}).get('requested') == 'multimodal':
+                from ..motion_references import silent_motion_asset
+                endpoint = f'/openapi/v2/bytedance/{global_segment}/multimodal-video'
+                body = {**base, 'imageUrls': [_upload(client, root, asset) for asset in refs],
+                    'ratio': str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
+                    'realPersonMode': True, 'conversionSlots': ['all'], 'omniReferenceTaskType': 'reference'}
+                if job['input'].get('motion_reference'):
+                    body['videoUrls'] = [_upload(client, root, silent_motion_asset(job))]
+                if dialogue_reference:
+                    from .volcengine_ark import _dialogue_reference_audio
+                    import base64
+                    track = s.ASSETS / (s.uid('motion-dialogue-') + '.mp3')
+                    try:
+                        track.write_bytes(base64.b64decode(_dialogue_reference_audio(job, duration).split(',', 1)[1]))
+                        body['audioUrls'] = [_upload(client, root, {'path': track.name, 'mime': 'audio/mpeg'})]
+                    finally:
+                        track.unlink(missing_ok=True)
+                    body['generateAudio'] = True
+            elif dialogue_reference:
                 from .volcengine_ark import _dialogue_reference_audio, _dialogue_reference_prompt
                 worker.progress(job, '编排固定对白音频参考')
                 endpoint = f'/openapi/v2/bytedance/{global_segment}/multimodal-video'

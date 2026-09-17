@@ -1,5 +1,6 @@
 import { requiresInitialStateReview } from "./graph.ts";
 import { shotIdentity } from "./storyboard.ts";
+import {videoGenerationMode} from './motionReference.ts';
 
 type Value = Record<string, any>;
 
@@ -65,6 +66,10 @@ export function deriveVideoProductionRows(
     const videoAsset = videoNode?.data?.assetId ? assetMap.get(videoNode.data.assetId) : undefined;
     const job = latestJob(jobs, videoNode?.id);
     const provider = providerMap.get(videoNode?.data?.model_id);
+    const mode=videoGenerationMode(document,shot),multimodal=mode==='multimodal';
+    const motionAsset=assets.find(asset=>asset.id===shot.motionReference?.assetId&&asset.kind==='video');
+    const bindings=shot.assetBindings||{};
+    const hasVisualBindings=Boolean(bindings.characters?.length||bindings.scene?.versionId||bindings.props?.length);
     const profiles = document.filmBible?.voices?.profiles || {};
     const dialogues = Array.isArray(shot.dialogues) ? shot.dialogues.filter((item: Value) => String(item.text || "").trim()) : [];
     const dialogueAudioAssets: Value[] = [];
@@ -99,23 +104,31 @@ export function deriveVideoProductionRows(
     const catalogCapabilities = modelCapabilities[
       String(videoNode?.data?.model_id || "")
     ];
-    const endFrameSupported = Boolean(
+    const endFrameSupported = Boolean((multimodal&&provider?.capabilities?.image_reference)||(
       catalogCapabilities?.end_frame ??
       videoNode?.data?.model_capabilities?.end_frame ??
       provider?.capabilities?.end_frame ??
-      false
+      false)
     );
     let readinessReason = "";
     if (!videoNode) readinessReason = "视频生成节点不存在";
-    else if (!firstFrame) readinessReason = "缺少已生成的首帧";
+    else if (!firstFrame&&!multimodal) readinessReason = "缺少已生成的首帧";
     else if (imageNode?.data?.stale) readinessReason = "首帧已经过期，请先重新生成并核验";
     else if (requiresInitialStateReview(imageNode?.data?.prompt) && !imageNode?.data?.state_reviewed)
       readinessReason = "首帧包含关键初始状态，尚未人工核验";
     else if (!String(videoNode.data?.prompt || "").trim()) readinessReason = "Video Prompt 为空";
     else if (!provider || videoNode.data?.model_id === "local") readinessReason = "尚未选择可用的视频 Provider";
     else if (!String(videoNode.data?.model_id || "").trim()) readinessReason = "尚未选择视频模型";
+    else if (multimodal&&!provider?.capabilities?.multimodal_reference) readinessReason = "所选平台模型未发布多模态参考能力";
+    else if (shot.motionReference&&mode!=='multimodal') readinessReason = "动作视频需要明确选择多模态参考";
+    else if (shot.motionReference&&!provider?.capabilities?.video_reference) readinessReason = "所选模型未发布动作视频参考能力";
+    else if (shot.motionReference&&!motionAsset) readinessReason = "动作参考视频不存在或不可访问";
+    else if (multimodal&&!firstFrame&&!motionAsset&&!hasVisualBindings&&!videoNode.data?.asset_ids?.length&&!videoNode.data?.end_asset_id
+      &&!(dialogueAudioAssets.length&&provider?.capabilities?.audio_only_reference)) readinessReason = "多模态模式缺少参考素材";
     else if (videoNode.data?.end_asset_id && !endFrameSupported) readinessReason = "当前模型不支持尾帧";
     else if (dialogueReadinessReason) readinessReason = dialogueReadinessReason;
+    else if (mode!=='legacy'&&!multimodal&&dialogueAudioAssets.length) readinessReason = "严格帧模式不能混入固定对白音频";
+    else if (multimodal&&Math.ceil(effectiveDuration)>Number(provider?.capabilities?.max_video_duration||30)) readinessReason = "镜头/对白超过模型时长上限，请拆分镜头";
 
     let status: VideoProductionStatus;
     if (["queued", "running", "interrupted"].includes(job?.status)) status = "generating";
@@ -125,7 +138,7 @@ export function deriveVideoProductionRows(
     else if (readinessReason) status = "blocked";
     else status = "ready";
 
-    const submissionDuration = ["volcengine_ark", "runninghub", "hc_atom"].includes(provider?.type)
+    const submissionDuration = multimodal ? Math.max(4,Math.ceil(effectiveDuration)) : ["volcengine_ark", "runninghub", "hc_atom"].includes(provider?.type)
       ? Math.max(4, Math.min(30, Math.ceil(effectiveDuration)))
       : Math.ceil(effectiveDuration);
     return {

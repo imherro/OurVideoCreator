@@ -735,6 +735,7 @@ class ProjectCreate(StrictBody):
     video_ratio:str=Field(default='16:9')
     video_duration:int=Field(default=-1)
     video_format:str=Field(default='mp4')
+    video_reference_mode:str=Field(default='legacy')
     episode_count:int=Field(default=1,ge=1,le=500)
     platform:str=Field(default='通用短视频',min_length=1,max_length=100)
     brief:str|None=Field(default=None,max_length=24000)
@@ -768,6 +769,9 @@ def project_create_document(body:ProjectCreate):
     document['videoRatio']=body.video_ratio
     document['videoDuration']=body.video_duration
     document['videoFormat']=body.video_format
+    if body.video_reference_mode not in ('legacy','multimodal','first_frame','first_last_frame'):
+        raise ValueError('视频参考模式无效')
+    if body.video_reference_mode!='legacy': document['videoReferenceMode']=body.video_reference_mode
     if body.brief is not None:document['brief']=body.brief
     if body.generation_policy is not None:
         document['generationPolicy']=validate_generation_policy(
@@ -1180,11 +1184,67 @@ def image_spec_preview(pid:str,body:ImageSpecPreview):
         return binding.image_spec
 
 
+class VideoSpecPreview(StrictBody):
+    node_id: str
+    model_id: str
+    node_data: dict = Field(default_factory=dict)
+    shot: dict = Field(default_factory=dict)
+    videoReferenceMode: str | None = None
+
+
+@app.post('/api/projects/{pid}/video-spec')
+def video_spec_preview(pid:str,body:VideoSpecPreview):
+    import copy
+    from .motion_references import compile_motion_input, _shot_for_video_node
+    from .video_dialogue import compile_shot_video_input, bind_fixed_dialogue_audio
+    model_validation.reject_private_overrides(body.model_dump())
+    if set(body.shot)-{'motionReference','videoReferenceMode','video_prompt','duration','camera'}:
+        raise ValueError('视频预览只接受本镜头参考设置，不接受其他业务对象')
+    with s.db() as c:
+        collaboration.project_scope(c,pid,'viewer')
+        state=read_project_state(c,pid)
+    document=copy.deepcopy(state['document'])
+    shot=_shot_for_video_node(document,body.node_id)
+    node=next((item for item in document.get('nodes',[]) if item['id']==body.node_id),None)
+    if shot is None or node is None or node.get('data',{}).get('kind')!='video':
+        raise HTTPException(404,'视频预览目标镜头不存在')
+    shot.update(body.shot)
+    node['data'].update(body.node_data)
+    if 'video_prompt' in body.shot: node['data']['prompt']=shot['video_prompt']
+    if body.videoReferenceMode is not None: document['videoReferenceMode']=body.videoReferenceMode
+    provider=next((item for item in platform_models.compiler_catalog() if item['id']==body.model_id),None)
+    if provider is None: raise ValueError('请选择已发布的平台视频模型')
+    data={**node['data'],'model_id':body.model_id}
+    # Collect saved graph inputs just as the single-node submit UI does.
+    nodes={item['id']:item['data'] for item in document.get('nodes',[])}
+    data['asset_ids']=list(dict.fromkeys([*data.get('asset_ids',[]), *[
+        nodes[edge['source']]['assetId'] for edge in document.get('edges',[])
+        if edge.get('target')==body.node_id and nodes.get(edge.get('source'),{}).get('kind')=='image'
+        and nodes[edge['source']].get('assetId')]]))
+    data=compile_shot_video_input(document,body.node_id,'video',data,parameter_rules=provider['rules'])
+    if provider['type'] in ('volcengine_ark','runninghub') or (provider['type']=='hc_atom' and provider['capabilities'].get('audio_reference')):
+        data=bind_fixed_dialogue_audio(document,body.node_id,'video',data,
+            production_assets(state['project']['production_id'],kind='audio'),
+            parameter_rules=provider['rules'],require_canonical=provider['type']=='hc_atom')
+    data=compile_motion_input(document,body.node_id,'video',data,pid,provider)
+    with s.db() as c:
+        binding=platform_models.resolve(c,body.model_id,'video',data,document=document,node_id=body.node_id)
+        selected=platform_models.config_for_binding(c,binding)
+    if data.get('motion_reference') and provider['type'] in ('volcengine_ark','hc_atom'):
+        from .provider_assets import public_asset_base
+        public_asset_base(selected)
+    data['parameters']=binding.parameters
+    # Deliberate whitelist: no private model identity, provider URL, credentials, or arbitrary node fields.
+    return {key:data[key] for key in ('prompt','generation_mode','motion_reference','reference_manifest',
+        'motion_warnings','planned_shot_duration','shot_duration','parameters','dialogue_audio_mode') if key in data}
+
+
 def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     from .job_contracts import freeze_prompt_contract
     from .job_candidates import freeze_relation
     model_validation.reject_private_overrides(body.input)
     body.input.pop('image_spec',None)  # Read-only projection, never trust caller metadata.
+    body.input.pop('video_spec',None)
     submitted_input=body.input
     body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
@@ -1239,6 +1299,10 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if body.kind!='video':raise ValueError('MiniMax 原生服务仅支持视频节点')
         payload({**body.input,**binding.parameters,'parameters':binding.parameters},selected)
     references=list(body.input.get('asset_ids',[]))
+    multimodal=(body.input.get('generation_mode') or {}).get('requested')=='multimodal'
+    if body.input.get('motion_reference') and selected and selected['type'] in ('volcengine_ark','hc_atom'):
+        from .provider_assets import public_asset_url
+        public_asset_url(selected, 'motion-preflight')
     if body.input.get('end_asset_id'):references.append(body.input['end_asset_id'])
     if selected and selected.get('type')=='volcengine_ark':
         from .providers.volcengine_ark import max_image_references, model_capabilities
@@ -1247,7 +1311,7 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
             if 'image_reference_sources' in body.input
             else len(body.input.get('asset_ids',[]))
         )
-        if body.kind=='video' and ark_video_reference_count>1:
+        if body.kind=='video' and ark_video_reference_count>1 and not multimodal:
             raise ValueError('当前火山方舟视频最多接受一张首帧，请移除多余引用')
         if body.kind=='video' and body.input.get('end_asset_id') and ark_video_reference_count!=1:
             raise ValueError('使用火山方舟尾帧时必须同时指定一张首帧')
@@ -1261,7 +1325,7 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if body.kind=='video' and body.input.get('dialogue_audio'):
             from .providers.hc_atom import validate_fixed_dialogue
             validate_fixed_dialogue(selected, body.input, binding.parameters)
-        if body.kind=='video' and len(body.input.get('asset_ids',[]))>1:
+        if body.kind=='video' and len(body.input.get('asset_ids',[]))>1 and not multimodal:
             raise ValueError('幻场 AI 通用视频接口最多提交一张参考图')
         if body.kind=='video' and body.input.get('end_asset_id'):
             raise ValueError('幻场 AI 通用视频接口暂未声明尾帧协议，请清除尾帧')
@@ -1316,6 +1380,11 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     input_hash=job_admission.fingerprint(pid,body,target,binding)
     if binding and binding.image_spec:
         body.input={**body.input,'image_spec':binding.image_spec}
+    if binding and body.kind=='video' and body.input.get('generation_mode'):
+        body.input={**body.input,'video_spec':{
+            **{key:body.input[key] for key in ('generation_mode','reference_manifest','motion_reference',
+                'motion_warnings','planned_shot_duration','shot_duration') if key in body.input},
+            'parameters':binding.parameters}}
     c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id,submission_namespace,input_hash)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id,entrypoint,input_hash))
     if binding:
@@ -1379,6 +1448,9 @@ def submit(pid:str,body:JobCreate):
     if body.kind in ('text','storyboard') and prepared_input.get('target_duration') is None:
         prepared_input={**prepared_input,'target_duration':saved_project['document'].get('duration',15)}
     body=body.model_copy(update={'input':prepared_input})
+    from .motion_references import compile_motion_input
+    body=body.model_copy(update={'input':compile_motion_input(
+        project_state['document'],body.node_id,body.kind,body.input,pid,selected_provider)})
     with s.db() as c:
         job_admission.lock(c)
         if body.input.get('reference_compiler'):
@@ -2109,6 +2181,9 @@ def prepare_run_workflow(pid,body):
         for aid in data['asset_ids']:
             reference_asset(pid,aid)
         provider=providers.get(data.get('model_id'))
+        from .motion_references import resolve_generation_mode
+        from .video_dialogue import _shot_for_video_node
+        multimodal=kind=='video' and resolve_generation_mode(p['document'],_shot_for_video_node(p['document'],node['id']))['requested']=='multimodal'
         if provider and provider.get('type')=='volcengine_ark':
             if kind=='video':
                 data=bind_fixed_dialogue_audio(
@@ -2124,9 +2199,9 @@ def prepare_run_workflow(pid,body):
                 }
             from .providers.volcengine_ark import max_image_references
             reference_count=len(data['asset_ids'])+generated_image_parents
-            if kind=='video' and reference_count>1:
+            if kind=='video' and reference_count>1 and not multimodal:
                 raise ValueError('当前火山方舟视频最多接受一张首帧，请只保留一条图像连线或一张素材')
-            if kind=='video' and data.get('end_asset_id') and reference_count!=1:
+            if kind=='video' and data.get('end_asset_id') and reference_count!=1 and not multimodal:
                 raise ValueError('使用火山方舟尾帧时必须同时保留一张首帧')
             if kind=='image' and reference_count>max_image_references(provider):
                 raise ValueError(f'当前火山方舟图片模型最多支持 {max_image_references(provider)} 张参考图，请移除多余引用')
@@ -2139,9 +2214,9 @@ def prepare_run_workflow(pid,body):
                     parameter_rules=provider.get('rules',{}), require_canonical=True,
                 )
             reference_count=len(data['asset_ids'])+generated_image_parents
-            if kind=='video' and reference_count>1:
+            if kind=='video' and reference_count>1 and not multimodal:
                 raise ValueError('幻场 AI 通用视频接口最多提交一张参考图')
-            if kind=='video' and data.get('end_asset_id'):
+            if kind=='video' and data.get('end_asset_id') and not multimodal:
                 raise ValueError('幻场 AI 通用视频接口暂未声明尾帧协议，请清除尾帧')
             if kind=='image' and reference_count>10:
                 raise ValueError('幻场 AI 图片任务最多提交 10 张参考图')
@@ -2167,6 +2242,10 @@ def prepare_run_workflow(pid,body):
             # upstream image branches before any expensive parent job starts.
             if len(data['asset_ids'])+generated_image_parents>1:
                 raise ValueError('MiniMax 图生视频仅接受一张首帧；请保留一条图像连线或在节点中选择一张素材')
+        from .motion_references import compile_motion_input
+        data['image_reference_sources']=reference_sources
+        data=compile_motion_input(p['document'],node['id'],kind,data,pid,provider)
+        reference_sources=data.get('image_reference_sources',reference_sources)
         if not data.get('prompt','').strip():
             if not parents: raise ValueError(f'节点 {data.get("label",node["id"])} 缺少输入')
             data['prompt']={'text':'根据上游信息编写剧本','storyboard':'将上游剧本拆解为结构化分镜','image':'生成上游描述的电影画面','video':'根据上游画面与描述生成动态镜头'}[kind]

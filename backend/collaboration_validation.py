@@ -46,6 +46,8 @@ def envelope(kind, content):
             invalid('镜头及其附属节点格式无效')
         identifier(shot.get('uid') or shot.get('id'))
         identifier(shot.get('id'))
+        from .motion_references import validate_shot_reference
+        validate_shot_reference(shot)
         children = content['nodes']
         links = {value for value in (shot.get('imageNode'), shot.get('videoNode'),
                  (shot.get('pipeline') or {}).get('imageNodeId'),

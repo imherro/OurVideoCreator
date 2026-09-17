@@ -397,7 +397,7 @@ def authorize_request(request: Request, principal: Principal) -> None:
                 needed = 'manager'
             if method == 'POST' and re.fullmatch(r'objects/[^/]+/comments', suffix):
                 needed = 'viewer'
-            if method == 'POST' and suffix == 'image-spec':
+            if method == 'POST' and suffix in ('image-spec','video-spec'):
                 needed = 'viewer'  # Pure local preview; never writes or calls a provider.
             if method == 'DELETE' and suffix.startswith('assets/'):
                 needed = 'manager'

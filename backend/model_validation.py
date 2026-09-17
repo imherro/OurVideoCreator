@@ -160,15 +160,33 @@ def model_definition(body, config, kind):
         raise ValueError('当前 MiniMax 原生适配器仅接通 MiniMax-Hailuo-2.3')
     caps = value.setdefault('capabilities', {})
     _object(caps, {'image_reference', 'end_frame', 'audio_reference', 'max_references',
+                  'multimodal_reference', 'video_reference', 'max_reference_duration', 'max_video_duration', 'audio_only_reference',
                   'requires_reference', 'max_prompt_length',
                   'fps', 'min_frames', 'frame_step', 'max_frames'}, '模型能力')
-    for name in ('image_reference', 'end_frame', 'audio_reference', 'requires_reference'):
+    for name in ('image_reference', 'end_frame', 'audio_reference', 'requires_reference',
+                 'multimodal_reference', 'video_reference', 'audio_only_reference'):
         if name in caps and type(caps[name]) is not bool:
             raise ValueError('模型能力必须为布尔值')
     for name, ceiling in (('max_references', 30), ('max_prompt_length', 240000)):
         if name in caps and (type(caps[name]) is not int or not 0 <= caps[name] <= ceiling):
             raise ValueError('模型能力上限无效')
     timing = {'fps', 'min_frames', 'frame_step', 'max_frames'}
+    reference_limits = None
+    if caps.get('multimodal_reference'):
+        from .motion_references import protocol_limits
+        if kind != 'video':
+            raise ValueError('多模态参考能力仅用于视频')
+        reference_limits = protocol_limits(config['type'], value['upstream_model'])
+        maximum = caps.setdefault('max_reference_duration', reference_limits['max_reference_duration'])
+        if type(maximum) is not int or not 2 <= maximum <= reference_limits['max_reference_duration']:
+            raise ValueError('动作参考时长超过已接通协议上限')
+        video_maximum=caps.setdefault('max_video_duration',reference_limits['max_duration'])
+        if type(video_maximum) is not int or not 4 <= video_maximum <= reference_limits['max_duration']:
+            raise ValueError('视频输出时长超过已接通协议上限')
+        if caps.get('audio_only_reference') and not reference_limits['audio_only']:
+            raise ValueError('当前模型未接通仅音频参考')
+    elif caps.get('video_reference') or caps.get('audio_only_reference') or 'max_reference_duration' in caps or 'max_video_duration' in caps:
+        raise ValueError('参考视频及参考时长须同时发布多模态能力')
     if timing.intersection(caps):
         if kind != 'video' or not timing.issubset(caps):
             raise ValueError('视频帧数能力必须完整声明')
@@ -194,6 +212,8 @@ def model_definition(body, config, kind):
         raise ValueError('尾帧模式必须声明首帧参考能力')
     limit = ({'volcengine_ark':10,'hc_atom':10,'runninghub':10,'comfy':1}.get(config['type'],30)
              if kind=='image' else {'volcengine_ark':1,'hc_atom':1,'runninghub':30,'comfy':1,'maestro':1,'minimax':1}.get(config['type'],30))
+    if reference_limits:
+        limit = reference_limits['max_images']
     if caps.get('max_references',1)>limit:
         raise ValueError('参考图数量超过当前适配器已接通的上限')
     rules = value.setdefault('rules', {})

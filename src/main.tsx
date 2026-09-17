@@ -92,6 +92,8 @@ import {
 import { PromptLibrary } from "./PromptLibrary";
 import { ModelSelector } from "./ModelSelector";
 import { ImageGenerationSettings } from "./ImageGenerationSettings";
+import {MotionReferenceEditor} from './components/MotionReferenceEditor';
+import {videoModeLabels} from './motionReference';
 import { PlatformModels } from "./PlatformModels";
 import { GenerationPolicyPanel } from "./GenerationPolicyPanel";
 import { VisualStylePicker } from "./VisualStylePicker";
@@ -1384,13 +1386,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     if (!selected) return;
     if (data.canonicalScriptProjection)
       patch = { ...patch, generationPolicyInherited: false };
-    // Public capabilities decide whether a tail frame survives a model change.
-    const clearTail = 'model_id' in patch && patch.model_capabilities?.end_frame !== true;
+    // Keep authored bindings; unsupported combinations are reported before submission.
     update((d) =>
       patchNode(
         d,
         selected,
-        clearTail ? { ...patch, end_asset_id: "" } : patch,
+        patch,
       ),
     );
   }
@@ -1999,7 +2000,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const targets = validateVideoSubmission(rows, shotUids);
     let extendedCount = 0;
     for (const target of targets) {
-      if (target.effectiveDuration > target.plannedDuration) {
+      if ((target.shot.videoReferenceMode||(snapshot.doc as Any).videoReferenceMode)!=='multimodal'&&target.effectiveDuration > target.plannedDuration) {
         prepared = updateShot(prepared, target.shot.id, { duration: target.effectiveDuration }) as Doc;
         extendedCount += 1;
       }
@@ -2999,6 +3000,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "video" ? (
           <VideoProductionWorkspace
+            projectId={project.id}
+            onUploaded={asset=>setAssets(items=>[asset as Asset,...items])}
             document={doc}
             assets={assets}
             jobs={jobs}
@@ -3553,6 +3556,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 <small>生成后校验总时长，不合格时自动修正一次。</small>
               </label>
             )}
+            {data.kind==='video'&&doc.shots.filter(shot=>(shot.videoNode||shot.pipeline?.videoNodeId)===node.id).map(shot=><MotionReferenceEditor
+              key={shot.uid||shot.id} document={doc} shot={shot} node={node} assets={assets} models={config.models}
+              projectId={project.id} request={api} onUploaded={asset=>setAssets(items=>[asset as Asset,...items])}
+              onPatch={patch=>update(document=>updateStoryboardShot(document,shotIdentity(shot),patch))}/>)}
             {data.kind === 'image' ? <ImageGenerationSettings key={node.id} node={node} document={doc}
               projectId={project.id} models={config.models} request={api} onChange={changeModel}/> : <ModelSelector
               data={data}
@@ -4090,6 +4097,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                   <label>避免项（每行一项）<textarea value={projectBibleFields.avoidItems} onChange={(event)=>update((document)=>mergeBibleFields(document,{...bibleFields(document),avoidItems:event.target.value}))}/></label>
                 </> : <>
                   <h3>当前制作集设置</h3>
+                  <label>视频参考模式<select value={(doc as any).videoReferenceMode||'legacy'} onChange={event=>update(document=>({...document,videoReferenceMode:event.target.value}))}>{Object.entries(videoModeLabels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>仅影响本集跟随默认模式的镜头，原素材保留。</small></label>
                   <label>Episode 标题<input maxLength={100} value={project.name} onChange={(event)=>{setProject({...project,name:event.target.value,episode_title:event.target.value});dirty.current=true;setSaved("未保存");}}/><small>只修改当前 EP{String(project.episode_no).padStart(2,"0")}，不会改变整部作品名称。</small></label>
                   <label>创作简介<textarea value={doc.brief} onChange={(event)=>update((document)=>({...document,brief:event.target.value}))}/></label>
                   <div className="two-fields">

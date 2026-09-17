@@ -1,0 +1,5 @@
+.motion-reference-editor{display:grid;gap:8px;min-width:0;padding:10px;border:1px solid var(--border,#35404a);border-radius:8px}
+.motion-reference-editor label{display:grid;gap:5px;min-width:0}.motion-reference-editor details{min-width:0}.motion-reference-editor details>label{margin-top:8px}
+.motion-reference-editor small,.motion-preview p,.motion-preview li{overflow-wrap:anywhere}.motion-preview-actions{display:flex;gap:8px;flex-wrap:wrap}
+.motion-preview{min-width:0;max-height:520px;overflow:auto}.motion-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}
+.motion-reference-editor select,.motion-reference-editor textarea{max-width:100%;min-width:0}.motion-reference-editor input[type=file]{max-width:100%}

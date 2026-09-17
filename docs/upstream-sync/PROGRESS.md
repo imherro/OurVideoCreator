@@ -176,6 +176,26 @@
 
 前端 `npm run test:frontend` **232 passed / 0 failed / 0 skipped，1363.48ms**；`npm run build` **tsc与Vite exit0，Vite 7.61秒**，既有大chunk警告保留。未跑浏览器、全量后端或真实付费服务；本地合成MP3/MP4和MockTransport证明请求、下载登记与采纳，不代表供应商实际音色/口型质量已验收。`git diff --check`通过。PG夹具只释放各轮新建隔离测试库，保留用户库、历史媒体、草稿和服务；master工作区干净且仍为eeb7a4f。本批仅交付集成分支，不部署、不合并master。`READY_FOR_REVIEW`为开发交付标识，用户已取消外部ChatGPT审核，不代表外部PASS。
 
+## UPSTREAM-SYNC-10：动作参考视频与显式多模态模式
+
+来源 `67c9f5b` 及冻结上游动作参考文档、`4e86bac` / `77b99d7` 的多模态协议。协作版原来没有这一闭环，本批按需求适配，不将单机实现直接覆盖；相关上游提交还含音色样本、状态音色和后续参考缩略图等内容，不整体标记为全部完成。详细使用与约束见 [动作参考说明](../motion-reference.md)。
+
+- 网页新作品默认多模态，本集默认/镜头覆盖；旧文档及省略新字段的旧创建 API 保持 legacy。镜头保存一段 MP4 动作引用、角色和运镜模式；保留素材、计划时长和明确采纳流程。切模式/模型不删除绑定，不自动降级。
+- 只读 video-spec 与单次/精确批量共用服务端编译。图片（含全部已确认角色/场景/道具）、动作、已采纳对白统一清单和编号；超过公开能力报错而非截断。纯单图仍走显式参考协议，严格首/尾帧拒绝额外引用。待生成图片绑定 durable job ID；旧结果不混入，执行时多图结果明确拒绝，避免编号漂移。
+- FFmpeg 实测合法性和完整解码，冻结原文件 hash；第一次执行生成可复用静音派生 MP4，不改源文件、不裁剪变速。HC/Ark 使用短期签名 URL，RunningHub 上传视频/时序 MP3；预览没有 DB 写入。远端 handle 仅查询不补发。
+- 保留平台发布/冻结模型规则、服务端作品素材 ACL、对象负责人和 revision。引用/模式改变时在事务锁内只更新相关视频及下游的生成版本/stale，其他负责人正文/分配/租约不覆盖；旧编辑会冲突，晚到候选仍须明确采纳并保持 stale。
+- 视频工作区及高级画布可展开/刷新最终预览；生成忙碌不禁止只读查看。原“实际发送”客户端摘要改为折叠摘要，避免与服务器实际清单混淆。任务详情展示冻结参数。本批没有依赖、迁移或新后台页面；新增的是已有模型定义中的公开能力字段，没有修改现用配置。
+
+开发过程实际记录：初始专项修正只读路由、缺少导入以及预览完整参数对比后 9 passed；首次构建因混用 `||`/`??` 失败，修正括号后通过。随后专项 20 passed。新增单图测试初次 3 例未传单次请求的 asset_ids（批量/预览读取已保存字段），修正请求与实际 UI 一致；重复编译测试发现参考标签丢失，修复去重后合并标签，4 项复测通过。新增前端测试首次有一处括号笔误，修正后 236 passed。动态图片负例首次误用不可变终态的 job_update，改为仅在隔离测试库注入异常供应商结果；生产终态保护未放宽。
+
+前端最终 `npm test`：**236 passed / 0 failed / 0 skipped，1577.39ms**。最终 `npm run build`：**tsc/Vite exit0，Vite 8.01秒**，保留既有大 chunk 警告。额外供应商组合专项 `test_motion_references.py -k 'motion_and_adopted or 2.0 or 2-0'`：**6 passed / 26 deselected，41.84秒**，其中包括本次追加的5项和1项重复的发布上限测试，不与联合回归简单相加。
+
+浏览器实际组件隔离检查（无 API 代理、无业务库）：忙碌时生成按钮禁用但可展开预览，修改次数保持0；显示计划2秒/提交4秒/动作2秒；长中文 prompt 折行。切严格模式显示错误且保留绑定；切回后可继续使用；解绑时素材数仍1。浏览器技能用于实际交互/布局核对，不把 Mock 预览描述为登录后的业务 E2E。完成后只关闭本轮测试页及其 Vite 服务，没有停止用户实例。
+
+最终联合后端回归：`tests/test_motion_references.py tests/test_upstream_hc_dialogue.py tests/test_hc_atom.py tests/test_volcengine_ark.py tests/test_runninghub.py tests/test_video_dialogue.py tests/test_p5_object_transactions.py tests/test_p5_object_candidates.py tests/test_p5_run_permissions.py tests/test_p5_canonical_integration.py tests/test_p4_model_foundation.py tests/test_p4_submission_execution.py tests/test_image_settings.py tests/test_project_setup.py` → **204 passed，506.83秒，exit0**。该次收集包含动作专项27项；运行期间追加的2个2.0请求和3个动作+对白组合已在上述6项独立专项中验证。测试共同使用真实隔离PG，商业网络套接字禁用。未运行真实付费 Provider、完整业务浏览器 E2E 或全量后端测试，不对口型/动作跟随质量签发验收结论。
+
+`git diff --check` 通过；原 master 工作区干净，HEAD 仍为 `eeb7a4f`，不合并、不部署、不发送 ChatGPT 审核。仅提交/推送到 `origin/codex/upstream-sync-20260917`。`READY_FOR_REVIEW` 是开发交付标识，不代表新的外部 PASS。
+
 ## 后续队列
 
-前九组已完成各自专项，其余仍未全部移植。继续处理多模态/参考输入与音色剩余需求，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+前十组已完成各自验证并交付，其余仍未全部移植。后续处理音色样本/状态继承与剩余参考展示需求，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

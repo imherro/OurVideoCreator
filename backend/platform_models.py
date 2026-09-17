@@ -299,6 +299,10 @@ def resolve(connection, model_id, kind, inp, *, document=None, node_id=None, pre
 
 
 def validate_capabilities(caps, inp):
+    if (inp.get('generation_mode') or {}).get('requested') == 'multimodal' and not caps.get('multimodal_reference'):
+        raise ValueError('所选平台模型未发布多模态参考能力')
+    if inp.get('motion_reference') and not caps.get('video_reference'):
+        raise ValueError('所选平台模型未发布视频参考能力')
     prompt = inp.get('prompt', '')
     if not isinstance(prompt, str) or len(prompt) > caps.get('max_prompt_length', 240000):
         raise ValueError('提示词超过平台模型允许长度')

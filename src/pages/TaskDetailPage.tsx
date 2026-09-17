@@ -120,6 +120,11 @@ export function TaskDetailPage({ jobId, request }: { jobId: string; request: (pa
           <h3>User Prompt</h3><pre className="debug-block">{job.input?.prompt || "未记录"}</pre>
           <h3>Output Schema · {job.input?.schema_version || "无版本"}</h3><pre className="debug-block">{job.input?.response_schema ? JSON.stringify(job.input.response_schema, null, 2) : "此任务没有结构化输出 Schema"}</pre>
         </>}
+        {job.kind==='video'&&job.input?.video_spec&&<section><h3>视频参考清单（任务创建时冻结）</h3>
+          <p>模式：{job.input.video_spec.generation_mode?.actual} · 计划 {job.input.video_spec.planned_shot_duration} 秒 · 提交 {job.input.video_spec.shot_duration} 秒</p>
+          <ul>{(job.input.video_spec.reference_manifest||[]).map((item:Value)=><li key={`${item.kind}:${item.index}`}>{item.kind} {item.index} · {item.name} · {item.purpose||item.audio||''}</li>)}</ul>
+          {(job.input.video_spec.motion_warnings||[]).map((warning:string)=><p key={warning}>{warning}</p>)}
+          <pre className="debug-block">{JSON.stringify(job.input.video_spec.parameters,null,2)}</pre></section>}
         {job.kind==='image'&&job.input?.image_spec&&<section><h3>图片提交规格（任务创建时冻结）</h3>
           <p>{job.input.image_spec.ratio} · {job.input.image_spec.size||'平台未发布像素尺寸'} · {job.input.image_spec.seedSupported
             ? `实际种子：${job.input.image_spec.seed??'未记录'}`:'供应商控制随机性'}</p>

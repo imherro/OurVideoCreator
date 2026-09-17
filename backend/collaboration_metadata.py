@@ -10,7 +10,7 @@ from .generation_policy import validate_generation_policy
 
 router = APIRouter()
 EPISODE_FIELDS = {'brief', 'ratio', 'duration', 'videoResolution', 'videoRatio',
-                  'videoDuration', 'videoFormat', 'characters'}
+                  'videoDuration', 'videoFormat', 'videoReferenceMode', 'characters'}
 BIBLE_FIELDS = {'story', 'style', 'continuity', 'styleVersion'}
 
 
@@ -44,6 +44,8 @@ def check_episode(patch):
                 raise HTTPException(422, '视频输出时长须为 -1 或 4–30 秒')
     if 'characters' in patch and not isinstance(patch['characters'], list):
         raise HTTPException(422, '旧角色资料必须为列表')
+    if 'videoReferenceMode' in patch and patch['videoReferenceMode'] not in ('legacy','multimodal','first_frame','first_last_frame'):
+        raise HTTPException(422,'视频参考模式无效')
 
 
 @router.patch('/api/projects/{pid}/metadata')
@@ -59,6 +61,21 @@ def episode_metadata(pid: str, body: Metadata):
             raise HTTPException(409, {'type': 'metadata', 'revision': row['revision']})
         collab.validate_asset_references(c,row['production_id'],body.patch)
         metadata = json.loads(row['document'])
+        if 'videoReferenceMode' in body.patch and metadata.get('videoReferenceMode','legacy')!=body.patch['videoReferenceMode']:
+            from .motion_references import invalidated_nodes, invalidate_content
+            from .collaboration_document import object_content
+            objects=list(c.execute('SELECT * FROM collaboration_objects WHERE project_id=%s AND NOT deleted ORDER BY id FOR UPDATE',(pid,)))
+            roots=[]
+            for obj in objects:
+                value=object_content(obj)
+                if obj['kind']=='shot' and not value['shot'].get('videoReferenceMode'):
+                    roots.append(value['shot'].get('videoNode') or (value['shot'].get('pipeline') or {}).get('videoNodeId'))
+                elif obj['kind']=='node' and value['node']['data'].get('kind')=='video': roots.append(value['node']['id'])
+            affected=invalidated_nodes(objects,roots)
+            for obj in objects:
+                if collab.validation.node_ids(obj['kind'],object_content(obj)) & affected:
+                    obj['workspace_id']=scope['workspace_id']
+                    collab.replace_content(c,obj,invalidate_content(object_content(obj),affected),pid,'reference.invalidate')
         metadata.update({key: value for key,value in body.patch.items() if key in EPISODE_FIELDS})
         now = time.time()
         name = body.patch.get('name', row['name']).strip() or '未命名短片'

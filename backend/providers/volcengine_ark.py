@@ -409,7 +409,8 @@ def _dialogue_reference_prompt(prompt, image_count=0):
 
 
 def generate_video(worker, job, provider):
-    if len(job['input'].get('asset_ids',[]))>1:
+    multimodal = (job['input'].get('generation_mode') or {}).get('requested') == 'multimodal'
+    if len(job['input'].get('asset_ids',[]))>(provider.get('capabilities',{}).get('max_references',1) if multimodal else 1):
         raise ValueError('当前火山方舟视频最多接受一张首帧，请移除多余引用')
     if job['input'].get('end_asset_id') and len(job['input'].get('asset_ids',[]))!=1:
         raise ValueError('使用火山方舟尾帧时必须同时指定一张首帧')
@@ -417,7 +418,7 @@ def generate_video(worker, job, provider):
     if not model:
         raise ValueError('请填写火山方舟视频模型 ID')
     selected_model = str(model).strip()
-    if selected_model.lower().startswith(DISABLED_VIDEO_PREFIXES):
+    if selected_model.lower().startswith(DISABLED_VIDEO_PREFIXES) and not multimodal:
         raise ValueError('安影已停用 Seedance 2.0，请在项目设置中选择 Doubao-Seedance-2.5')
     root = _root(provider)
     remote = job.get('provider_job_id')
@@ -426,13 +427,21 @@ def generate_video(worker, job, provider):
         bool(job['input'].get('dialogue_audio'))
         and job['input'].get('dialogue_audio_mode') == DIALOGUE_REFERENCE_MODE
     )
-    if dialogue_reference and not selected_model.lower().startswith(SEEDANCE_25_PREFIX):
+    if dialogue_reference and not selected_model.lower().startswith(SEEDANCE_25_PREFIX) and not multimodal:
         raise ValueError('固定对白音频参考需要 Doubao-Seedance-2.5，请在项目设置中选择该模型')
     with provider_egress.client(origin=provider['url'],timeout=120, headers=_headers(provider), trust_env=True) as client:
         if not remote:
             assets=common.assets_for(job)
             content=[{'type': 'text', 'text': job['input']['prompt']}]
-            if assets:
+            if multimodal:
+                for asset in assets:
+                    content.append({'type':'image_url', 'image_url':{'url':seedance_frame(asset)['url']}, 'role':'reference_image'})
+                if job['input'].get('motion_reference'):
+                    from ..motion_references import silent_motion_asset
+                    from ..provider_assets import public_asset_url
+                    content.append({'type':'video_url', 'role':'reference_video',
+                                    'video_url':{'url':public_asset_url(provider,silent_motion_asset(job)['id'])}})
+            elif assets:
                 first=seedance_frame(assets[0])
                 content.append({
                     'type':'image_url',
@@ -462,9 +471,10 @@ def generate_video(worker, job, provider):
             )
             if dialogue_reference:
                 worker.progress(job, '编排固定对白音频参考')
-                prompt = _dialogue_reference_prompt(
-                    prompt, sum(item.get('role') == 'reference_image' for item in content),
-                )
+                if not multimodal:
+                    prompt = _dialogue_reference_prompt(
+                        prompt, sum(item.get('role') == 'reference_image' for item in content),
+                    )
                 content.append({
                     'type': 'audio_url',
                     'audio_url': {'url': _dialogue_reference_audio(job, submission_duration)},
@@ -479,11 +489,11 @@ def generate_video(worker, job, provider):
                     False if job['input'].get('dialogue_audio') else bool(params.get('generate_audio', True))
                 ),
             }
-            if dialogue_reference:
+            if (dialogue_reference or multimodal) and selected_model.lower().startswith(SEEDANCE_25_PREFIX):
                 body['omni_reference_task_type'] = 'reference'
             # Seedance derives image-to-video output ratio from the first frame
             # and rejects an explicit ratio for first-frame/first-last-frame jobs.
-            if not assets or dialogue_reference:
+            if not assets or dialogue_reference or multimodal:
                 body['ratio'] = str(job['input'].get('ratio') or params.get('ratio') or '16:9')
             if worker.cancelled(job):
                 raise InterruptedError()

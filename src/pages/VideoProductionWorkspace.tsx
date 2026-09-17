@@ -3,6 +3,7 @@ import { AlertCircle, ArrowUpRight, CheckSquare2, Film, Image as ImageIcon, Play
 import { deriveVideoProductionRows, videoSubmissionSummary, type VideoProductionStatus } from "../videoProduction.ts";
 import { ModelSelector } from "../ModelSelector";
 import { compileVideoPrompt } from "../videoDialogue.ts";
+import {MotionReferenceEditor} from '../components/MotionReferenceEditor';
 
 type Value = Record<string, any>;
 type Asset = { id: string; name: string; kind: string; url: string; metadata: Value; category: string; source: string };
@@ -12,7 +13,9 @@ type Props = {
   jobs: Value[];
   providers: Value[];
   busy: boolean;
-  request: (path: string) => Promise<any>;
+  projectId:string;
+  onUploaded:(asset:Value)=>void;
+  request: (path: string,init?:RequestInit) => Promise<any>;
   onPatchShot: (uid: string, patch: Value) => void;
   onPatchVideoNode: (nodeId: string, patch: Value) => void;
   onGenerate: (uids: string[]) => Promise<void>;
@@ -81,9 +84,12 @@ export function VideoProductionWorkspace(props: Props) {
           {row.endFrameSupported && <div className="video-frame-column"><small>END FRAME · 可选</small><button className="video-frame-preview" disabled={!row.endFrame} onClick={() => row.endFrame && props.onPreview(row.endFrame as Asset)}>{row.endFrame ? <img src={row.endFrame.url} alt="尾帧"/> : <span><ImageIcon/>未设置尾帧</span>}</button><select aria-label="尾帧素材" value={data.end_asset_id || ""} onChange={(event) => props.onPatchVideoNode(row.videoNode!.id,{end_asset_id:event.target.value})}><option value="">不使用尾帧</option>{props.assets.filter((asset) => asset.kind === "image").map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></div>}
           <div className="video-production-fields">
             <label>Video Prompt<textarea value={row.shot.video_prompt || ""} onChange={(event) => props.onPatchShot(row.uid,{video_prompt:event.target.value})}/></label>
-          <div className="video-dialogue-projection" aria-label="实际发送给视频模型"><header><b>实际发送给视频模型</b><small>{row.shot.dialogues?.length ? `已自动加入 ${row.shot.dialogues.length} 条对白` : "本镜无结构化对白"}</small></header><pre>{compileVideoPrompt(row.shot.video_prompt,row.shot,row.submissionDuration)}</pre>{row.submissionDuration !== row.plannedDuration && <small>分镜计划 {row.plannedDuration} 秒；结合项目策略、对白长度和模型限制，实际提交 {row.submissionDuration} 秒。</small>}{row.shot.dialogues?.length > 0 && ["volcengine_ark", "runninghub"].includes(row.provider?.type) && <small>{row.dialogueAudioAssets.length === row.shot.dialogues.length ? `固定音色对白已就绪 ${row.dialogueAudioAssets.length}/${row.shot.dialogues.length}；将作为 Seedance 2.5 音频参考提交。` : "请先在塑角造景生成当前音色版本的本镜对白。"}</small>}</div>
+          <details className="video-dialogue-projection"><summary>镜头与对白摘要（最终参数请展开下方提交预览）</summary><pre>{compileVideoPrompt(row.shot.video_prompt,row.shot,row.submissionDuration)}</pre>{row.submissionDuration !== row.plannedDuration && <small>分镜计划 {row.plannedDuration} 秒；预计提交 {row.submissionDuration} 秒，以服务端预览校验为准。</small>}</details>
             <div className="domain-fields three"><label>时长（秒）<input type="number" min="0.1" step="0.1" value={row.shot.duration ?? 3} onChange={(event) => props.onPatchShot(row.uid,{duration:Number(event.target.value)})}/></label><ModelSelector data={{...data,kind:"video"}} providers={providers} request={props.request}
-              onChange={patch=>props.onPatchVideoNode(row.videoNode!.id,{...patch,end_asset_id:""})}/></div>
+              onChange={patch=>props.onPatchVideoNode(row.videoNode!.id,patch)}/></div>
+            {row.videoNode&&<MotionReferenceEditor document={props.document} shot={row.shot} node={row.videoNode}
+             assets={props.assets} models={props.providers} projectId={props.projectId} request={props.request}
+             onUploaded={props.onUploaded} onPatch={patch=>props.onPatchShot(row.uid,patch)}/>}
             <div className="video-shot-context"><span>{row.shot.action || "未填写镜头动作"}</span><small>{row.shot.camera || "未设置机位"} · 分镜 {row.plannedDuration || 0} 秒 · 提交 {row.submissionDuration || 0} 秒</small></div>
           </div>
           <div className="video-result-column"><small>GENERATED VIDEO</small><button className="video-result-preview" disabled={!row.videoAsset} onClick={() => row.videoAsset && props.onPreview(row.videoAsset as Asset)}>{row.videoAsset ? <video src={row.videoAsset.url} muted preload="metadata"/> : <span><Film/>等待视频</span>}</button>{row.job && <div className="video-job-state"><span>{jobLabels[row.job.status] || row.job.status}</span>{row.job.progress != null && <b>{Math.round(row.job.progress)}%</b>}<small>{row.job.phase}</small></div>}</div>

@@ -42,6 +42,7 @@ export function createStoryboardShot<T extends FilmBibleDocument>(
         id: uid,
         uid,
         duration: 3,
+        videoReferenceMode: (document as Record<string,any>).videoReferenceMode && (document as Record<string,any>).videoReferenceMode !== 'legacy' ? undefined : 'multimodal',
         scene: "",
         characters: [],
         action: "",

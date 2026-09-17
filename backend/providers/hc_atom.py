@@ -430,10 +430,11 @@ def validate_fixed_dialogue(provider, inp, params):
 
 
 def _generate_seedance_v3(worker, job, provider, model, refs, params):
+    multimodal = (job['input'].get('generation_mode') or {}).get('requested') == 'multimodal'
     dialogue_reference = bool(job['input'].get('dialogue_audio'))
     if not job.get('provider_job_id'):
         validate_fixed_dialogue(provider, job['input'], params)
-    if len(refs) > 1:
+    if len(refs) > (provider.get('capabilities', {}).get('max_references', 1) if multimodal else 1):
         raise ValueError('幻场 Seedance 当前最多提交一张首帧，请移除多余引用')
     if job['input'].get('end_asset_id'):
         raise ValueError('幻场 Seedance 当前尚未开放尾帧绑定，请清除尾帧')
@@ -448,17 +449,23 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
             if dialogue_reference:
                 from .volcengine_ark import _dialogue_reference_audio, _dialogue_reference_prompt
                 audio_url = _dialogue_reference_audio(job, submitted, public_provider=provider)
-                prompt = _dialogue_reference_prompt(prompt, len(refs))
+                if not multimodal:
+                    prompt = _dialogue_reference_prompt(prompt, len(refs))
             content = [{
                 'type': 'text',
                 'text': prompt,
             }]
-            if refs:
+            for asset in refs:
                 content.append({
                     'type': 'image_url',
-                    'image_url': {'url': _register_seedance_asset(worker, job, client, provider, refs[0])},
-                    'role': 'reference_image' if dialogue_reference else 'first_frame',
+                    'image_url': {'url': _register_seedance_asset(worker, job, client, provider, asset)},
+                    'role': 'reference_image' if multimodal or dialogue_reference else 'first_frame',
                 })
+            if job['input'].get('motion_reference'):
+                from ..motion_references import silent_motion_asset
+                from ..provider_assets import public_asset_url
+                content.append({'type': 'video_url', 'role': 'reference_video',
+                    'video_url': {'url': public_asset_url(provider, silent_motion_asset(job)['id'])}})
             if audio_url:
                 content.append({'type': 'audio_url', 'audio_url': {'url': audio_url}, 'role': 'reference_audio'})
             resolution = str(params.get('resolution') or '720p').lower()
@@ -468,11 +475,11 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
                 'model': model,
                 'content': content,
                 'resolution': resolution,
-                'ratio': 'adaptive' if refs and not dialogue_reference else str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
+                'ratio': 'adaptive' if refs and not (multimodal or dialogue_reference) else str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
                 'duration': submitted,
                 'generate_audio': bool(params.get('generate_audio', True)),
             }
-            if dialogue_reference and 'seedance-2.5' in model.lower():
+            if (multimodal or dialogue_reference) and 'seedance-2.5' in model.lower():
                 body['omni_reference_task_type'] = 'reference'
             value = _post_task(worker, job, client, path, body)
             remote = value.get('id') or value.get('taskId') or value.get('task_id')

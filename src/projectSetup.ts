@@ -23,6 +23,7 @@ export type ProjectSetupDraft = {
   videoRatio: "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "adaptive";
   videoDuration: number;
   videoFormat: "mp4" | "mov";
+  videoReferenceMode: 'multimodal' | 'first_frame' | 'first_last_frame' | 'legacy';
   episodeCount: number;
   platform: string;
   brief: string;
@@ -50,6 +51,7 @@ export function defaultProjectSetupDraft(providers: Value[]): ProjectSetupDraft 
     videoRatio: "16:9",
     videoDuration: -1,
     videoFormat: "mp4",
+    videoReferenceMode: 'multimodal',
     episodeCount: 1,
     platform: "通用短视频",
     brief: "",
@@ -102,6 +104,7 @@ export function projectSetupPayload(draft: ProjectSetupDraft) {
     video_ratio: draft.videoRatio,
     video_duration: draft.videoDuration,
     video_format: draft.videoFormat,
+    video_reference_mode: draft.videoReferenceMode,
     episode_count: draft.episodeCount,
     platform: draft.platform,
     brief: draft.brief,

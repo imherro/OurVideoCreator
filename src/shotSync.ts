@@ -14,6 +14,12 @@ export function updateShot<T extends {shots:Value[];nodes:Node[];edges:Edge[]}>(
  const imageNodeId=shot.imageNode||shot.pipeline?.imageNodeId;
  const videoNodeId=shot.videoNode||shot.pipeline?.videoNodeId;
  let next={...document,shots:document.shots.map(s=>s.id===id?{...s,...patch}:s)};
+ if(['motionReference','videoReferenceMode'].some(key=>key in patch&&JSON.stringify(shot[key])!==JSON.stringify(patch[key]))){
+  // Only edit the owned shot locally. The server marks dependent objects without overwriting their owners' work.
+  next={...next,nodes:next.nodes.map(node=>node.id===videoNodeId?{...node,data:{...node.data,
+   generation_revision:Number(node.data.generation_revision||0)+1,
+   stale:Boolean(node.data.assetId||node.data.resultJob||node.data.text)}}:node)};
+ }
  if('image_prompt' in patch&&imageNodeId)next=patchNode(next,imageNodeId,{prompt:patch.image_prompt});
  if('video_prompt' in patch&&videoNodeId)next=patchNode(next,videoNodeId,{prompt:patch.video_prompt});
  if('duration' in patch&&videoNodeId){

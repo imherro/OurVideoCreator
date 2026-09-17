@@ -353,8 +353,8 @@ def revoke_assignments(connection, user_id, *, production_id=None, workspace_id=
 def commands(connection, project_id, *, creates, updates, deletes, _action='save', _promote_node_id=None):
     """Atomic structural import/edit. Validate the prospective state FIRST.
 
-    Only caller-selected objects are written; the rest are read for reference
-    integrity, never replaced by a stale aggregate snapshot.
+    Caller-selected content is written; reference changes may also invalidate
+    downstream generation flags under locks, never replace another owner's text.
     """
     # The internal storyboard importer can replace 100 shots, add 100 cards,
     # and delete 100 old shots, plus its source and graph. Public commands stay
@@ -370,6 +370,20 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
         raise HTTPException(422, '命令不能重复操作同一对象')
     requested={item['id']:item for item in modifications}
     lock_ids=set(requested)
+    from .motion_references import invalidated_nodes, invalidate_content
+    motion_rows=list(connection.execute('SELECT * FROM collaboration_objects WHERE project_id=%s AND NOT deleted',(project_id,)))
+    motion_prior={row['id']:row for row in motion_rows}
+    motion_roots=[]
+    for item in updates:
+        prior=motion_prior.get(item['id'])
+        if not prior or prior['kind']!='shot':continue
+        before=validation.object_content(prior)['shot'];after=item['content'].get('shot',{})
+        if any(before.get(key)!=after.get(key) for key in ('motionReference','videoReferenceMode')):
+            motion_roots.append(after.get('videoNode') or (after.get('pipeline') or {}).get('videoNodeId'))
+    motion_affected=invalidated_nodes(motion_rows,motion_roots)
+    if motion_affected:
+        lock_ids.update(row['id'] for row in motion_rows if row['kind']=='graph' or
+            validation.node_ids(row['kind'],validation.object_content(row)) & motion_affected)
     dependency_targets=set()
     for item in creates:
         validate_content(item['kind'],item['content'])
@@ -405,6 +419,12 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
             editable(connection, row)
             expected(row, item['expected_revision'], item['assignment_epoch'])
         locked[row['id']] = row
+    if motion_affected:
+        for row in motion_rows:
+            if row['kind']=='graph':
+                expected(locked[row['id']],row['revision'],row['assignment_epoch'])
+        updates=[{**item,'content':invalidate_content(item['content'],motion_affected,
+                    validation.object_content(locked[item['id']]))} for item in updates]
     for item in deletes:
         row = locked[item['id']]
         if not (_action=='script_promote' and row['kind']=='node' and row['id']==_promote_node_id):
@@ -508,6 +528,12 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     # have passed. The following writes/history/audit/events commit together.
     created = [create(connection, project_id, item['kind'], item['content'], validated=True) for item in creates]
     updated = [replace_content(connection, locked[item['id']], item['content'], project_id, _action) for item in updates]
+    for oid,row in locked.items():
+        if oid in requested or not (validation.node_ids(row['kind'],validation.object_content(row)) & motion_affected):
+            continue
+        # Derived invalidation only: retain the other editor's content, assignment and lease.
+        replace_content(connection,row,invalidate_content(validation.object_content(row),motion_affected),
+                        project_id,'reference.invalidate')
     for item in deletes:
         row=locked[item['id']]
         removed=connection.execute('''UPDATE collaboration_objects SET deleted=TRUE,revision=revision+1,

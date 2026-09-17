@@ -202,10 +202,13 @@ class Worker:
                 if source.get('type')=='asset' and source.get('asset_id'):
                     asset_ids.append(source['asset_id'])
                 elif source.get('type')=='upstream_job' and source.get('job_id') in upstream_results:
-                    asset_ids.extend(
+                    resolved_images = [
                         a['id'] for a in upstream_results[source['job_id']].get('assets',[])
                         if a.get('kind')=='image' and a.get('id')
-                    )
+                    ]
+                    if inp.get('motion_compiler') and len(resolved_images) != 1:
+                        raise ValueError('多模态待生成图片参考须产生恰好一张图片，避免改变冻结编号；请明确选择素材后重新提交')
+                    asset_ids.extend(resolved_images)
                 else:
                     raise ValueError('批次图像参考来源已损坏，请重新运行画布')
         if upstream_text and not inp.get('reference_compiler'):

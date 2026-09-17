@@ -4,6 +4,7 @@ import { GenerationPolicyPanel } from "../GenerationPolicyPanel";
 import { VisualStylePicker } from "../VisualStylePicker";
 import { DURATION_OPTIONS, PLATFORM_OPTIONS } from "../adaptation";
 import { VIDEO_FORMATS, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from "../mediaSpecs";
+import {videoModeLabels} from '../motionReference';
 import {
   defaultProjectSetupDraft,
   validateProjectSetupDraft,
@@ -60,6 +61,7 @@ export function ProjectSetupDialog({
               <label>视频宽高比 *<select value={draft.videoRatio} onChange={(event)=>patch({videoRatio:event.target.value as ProjectSetupDraft["videoRatio"]})}>{VIDEO_RATIOS.map((value)=><option value={value} key={value}>{value}</option>)}</select><small>adaptive 由首帧或模型决定。</small></label>
               <label>单镜输出时长策略 *<select value={draft.videoDuration} onChange={(event)=>patch({videoDuration:Number(event.target.value)})}><option value={-1}>-1（按分镜及对白自动）</option>{Array.from({length:27},(_,index)=>index+4).map((value)=><option value={value} key={value}>{value} 秒</option>)}</select></label>
               <label>视频格式 *<select value={draft.videoFormat} onChange={(event)=>patch({videoFormat:event.target.value as ProjectSetupDraft["videoFormat"]})}>{VIDEO_FORMATS.map((value)=><option value={value} key={value}>{value}</option>)}</select></label>
+              <label>视频参考模式<select value={draft.videoReferenceMode} onChange={event=>patch({videoReferenceMode:event.target.value as ProjectSetupDraft['videoReferenceMode']})}>{Object.entries(videoModeLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><small>新项目默认多模态，须选择发布此能力的平台模型。</small></label>
               <label>总集数 *<input type="number" min={1} max={500} value={draft.episodeCount} onChange={(event)=>patch({episodeCount:Number(event.target.value)})}/><small>原著章节数不等于成片集数，可按改编节奏设置。</small></label>
               <label>发布平台 *<select value={draft.platform} onChange={(event)=>patch({platform:event.target.value})}>{PLATFORM_OPTIONS.map((value)=><option value={value} key={value}>{value}</option>)}</select><small>用于 AI 判断节奏、钩子和付费卡点。</small></label>
             </div>
