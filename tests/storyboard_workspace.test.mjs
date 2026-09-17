@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {
   createStoryboardShot,
   moveStoryboardShot,
@@ -9,6 +10,9 @@ import {
   shotIdentity,
   updateStoryboardShot,
 } from '../src/storyboard.ts';
+
+const storyboardWorkspace=readFileSync(new URL('../src/pages/StoryboardWorkspace.tsx',import.meta.url),'utf8');
+const storyboardStyles=readFileSync(new URL('../src/style.css',import.meta.url),'utf8');
 
 function fixture(){
   const cards={
@@ -75,4 +79,15 @@ test('selected generation targets only explicit shots and manual creation perfor
   assert.equal(created.shots[2].uid,'shot-new-uid');
   assert.equal(created.nodes.length,document.nodes.length);
   assert.deepEqual(created.shots[2].assetBindings,{characters:[],scene:null,props:[]});
+});
+
+test('image review cards collapse mounted editing controls while planning stays expanded',()=>{
+  assert.match(storyboardWorkspace,/props\.purpose === "planning" \? shotFields : <div className="storyboard-image-summary">/);
+  assert.match(storyboardWorkspace,/props\.purpose === "planning" \? <>\{bindingEditor\}\{promptEditor\}<\/> : <details className="storyboard-image-details">/);
+  assert.match(storyboardWorkspace,/<summary>镜头详情与设置<\/summary>[\s\S]*\{node && props\.renderImageSettings\?\.\(node\)\}[\s\S]*\{promptEditor\}/);
+  assert.doesNotMatch(storyboardWorkspace,/<details className="storyboard-image-details" open/);
+  assert.match(storyboardWorkspace,/className="storyboard-grid-details"><summary>镜头详情与设置<\/summary>/);
+  assert.equal((storyboardWorkspace.match(/props\.renderImageSettings\?\.\(node\)/g)||[]).length,2);
+  assert.match(storyboardStyles,/\.storyboard-image-details>summary\{[^}]*cursor:pointer/);
+  assert.match(storyboardStyles,/\.storyboard-action-summary\{[^}]*-webkit-line-clamp:2[^}]*overflow-wrap:anywhere/);
 });

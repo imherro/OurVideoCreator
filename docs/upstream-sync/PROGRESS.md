@@ -487,3 +487,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 本批只覆盖 `VideoProductionWorkspace` 已有 `video-shot-context` 的显示，不修改镜头动作、Video Prompt、机位、计划/提交时长数据，不改变保存、候选、任务提交或 Provider 参数。采用后置同等选择器覆盖旧单行规则，明确恢复 `overflow:visible` / `text-overflow:clip`，避免旧省略声明继续生效。
 
 定向 `video_production + motion_reference + video_dialogue`：**21 passed / 0 failed**；新增契约断言验证组件实际使用目标选择器、动作文本 `pre-wrap/anywhere` 和摘要 `normal/anywhere`。全量 `npm test`：**284 passed / 0 failed / 0 skipped，1654.32ms**。`npm run build` tsc/Vite exit0，Vite **7.69秒**，产物 `assets/index-O6uBJ7K5.js` / `assets/index-DaU2Z3_n.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
+
+## UPSTREAM-SYNC-34：折叠分镜图编辑详情
+
+按冻结上游 `7afcf70` 的界面目标适配。分镜规划阶段继续直接展示时长、场景、角色、情绪、动作、机位/声音、视觉绑定与提示词；分镜图阶段改为结果优先：表格默认显示预览、场景、两行动作摘要和视觉引用，详细字段、视觉绑定、统一图片设置及提示词放入默认关闭的“镜头详情与设置”。宫格也将动作/角色/情绪/机位/声音和统一图片设置放入每卡 disclosure。
+
+折叠使用原生 `details`，关闭时子控件仍挂载，不建立第二份草稿，也不触发保存、生成或 API。所有编辑继续调用原 `onPatch` / 绑定命令和共享 `ImageGenerationSettings`；两处图片设置入口数量保持，负责人、对象 revision、冲突和草稿保护仍由宿主原链路实施。分镜图卡继续在折叠外显示过期、待核对提示词、无视觉绑定或缺主参考图警告，生成/预览/尾帧/高级画布按钮不移入折叠区。
+
+定向 `storyboard_workspace + image_settings + shot_sync + batch_generation`：**16 passed / 0 failed**；新增契约断言验证规划展开、图片 disclosure 默认关闭、两处图片设置仍挂载及摘要换行样式。全量 `npm test`：**285 passed / 0 failed / 0 skipped，1689.99ms**。`npm run build` tsc/Vite exit0，Vite **7.78秒**，产物 `assets/index-DWRuFsqu.js` / `assets/index-He3xw10A.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
