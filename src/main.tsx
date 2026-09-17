@@ -181,6 +181,7 @@ import { ScriptRoomPage } from "./pages/ScriptRoomPage";
 import { ArtDepartmentPage } from "./pages/ArtDepartmentPage";
 import { ProductionAssetCenter } from "./pages/ProductionAssetCenter";
 import { EpisodeSelector } from "./app/EpisodeSelector";
+import { EpisodeTransition, useEpisodeTransition } from "./app/EpisodeTransition";
 import {
   episodeLabel,
   episodesForProduction,
@@ -711,6 +712,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
   // Production-scoped planning focus also represents plans whose Episode
   // project has not been created yet, so adaptation and script stay aligned.
   const [planningEpisodeFocus,setPlanningEpisodeFocus]=useState<Record<string,number>>({});
+  const { transition: episodeTransition, switchEpisode } = useEpisodeTransition();
   const [selected, setSelected] = useState<string | null>(null),
     [view, setView] = useState(defaultViewForStage(initialWorkflowStage)),
     [panel, setPanel] = useState<string | null>(null),
@@ -2688,7 +2690,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     setTimelineOpen(!timelineOpen);
   };
   return (
-    <div className="studio-shell">
+    <div className="studio-shell" inert={episodeTransition ? true : undefined} aria-busy={Boolean(episodeTransition)}>
+      <EpisodeTransition transition={episodeTransition} />
       {episodeSetupProduction&&<EpisodeSetupDialog name={episodeSetupProduction.name}
         next={Math.max(0,...episodesForProduction(projects,episodeSetupProduction.id).map(item=>item.episode_no))+1}
         defaultMode={episodeSetupProduction.id===project.production_id?((doc as Any).creationMode||'direct'):'direct'}
@@ -2742,7 +2745,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           active={workflowStage}
           onChange={activateWorkflowStage}
           states={Object.fromEntries(Object.entries(workflowGuide.stages).map(([stage, guide]: any) => [stage, guide.state]))}
-          episodeControl={<EpisodeSelector episode={project} episodes={currentEpisodes} onSelect={(projectId) => openProject(projectId).catch(report)} />}
+          episodeControl={<EpisodeSelector episode={project} episodes={currentEpisodes} onSelect={(projectId) => {
+            if (projectId === project.id) return;
+            const target = currentEpisodes.find((item) => item.id === projectId);
+            if (!target) return;
+            void switchEpisode(episodeLabel(target), () => openProject(projectId)).catch(report);
+          }} />}
         />
         <div className="workflow-header-meta" aria-label={`当前集规格：${doc.ratio} · ${doc.style} · ${doc.duration} 秒`}
           title={`${doc.ratio} · ${doc.style} · ${doc.duration} 秒`}>

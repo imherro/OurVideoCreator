@@ -1,0 +1,32 @@
+.episode-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 68%);
+  cursor: progress;
+}
+.episode-transition.is-loading { animation: episode-veil-in 140ms ease-out both; }
+.episode-transition.is-revealing { animation: episode-veil-out 160ms ease-out both; }
+.episode-transition-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(480px, 85vw);
+  padding: 14px 20px;
+  border: 1px solid #4a5054;
+  border-radius: 10px;
+  background: #1b2023;
+  color: #dce0e2;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.episode-transition-label svg { flex-shrink: 0; color: #ddc08e; }
+.episode-transition-label strong { color: #edcf9a; }
+@keyframes episode-veil-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes episode-veil-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .episode-transition.is-loading,
+  .episode-transition.is-revealing { animation: none; }
+}

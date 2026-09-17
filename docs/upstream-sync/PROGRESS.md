@@ -455,3 +455,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 实际验证：纯规则及真实隔离 PostgreSQL 恢复专项 **7 passed，14.58秒**；扩展到 Film Bible、视觉主源、普通对象历史/事务、分镜候选与采纳的真实PG联合回归 **64 passed，213.49秒**。覆盖locked/draft恢复、只改状态、跨集可见、负责人/manager/viewer、旧revision、缺失版本、两请求竞争只一次提交、历史/审计/事件，以及原整对象恢复与候选采纳回归。
 
 前端协作客户端专项 **22 passed，173.42ms**；全量 `npm test` **278 passed / 0 failed / 0 skipped，1395.82ms**；`npm run build` tsc/Vite exit0，Vite **7.43秒**，保留既有大chunk警告。无新增依赖、数据库迁移、平台配置或后台页面；未调用真实付费Provider，未运行登录业务浏览器E2E或全量后端。整体上游同步仍未全部完成，下批继续分集切换反馈与剩余冻结清单审计。
+
+## UPSTREAM-SYNC-30：分集切换渐隐反馈
+
+按冻结上游 `a3b9e6b` 与 `fcbbe4c` 的交互目标适配。顶部作品/分集选择器切换到另一集时，页面显示固定视口的深色渐隐反馈和目标分集名称；工作区在切换期间设置 `inert` 与 `aria-busy`，状态层通过 Portal 挂到工作区之外并使用 `role=status` / `aria-live=polite`。最终遮罩深度为 **68%**，进入和退出动画分别为 140ms 与 160ms；系统启用减少动态效果时取消动画。
+
+反馈层只包裹既有 `openProject` 调用，不直接设置项目、文档或脏状态，因而保留协作版已有的未保存草稿检查、对象保存、冲突拒绝、请求代际及作用域校验。重复点击在活动切换期间被忽略；当前分集和未知目标不触发切换；无论切换成功还是失败都会退出反馈并恢复仍存在的原焦点。组件卸载不会吞掉原 `openProject` 异常，原调用链继续交给既有错误报告处理。
+
+定向 `episode_transition + workflow_shell + production_navigation + adaptation_frontend`：**20 passed / 0 failed**。全量 `npm test`：**281 passed / 0 failed / 0 skipped，1422.78ms**。`npm run build` tsc/Vite exit0，Vite **7.21秒**，主产物 `assets/index-Ca71Y38Z.js`，保留既有大 chunk 警告。`git diff --check`通过。本批纯前端，没有新增 API、后端逻辑、依赖、数据库迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。整体上游同步仍未完成，后续继续剩余冻结清单审计和未完成项。
