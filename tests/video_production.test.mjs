@@ -83,7 +83,9 @@ test("fresh model catalog overrides a stale cached end-frame capability", () => 
   assert.equal(rows[4].readinessReason, "");
 });
 
-test("Seedance dialogue requires the current locked voice take before paid submission", () => {
+for (const providerType of ["volcengine_ark", "runninghub", "hc_atom"]) {
+test(`${providerType} dialogue requires the current locked voice take before paid submission`, () => {
+  const providers = [{ id: "video-model", type: providerType, capabilities: { audio_reference: true } }];
   const { document, jobs } = fixture();
   document.shots[0].duration = 5;
   document.shots[0].dialogues = [{ id: "dialogue-1", characterCardId: "robot", characterName: "球球", text: "你好" }];
@@ -97,6 +99,16 @@ test("Seedance dialogue requires the current locked voice take before paid submi
   rows = deriveVideoProductionRows(document, [...assets, voiceAsset], jobs, providers, capabilities);
   assert.equal(rows[0].readinessReason, "");
   assert.deepEqual(rows[0].dialogueAudioAssets.map((asset) => asset.id), ["voice-1"]);
+});
+}
+
+test("HC models without published audio capability retain text-only dialogue readiness", () => {
+  const { document, jobs } = fixture();
+  document.shots[0].dialogues = [{ id: "line", characterCardId: "hero", text: "你好" }];
+  const models = [{ id: "video-model", type: "hc_atom", capabilities: { audio_reference: false } }];
+  const rows = deriveVideoProductionRows(document, assets, jobs, models, capabilities);
+  assert.equal(rows[0].readinessReason, "");
+  assert.deepEqual(rows[0].dialogueAudioAssets, []);
 });
 
 test("Seedance dialogue extends a short shot instead of blocking submission", () => {

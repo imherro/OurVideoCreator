@@ -120,7 +120,7 @@ def compile_shot_video_input(document, node_id, kind, input_value, production_co
     return result
 
 
-def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, production_context=None, parameter_rules=None):
+def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, production_context=None, parameter_rules=None, require_canonical=False):
     """Freeze current locked-voice dialogue takes into a video job."""
     result = dict(input_value)
     if kind != 'video':
@@ -130,7 +130,15 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
         document = compose_project_document(document, production_context)
     shot = _shot_for_video_node(document, node_id)
     if not shot:
+        if require_canonical and any(result.get(key) for key in (
+            'dialogue_audio', 'dialogue_audio_asset_ids', 'dialogue_audio_mode',
+            'audio_asset_ids', 'audio_reference_ids',
+        )):
+            raise ValueError('幻场固定对白必须来自当前镜头已采纳的音频')
         return result
+    if require_canonical:
+        result.pop('audio_asset_ids', None)
+        result.pop('audio_reference_ids', None)
     dialogues = [
         item for item in (shot.get('dialogues') or [])
         if isinstance(item, dict) and str(item.get('text') or '').strip()

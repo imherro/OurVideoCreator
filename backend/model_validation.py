@@ -180,7 +180,11 @@ def model_definition(body, config, kind):
         raise ValueError('该用途不支持图像参考能力')
     if caps.get('end_frame') and (kind != 'video' or config['type'] not in {'volcengine_ark', 'runninghub', 'maestro'}):
         raise ValueError('当前适配器未接通尾帧协议')
-    if caps.get('audio_reference') and (kind != 'video' or config['type'] not in {'volcengine_ark', 'runninghub'}):
+    hc_audio = config['type'] == 'hc_atom' and bool(re.match(
+        r'^(doubao|dreamina)-seedance-2\.(0|5)(?:-|$)', value['upstream_model'].lower()))
+    if caps.get('audio_reference') and (kind != 'video' or not (
+        config['type'] in {'volcengine_ark', 'runninghub'} or hc_audio
+    )):
         raise ValueError('当前适配器未接通参考音频协议')
     if caps.get('image_reference') and config['type'] in {'openai','video_api'}:
         raise ValueError('当前适配器未接通参考图协议')

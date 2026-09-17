@@ -72,7 +72,8 @@ export function deriveVideoProductionRows(
     const configuredDuration = Number(document.videoDuration ?? -1);
     let effectiveDuration = configuredDuration >= 4 ? configuredDuration : plannedDuration;
     let dialogueReadinessReason = "";
-    if (["volcengine_ark", "runninghub"].includes(provider?.type)) {
+    if (["volcengine_ark", "runninghub"].includes(provider?.type)
+      || (provider?.type === "hc_atom" && provider.capabilities?.audio_reference === true)) {
       for (const dialogue of dialogues) {
         const profile = profiles[dialogue.characterCardId] || {};
         if (profile.status !== "locked" || !String(profile.voiceType || "").trim()) {

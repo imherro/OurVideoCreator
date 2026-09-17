@@ -160,6 +160,22 @@
 
 最终候选回归 `tests/test_image_settings.py tests/test_p5_object_candidates.py tests/test_upstream_compiled_candidates.py` → **26 passed，93.47秒，exit0**，包括本轮最终16项设置测试及既有显式采纳/迟到结果边界。`git diff --check`通过。未运行全量后端、真实付费API或部署。无新依赖、数据库迁移或后台配置页面；原master工作区仍干净且HEAD为eeb7a4f。本批仅进入集成分支，不合并master，不发送ChatGPT审核。`READY_FOR_REVIEW`仅为开发交付标识，不代表新的外部验收PASS。
 
+## UPSTREAM-SYNC-09：幻场使用已采纳的固定对白
+
+来源 `4e86bac` / `77b99d7` 的固定对白分支与 `dcee553` 的HTTP音频引用需求。原协作版尚未接通HC参考音频，故本批是功能适配，不把上游Base64报错描述为本项目已复现的bug。动作视频、上传音色样本、状态独立音色和完整多模态预览仍未完成，不将这几个上游提交整体标记为已迁入。
+
+- 管理员可为私有上游ID符合doubao/dreamina-seedance-2.0或2.5协议的HC视频模型发布audio_reference；默认不开启，未知别名及其他HC模型不得宣称支持。还需发布generate_audio规则，并在已有Provider配置中填写public_base_url；没有新增配置字段、迁移、依赖或后台页面，也没有修改现用模型配置。
+- 开启后，单次与精确批量生成都从已保存镜头、锁定音色和明确采纳的对白素材编译轨道。未采纳拒绝入队，伪造输入不能替换轨道，无镜头归属的任意音频引用拒绝。视频工作区的准备状态使用同一公开能力标记；原HC未开启模型继续原行为。
+- 复用本地FFmpeg编排为时序MP3，按正常作品素材登记为derived/voice；HC取得短期签名HTTP链接，不发送Base64。签名不写入任务输入、幂等摘要或素材metadata。链接是现有的限时Bearer能力，默认一小时、绑定素材/方法/用途，沿用软删除过滤；不宣称它随用户成员资格变动即时失效。衍生音频按现有素材机制保留，没有自动清理任务。
+- 参考音频模式的单张图使用reference_image、保留项目比例，2.5增加omni_reference_task_type=reference；本批不扩展多图上限或尾帧。原方舟Base64协议不变。入队前验证公网地址与时长，已有15/30秒限制保持，新增音轨末尾不得超过提交时长；有远端ID时仅查询，不再次编排或提交。
+- 原对象负责人/版本、平台冻结参数、候选生成及显式采纳均保留，不因完成生成自动写回镜头。
+
+实际验证记录：首次新增专项8 passed / 3 failed（签名断言传字符串、误认批量返回jobs而非job_ids、预期错误文案不符），修正测试后初步联合 **62 passed，92.87秒**。扩展真实合成视频回路后的联合38 passed / 2 failed：两个超限请求已被原适配器提前拒绝，但测试错误要求新文案；改为断言超限，不改原限制。最终新增专项 **16 passed，46.06秒**。
+
+最终联合 `tests/test_upstream_hc_dialogue.py tests/test_hc_atom.py tests/test_volcengine_ark.py tests/test_video_dialogue.py tests/test_p5_object_candidates.py tests/test_p5_run_permissions.py tests/test_p4_submission_execution.py tests/test_p3_identity_acl.py::test_media04_signed_capability_binds_asset_method_purpose_expiry_and_revocation` → **93 passed，215.56秒，exit0**。含新增16项、真实PG普通编辑者单次/批量提交、未采纳拒绝且不增任务、他人及viewer拒绝、冻结真实音轨覆盖伪造引用、真实FFmpeg四秒MP3、签名验证及原签名路由软删除/过期边界、Mock视频下载与登记、成功后对象不变、显式采纳后视频不误标stale、有远端ID不再次POST或生成衍生音频。图片与音频组合的角色/比例测试使用编排及图片登记桩，不混称该组合进行了真实上游审核。前述专项与本次联合有重复，不相加计算独立测试数。
+
+前端 `npm run test:frontend` **232 passed / 0 failed / 0 skipped，1363.48ms**；`npm run build` **tsc与Vite exit0，Vite 7.61秒**，既有大chunk警告保留。未跑浏览器、全量后端或真实付费服务；本地合成MP3/MP4和MockTransport证明请求、下载登记与采纳，不代表供应商实际音色/口型质量已验收。`git diff --check`通过。PG夹具只释放各轮新建隔离测试库，保留用户库、历史媒体、草稿和服务；master工作区干净且仍为eeb7a4f。本批仅交付集成分支，不部署、不合并master。`READY_FOR_REVIEW`为开发交付标识，用户已取消外部ChatGPT审核，不代表外部PASS。
+
 ## 后续队列
 
-前八组已完成自测，其余仍未全部移植。下一组处理多模态/参考输入与音色，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+前九组已完成各自专项，其余仍未全部移植。继续处理多模态/参考输入与音色剩余需求，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

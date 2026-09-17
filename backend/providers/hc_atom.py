@@ -407,7 +407,32 @@ def _register_seedance_asset(worker, job, client, provider, asset):
             raise InterruptedError()
 
 
+def validate_fixed_dialogue(provider, inp, params):
+    """Validate the frozen HC dialogue request before admission or first submit."""
+    if not inp.get('dialogue_audio'):
+        return
+    import re
+    model = str(model_for(provider, 'video')).lower()
+    if not (provider.get('capabilities', {}).get('audio_reference') is True
+            and re.match(r'^(doubao|dreamina)-seedance-2\.(0|5)(?:-|$)', model)
+            and inp.get('dialogue_audio_mode') == 'seedance_reference'):
+        raise ValueError('当前幻场模型未接通固定对白参考音频')
+    requested = float(params.get('duration') or inp.get('duration') or 5)
+    submitted = _seedance_duration(model, requested)
+    latest_end = max(float(item.get('start') or 0) + float(item.get('duration') or 0)
+                     for item in inp['dialogue_audio'])
+    if requested > submitted or latest_end > submitted:
+        raise ValueError('固定对白超过幻场模型支持的镜头时长，请拆分镜头；不会截断对白')
+    if params.get('generate_audio') is not True:
+        raise ValueError('幻场固定对白必须开启已发布的 generate_audio 参数')
+    from ..provider_assets import public_asset_url
+    public_asset_url(provider, 'dialogue-preflight')
+
+
 def _generate_seedance_v3(worker, job, provider, model, refs, params):
+    dialogue_reference = bool(job['input'].get('dialogue_audio'))
+    if not job.get('provider_job_id'):
+        validate_fixed_dialogue(provider, job['input'], params)
     if len(refs) > 1:
         raise ValueError('幻场 Seedance 当前最多提交一张首帧，请移除多余引用')
     if job['input'].get('end_asset_id'):
@@ -418,16 +443,24 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
         if not remote:
             requested = float(params.get('duration') or job['input'].get('duration') or 5)
             submitted = _seedance_duration(model, requested)
+            prompt = _seedance_prompt(job['input']['prompt'], requested, submitted)
+            audio_url = None
+            if dialogue_reference:
+                from .volcengine_ark import _dialogue_reference_audio, _dialogue_reference_prompt
+                audio_url = _dialogue_reference_audio(job, submitted, public_provider=provider)
+                prompt = _dialogue_reference_prompt(prompt, len(refs))
             content = [{
                 'type': 'text',
-                'text': _seedance_prompt(job['input']['prompt'], requested, submitted),
+                'text': prompt,
             }]
             if refs:
                 content.append({
                     'type': 'image_url',
                     'image_url': {'url': _register_seedance_asset(worker, job, client, provider, refs[0])},
-                    'role': 'first_frame',
+                    'role': 'reference_image' if dialogue_reference else 'first_frame',
                 })
+            if audio_url:
+                content.append({'type': 'audio_url', 'audio_url': {'url': audio_url}, 'role': 'reference_audio'})
             resolution = str(params.get('resolution') or '720p').lower()
             if resolution not in ('480p', '720p'):
                 raise ValueError('幻场 Seedance 2.5 目前只支持 480p 或 720p，请修改项目视频分辨率')
@@ -435,10 +468,12 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
                 'model': model,
                 'content': content,
                 'resolution': resolution,
-                'ratio': 'adaptive' if refs else str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
+                'ratio': 'adaptive' if refs and not dialogue_reference else str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
                 'duration': submitted,
                 'generate_audio': bool(params.get('generate_audio', True)),
             }
+            if dialogue_reference and 'seedance-2.5' in model.lower():
+                body['omni_reference_task_type'] = 'reference'
             value = _post_task(worker, job, client, path, body)
             remote = value.get('id') or value.get('taskId') or value.get('task_id')
             if not remote:

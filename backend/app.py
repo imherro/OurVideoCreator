@@ -1258,6 +1258,9 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if body.kind=='image' and len(references)>max_image_references(selected):
             raise ValueError(f'当前火山方舟图片模型最多支持 {max_image_references(selected)} 张参考图，请移除多余引用')
     if selected and selected.get('type')=='hc_atom':
+        if body.kind=='video' and body.input.get('dialogue_audio'):
+            from .providers.hc_atom import validate_fixed_dialogue
+            validate_fixed_dialogue(selected, body.input, binding.parameters)
         if body.kind=='video' and len(body.input.get('asset_ids',[]))>1:
             raise ValueError('幻场 AI 通用视频接口最多提交一张参考图')
         if body.kind=='video' and body.input.get('end_asset_id'):
@@ -1363,12 +1366,15 @@ def submit(pid:str,body:JobCreate):
         production_context=project_state['production_context'],
         parameter_rules=(selected_provider or {}).get('rules',{}),
     )
-    if body.kind=='video' and selected_provider and selected_provider.get('type') in ('volcengine_ark','runninghub'):
+    hc_dialogue=bool(selected_provider and selected_provider.get('type')=='hc_atom'
+        and selected_provider.get('capabilities',{}).get('audio_reference'))
+    if body.kind=='video' and selected_provider and (selected_provider.get('type') in ('volcengine_ark','runninghub') or hc_dialogue):
         prepared_input=bind_fixed_dialogue_audio(
             project_state['episode_document'],body.node_id,body.kind,prepared_input,
             production_assets(saved_project['production_id'],kind='audio'),
             production_context=project_state['production_context'],
             parameter_rules=selected_provider.get('rules',{}),
+            require_canonical=hc_dialogue,
         )
     if body.kind in ('text','storyboard') and prepared_input.get('target_duration') is None:
         prepared_input={**prepared_input,'target_duration':saved_project['document'].get('duration',15)}
@@ -2125,6 +2131,13 @@ def prepare_run_workflow(pid,body):
             if kind=='image' and reference_count>max_image_references(provider):
                 raise ValueError(f'当前火山方舟图片模型最多支持 {max_image_references(provider)} 张参考图，请移除多余引用')
         if provider and provider.get('type')=='hc_atom':
+            if kind=='video' and provider.get('capabilities',{}).get('audio_reference'):
+                data=bind_fixed_dialogue_audio(
+                    project_state['episode_document'],node['id'],kind,data,
+                    available_audio_assets,
+                    production_context=project_state['production_context'],
+                    parameter_rules=provider.get('rules',{}), require_canonical=True,
+                )
             reference_count=len(data['asset_ids'])+generated_image_parents
             if kind=='video' and reference_count>1:
                 raise ValueError('幻场 AI 通用视频接口最多提交一张参考图')

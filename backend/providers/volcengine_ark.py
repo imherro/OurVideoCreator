@@ -339,7 +339,7 @@ def _mux_fixed_dialogue(worker, job, video_path):
         output.unlink(missing_ok=True)
 
 
-def _dialogue_reference_audio(job, duration):
+def _dialogue_reference_audio(job, duration, *, public_provider=None):
     """Compile locked dialogue takes into one timing-aware Seedance reference."""
     tracks = job['input'].get('dialogue_audio') or []
     if not tracks:
@@ -384,6 +384,10 @@ def _dialogue_reference_audio(job, duration):
             raise ValueError('固定对白音频参考编排失败：未生成音频文件')
         if output.stat().st_size > MAX_AUDIO_REFERENCE_BYTES:
             raise ValueError('固定对白音频参考超过 15MB，请缩短镜头对白后重试')
+        if public_provider is not None:
+            from ..provider_assets import public_asset_url
+            asset = common.register(job, output, name='固定对白时序参考.mp3', category='voice', asset_source='derived')
+            return public_asset_url(public_provider, asset['id'])
         return 'data:audio/mpeg;base64,' + base64.b64encode(output.read_bytes()).decode('ascii')
     finally:
         output.unlink(missing_ok=True)
