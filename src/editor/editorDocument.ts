@@ -6,6 +6,11 @@ export type EditorAsset = {
   kind: string;
   url: string;
   created?: number;
+  category?: string;
+  source?: string;
+  project_id?: string;
+  origin_project_id?: string;
+  origin_episode_no?: number;
   metadata: Record<string, any>;
 };
 

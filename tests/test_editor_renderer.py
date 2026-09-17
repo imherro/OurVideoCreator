@@ -58,6 +58,18 @@ def test_editor_compiler_rejects_cross_project_assets(tmp_path):
         compiler.compile('ffmpeg', Path(tmp_path / 'out.mp4'))
 
 
+@pytest.mark.parametrize('asset_production,target_production', [(None, 'work-a'), ('work-b', 'work-a'), ('work-a', None), ('', '')])
+def test_cross_episode_requires_explicit_matching_trusted_production(tmp_path, asset_production, target_production):
+    clip = element()
+    timeline = {'version': 2, 'tracks': [{'id': 'v1', 'elements': [clip]}],
+                'metadata': {'production_id': 'work-a'}}
+    row = {'id': 'asset-1', 'project_id': 'other-episode', 'production_id': asset_production, 'kind': 'image'}
+    compiler = EditorRenderCompiler('current-episode', timeline, (128, 128), tmp_path,
+                                   lambda _: row, lambda _: {}, production_id=target_production)
+    with pytest.raises(ValueError, match='属于其他项目'):
+        compiler._row(clip, 'image')
+
+
 @pytest.mark.parametrize('start,end', [(-1, 1), (1, 1), (0, 21601)])
 def test_editor_compiler_rejects_invalid_element_ranges(tmp_path, start, end):
     project = {'version': 2, 'tracks': [{'id': 'v1', 'name': 'V1', 'elements': [element(start=start, end=end)]}]}

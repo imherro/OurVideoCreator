@@ -165,8 +165,13 @@ class EditorRenderCompiler:
         work: Path,
         asset_lookup: Callable[[str], Any],
         probe_media: Callable[[Path], dict],
+        *,
+        production_id: str | None = None,
     ):
         self.project_id = project_id
+        # Only callers that resolved the production from trusted storage may
+        # opt into cross-episode assets. Timeline metadata is never authority.
+        self.production_id = production_id
         self.project = project
         self.width, self.height = resolution
         self.work = work
@@ -212,7 +217,8 @@ class EditorRenderCompiler:
 
     def _row(self, element: dict, expected: str):
         row = self.asset_lookup(_asset_id(element))
-        if not row or row['project_id'] != self.project_id:
+        same_production = bool(row and self.production_id and row.get('production_id') == self.production_id)
+        if not row or (row['project_id'] != self.project_id and not same_production):
             raise ValueError('编辑时间线引用了不存在或属于其他项目的素材')
         kind = row['kind']
         if expected == 'video' and kind != 'video':

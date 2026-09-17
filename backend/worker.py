@@ -618,12 +618,16 @@ class Worker:
 
     def export_editor(self,job):
         inp=job['input']; executable=ffmpeg_executable()
+        with s.db() as c:
+            target=c.execute('SELECT COALESCE(production_id,id) AS production_id FROM projects WHERE id=%s',
+                             (job['project_id'],)).fetchone()
+        if not target:raise ValueError('导出项目不存在')
         work=Path(tempfile.mkdtemp(prefix=f"{job['id']}-a{job.get('attempt_number',0)}-",dir=s.DATA))
         try:
             width,height=(int(x) for x in inp.get('resolution','1280x720').split('x'))
             def lookup(asset_id):
                 with s.db() as c:
-                    row=c.execute('''SELECT a.* FROM assets a
+                    row=c.execute('''SELECT a.*, COALESCE(a.production_id,origin.production_id,origin.id) AS resolved_production_id FROM assets a
                         JOIN projects origin ON origin.id=a.project_id
                         JOIN projects target ON target.id=%s
                         WHERE a.id=%s AND COALESCE(a.production_id,origin.production_id,origin.id)=COALESCE(target.production_id,target.id)
@@ -631,10 +635,12 @@ class Worker:
                     ''',(job['project_id'],asset_id)).fetchone()
                 if not row:return None
                 result=dict(row);result['absolute_path']=str(s.ASSETS/result['path'])
+                result['production_id']=result.pop('resolved_production_id')
                 return result
             output=work/'成片.mp4'
             compiler=EditorRenderCompiler(
-                job['project_id'],inp['editor_timeline'],(width,height),work,lookup,probe
+                job['project_id'],inp['editor_timeline'],(width,height),work,lookup,probe,
+                production_id=target['production_id']
             )
             plan=compiler.compile(executable,output)
             self.run_process(

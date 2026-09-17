@@ -32,3 +32,26 @@
 .mvc-editor-duration{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:#b8c0c4}
 .mvc-editor-duration input{max-width:76px;padding:5px}.mvc-editor-duration select{max-width:140px;padding:5px}
 .mvc-editor-actionbar{min-height:42px;height:auto;flex-wrap:wrap}.mvc-editor-actionbar>span{min-width:150px}
+
+/* Scoped project media: readable labels, with a keyboard-accessible resize handle. */
+.mvc-editor-assets{position:relative;flex:0 0 auto;width:360px;max-width:48vw}
+.mvc-editor-assets-resizer{position:absolute;z-index:5;top:0;right:0;width:12px;height:100%;cursor:ew-resize;touch-action:none;outline:none;user-select:none}
+.mvc-editor-assets-resizer:after{content:"";position:absolute;top:42%;right:3px;width:2px;height:48px;border-radius:2px;background:#657278;opacity:.35;transition:opacity .15s,background .15s}
+.mvc-editor-assets-resizer:hover:after,.mvc-editor-assets-resizer:focus:after{background:#d1ab68;opacity:1}
+.mvc-editor-assets-title{align-items:center}
+.mvc-editor-assets-title small{max-width:205px;line-height:1.35;text-align:right}
+.mvc-editor-asset-tabs button{gap:5px}
+.mvc-editor-asset-tabs button b{min-width:18px;padding:1px 5px;border-radius:9px;background:#ffffff0b;font-size:9px}
+.mvc-editor-asset{align-items:flex-start;padding:9px}
+.mvc-editor-asset-preview{width:92px;height:62px}
+.mvc-editor-asset-copy b{color:#d9c196;font-size:12px}
+.mvc-editor-asset-copy span{display:-webkit-box;overflow:hidden;overflow-wrap:anywhere;margin-top:4px;color:#b4bdc0;font-size:10px;line-height:1.4;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.mvc-editor-asset-copy small{color:#738087;font-size:9px}
+.mvc-editor-asset>button{align-self:center;flex:0 0 auto}
+.mvc-editor-asset-list{margin-right:12px}
+@media(max-width:1350px){.mvc-editor-asset-preview{width:76px;height:52px}}
+@media(max-width:1100px){.mvc-editor-assets{max-width:52vw}.mvc-editor-asset-preview{width:68px;height:48px}}
+.mvc-editor-asset-scope{display:flex;align-items:center;gap:8px;margin:10px 12px 0;font-size:11px;color:#899397}
+.mvc-editor-asset-scope>span{flex-shrink:0}
+.mvc-editor-asset-scope select{flex:1;min-width:0;width:100%;padding:7px 8px;font-size:12px}
+.mvc-editor-asset-search input{flex:1;min-width:0}
