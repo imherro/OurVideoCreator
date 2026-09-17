@@ -53,7 +53,7 @@ def compose(episode_metadata, production_context, rows):
     episode = copy.deepcopy(episode_metadata)
     for key in ('nodes', 'edges', 'shots', 'timeline', 'editor', 'director', 'audio_id',
                 'music_volume', 'transition', 'export_resolution',
-                'filmBible', 'style', 'generationPolicy', 'applied', 'viewport', 'selection',
+                'filmBible', 'style', 'generationPolicy', 'modelPool', 'applied', 'viewport', 'selection',
                 'selected', 'playhead', 'panel', 'panoramaViewpoint'):
         episode.pop(key, None)
     context = copy.deepcopy(production_context)

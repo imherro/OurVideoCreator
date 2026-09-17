@@ -2441,6 +2441,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     assets,
     jobs,
     generationPolicy: doc.generationPolicy,
+    modelPool: (doc as Any).modelPool,
     providers: config.models,
     localModels: system.models,
     request: api,
@@ -3638,6 +3639,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
               projectId={project.id} models={config.models} request={api} onChange={changeModel}/> : <ModelSelector
               data={data}
               providers={config.models}
+              modelPool={(doc as Any).modelPool}
               localModels={system.models}
               request={api}
               onChange={changeModel}
@@ -4154,7 +4156,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                     <button disabled={!visualStyleDraft.trim() || visualStyleDraft.trim() === doc.style} onClick={()=>{update((document)=>setProjectVisualStyle(document,visualStyleDraft.trim()));setNotice("视觉风格已应用；旧媒体保留，相关生成结果已标记为待更新");}}>应用风格</button>
                     <small>修改后会把已生成的分镜图和视频标记为待更新；旧媒体和剪辑内容会保留，不会自动生成。</small>
                   </div>
-                  <GenerationPolicyPanel value={doc.generationPolicy} providers={config.models} localModels={system.models} onChange={(generationPolicy)=>update((document)=>({...document,generationPolicy}))}/>
+                  <GenerationPolicyPanel value={doc.generationPolicy} modelPool={(doc as Any).modelPool} providers={config.models} localModels={system.models} onChange={(generationPolicy)=>update((document)=>({...document,generationPolicy}))} onModelPoolChange={(modelPool)=>update((document)=>({...document,modelPool}))}/>
                   <div className="project-bible-heading"><div><span className="eyebrow">PROJECT BIBLE</span><h3>创作约束</h3></div><button className="quiet" onClick={()=>setPanel("filmBible")}><BookOpen size={15}/>打开塑角造景 {Object.keys(visualBibleOf(doc).cards).length || ""}<ChevronRight size={14}/></button></div>
                   <p className="muted">这里只修改文字约束，不会覆盖已有 VisualCard、VisualVersion 或锁定参考图。</p>
                   <label>世界 / 时代<input value={projectBibleFields.worldEra} onChange={(event)=>update((document)=>mergeBibleFields(document,{...bibleFields(document),worldEra:event.target.value}))}/></label>

@@ -11,6 +11,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { ModelSelector } from "../ModelSelector.tsx";
+import {effectiveProjectModels,type ProjectModelPool} from '../modelAccess.ts';
 import type { GenerationPolicy } from "../generationPolicy.ts";
 import type {
   VisualAttribute,
@@ -64,6 +65,7 @@ export function FilmBiblePanel({
   assets,
   jobs,
   generationPolicy,
+  modelPool,
   providers,
   localModels,
   request,
@@ -105,6 +107,7 @@ export function FilmBiblePanel({
   assets: Array<Record<string, any>>;
   jobs: Array<Record<string, any>>;
   generationPolicy: GenerationPolicy | undefined;
+  modelPool?: Partial<ProjectModelPool>|null;
   providers: Array<Record<string, any>>;
   localModels: Array<Record<string, any>>;
   request: (path: string) => Promise<any>;
@@ -151,7 +154,7 @@ export function FilmBiblePanel({
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreError, setRestoreError] = useState("");
   const [referenceError, setReferenceError] = useState("");
-  const speechProviders = providers.filter((item) => item.type === "volcengine_speech" && item.kind === "audio");
+  const speechProviders = effectiveProjectModels(modelPool,providers,'audio').filter((item) => item.type === "volcengine_speech");
   const defaultSpeech = speechProviders.find(item=>item.is_default);
   const storedVoice = card ? voiceProfiles[card.id] : undefined;
   const voiceDocument={filmBible:{visual,voices:{profiles:voiceProfiles}}};
@@ -531,6 +534,7 @@ export function FilmBiblePanel({
                 model_id: override.model_id,
               }}
               providers={providers}
+              modelPool={modelPool}
               localModels={localModels}
               request={request}
               onChange={(patch) =>

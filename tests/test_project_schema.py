@@ -1,7 +1,9 @@
 import json,time
 import pytest
 from backend import store as s
-from backend.generation_policy import default_platform_policy,resolve_generation_target,validate_generation_policy
+from backend.generation_policy import (default_model_pool,default_platform_policy,
+    require_model_in_pool,resolve_generation_target,validate_generation_policy,
+    validate_model_pool,validate_policy_in_pool)
 from backend.project_schema import CURRENT_SCHEMA_VERSION,migrate_document,new_document
 
 def test_legacy_migration_is_lossless_and_idempotent():
@@ -48,3 +50,19 @@ def test_new_document_can_receive_platform_defaults():
     document=new_document(default_platform_policy(providers))
     assert document['schemaVersion']==CURRENT_SCHEMA_VERSION
     assert document['generationPolicy']['video']=={'model_id':'video'}
+
+def test_project_model_pool_uses_only_public_platform_ids_and_enforces_scope():
+    models=[{'id':kind,'kind':kind,'is_default':kind!='audio'}
+            for kind in ('text','image','video','audio')]
+    pool=default_model_pool(models)
+    assert pool=={kind:[{'model_id':kind}] for kind in ('text','image','video','audio')}
+    assert validate_model_pool(pool,models)==pool
+    validate_policy_in_pool(default_platform_policy(models),pool)
+    require_model_in_pool('storyboard','text',pool)
+    with pytest.raises(ValueError,match='可用模型范围'):
+        require_model_in_pool('image','another-image',pool)
+    with pytest.raises(ValueError,match='用途不匹配'):
+        validate_model_pool({**pool,'image':[{'model_id':'video'}]},models)
+    with pytest.raises(ValueError,match='必须先加入'):
+        validate_policy_in_pool({'text':None,'image':{'model_id':'image'},'video':None},
+                                {**pool,'image':[]})

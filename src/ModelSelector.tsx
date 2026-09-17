@@ -1,7 +1,8 @@
 import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
+import {effectiveProjectModels,type ProjectModelPool} from './modelAccess.ts';
 type Value=Record<string,any>;
-export function ModelSelector({data,providers,request,onChange,hideControl,preserveParameters=false}:{data:Value;providers:Value[];localModels?:Value[];request:(path:string)=>Promise<any>;onChange:(patch:Value)=>void;hideControl?:(name:string,rule:Value,model:Value)=>boolean;preserveParameters?:boolean}){
+export function ModelSelector({data,providers,modelPool,request,onChange,hideControl,preserveParameters=false}:{data:Value;providers:Value[];localModels?:Value[];modelPool?:Partial<ProjectModelPool>|null;request:(path:string)=>Promise<any>;onChange:(patch:Value)=>void;hideControl?:(name:string,rule:Value,model:Value)=>boolean;preserveParameters?:boolean}){
  const [models,setModels]=useState<Value[]>(providers),[loading,setLoading]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
  const kind=data.kind==='storyboard'?'text':data.kind;
  useEffect(()=>{
@@ -9,7 +10,7 @@ export function ModelSelector({data,providers,request,onChange,hideControl,prese
   request('/models').then(value=>{if(active)setModels(value.models||[])}).catch(e=>{if(active){setModels([]);setError(e.message)}}).finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[kind,refresh,request]);
- const available=models.filter(item=>item.kind===kind),selected=available.find(item=>item.id===data.model_id),caps=selected?.capabilities;
+ const available=effectiveProjectModels(modelPool,models,kind),selected=available.find(item=>item.id===data.model_id),caps=selected?.capabilities;
  function choose(id:string){
   const model=available.find(item=>item.id===id);
   onChange({model_id:id,parameters:{...model?.defaults,...(preserveParameters?data.parameters:{})},provider:undefined,model:undefined,

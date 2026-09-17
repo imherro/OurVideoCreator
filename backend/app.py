@@ -17,7 +17,8 @@ from . import store as s
 from . import identity, platform_models, model_validation, provider_egress, collaboration, job_admission
 from .instance_identity import describe as describe_instance
 from .prompts import TEMPLATES
-from .generation_policy import default_platform_policy, validate_generation_policy
+from .generation_policy import (default_model_pool, default_platform_policy,
+    validate_generation_policy, validate_model_pool, validate_policy_in_pool)
 from .project_schema import empty_film_bible, migrate_document, new_document
 from .production_context import (
     SHARED_DOCUMENT_KEYS,
@@ -626,7 +627,8 @@ class ProductionUpdate(StrictBody):
 def create_production(body:ProductionCreate):
     production_id=s.uid('production-')
     now=time.time();name=normalized_project_name(body.name)
-    context=new_production_context(default_platform_policy(platform_models.compiler_catalog()))
+    models=platform_models.compiler_catalog()
+    context=new_production_context(default_platform_policy(models),default_model_pool(models))
     with s.db() as c:
         workspace_id=_owned_workspace_id(c,body.workspace_id)
         c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated,workspace_id) VALUES(%s,%s,1,%s,%s,%s,%s)',(production_id,name,s.dumps(context),now,now,workspace_id))
@@ -752,6 +754,7 @@ class ProjectCreate(StrictBody):
     platform:str=Field(default='通用短视频',min_length=1,max_length=100)
     brief:str|None=Field(default=None,max_length=24000)
     generation_policy:dict|None=None
+    model_pool:dict|None=None
     film_bible:dict|None=None
 
 def normalized_project_name(name:str)->str:
@@ -760,6 +763,7 @@ def normalized_project_name(name:str)->str:
 def project_create_document(body:ProjectCreate):
     providers=platform_models.compiler_catalog()
     document=new_document(default_platform_policy(providers))
+    document['modelPool']=default_model_pool(providers)
     if body.creation_mode not in ('direct','adaptation'):raise ValueError('创作起点无效')
     document['creationMode']=body.creation_mode
     if body.style is not None:
@@ -793,6 +797,9 @@ def project_create_document(body:ProjectCreate):
         document['generationPolicy']=validate_generation_policy(
             body.generation_policy,providers,allow_missing=False,
         )
+    if body.model_pool is not None:
+        document['modelPool']=validate_model_pool(body.model_pool,providers,allow_missing=False)
+    validate_policy_in_pool(document['generationPolicy'],document['modelPool'])
     if body.film_bible is not None:
         if not isinstance(body.film_bible,dict):raise ValueError('Project Bible 必须是对象')
         unknown=set(body.film_bible)-{'story','style','continuity'}
@@ -1221,6 +1228,8 @@ def image_spec_preview(pid:str,body:ImageSpecPreview):
     with s.db() as c:
         collaboration.project_scope(c,pid,'viewer')
         state=read_project_state(c,pid)
+        from .generation_policy import require_model_in_pool
+        require_model_in_pool('image',body.model_id,state['production_context'].get('modelPool'))
         document=dict(state['document'])
         if body.ratio is not None: document['ratio']=body.ratio
         if body.videoResolution is not None:
@@ -1254,6 +1263,8 @@ def video_spec_preview(pid:str,body:VideoSpecPreview):
     with s.db() as c:
         collaboration.project_scope(c,pid,'viewer')
         state=read_project_state(c,pid)
+    from .generation_policy import require_model_in_pool
+    require_model_in_pool('video',body.model_id,state['production_context'].get('modelPool'))
     document=copy.deepcopy(state['document'])
     shot=_shot_for_video_node(document,body.node_id)
     node=next((item for item in document.get('nodes',[]) if item['id']==body.node_id),None)
@@ -1363,6 +1374,9 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if not isinstance(model_id,str) or not model_id.strip():
             raise ValueError('请选择已发布的平台 model_id；不会自动回退其他模型')
         state=read_project_state(c,pid)
+        from .generation_policy import require_model_in_pool
+        require_model_in_pool(body.kind,model_id,
+            (state or {}).get('production_context',{}).get('modelPool'))
         binding=platform_models.resolve(c,model_id,body.kind,submitted_input,
             document=state['document'] if state else {},node_id=body.node_id)
         selected=platform_models.config_for_binding(c,binding)

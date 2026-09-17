@@ -4,6 +4,7 @@ import {splitCollaborationDocument,composeCollaborationDocument,changedDocumentP
 
 function document(){return {schemaVersion:6,brief:'story',style:'film',ratio:'16:9',duration:15,
   generationPolicy:{text:null,image:null,video:null},characters:[],
+  modelPool:{text:[{model_id:'text-a'}],image:[],video:[],audio:[]},
   filmBible:{styleVersion:1,story:{premise:'premise'},visual:{cards:{},versions:{}},voices:{profiles:{}}},
   nodes:[{id:'image-x',position:{x:1,y:2},data:{kind:'image',prompt:'x'}},
     {id:'image-y',position:{x:3,y:4},data:{kind:'image',prompt:'y'}},
@@ -34,8 +35,14 @@ test('split/compose preserves shot identity, linked nodes, free nodes and produc
   const original=document(),snapshot=splitCollaborationDocument(original),result=composeCollaborationDocument(snapshot);
   assert.deepEqual(result.shots,original.shots);assert.deepEqual(result.nodes,original.nodes);
   assert.deepEqual(result.filmBible,original.filmBible);assert.equal(result.brief,'story');
+  assert.deepEqual(result.modelPool,original.modelPool);
   const roundtrip=changedDocumentParts(snapshot,splitCollaborationDocument(result));
   assert.equal(roundtrip.updated.length,0);assert.equal(roundtrip.episodeMetadata,false);
+});
+test('project model pool is production metadata, never episode metadata',()=>{
+  const split=splitCollaborationDocument(document());
+  assert.deepEqual(split.productionMetadata.modelPool,document().modelPool);
+  assert.equal('modelPool' in split.episodeMetadata,false);
 });
 test('voice and versions share their visual card boundary, not a free graph node',()=>{
   const value=document();

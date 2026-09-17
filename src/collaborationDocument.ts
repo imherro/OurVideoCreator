@@ -93,8 +93,8 @@ export function splitCollaborationDocument(document:Value, assets:EditorAsset[]=
   const filmBible=copy(document.filmBible||{});
   delete filmBible.visual;
   delete filmBible.voices;
-  const productionMetadata={style:document.style,generationPolicy:copy(document.generationPolicy||{}),filmBible};
-  const excluded=new Set(['nodes','edges','shots','timeline','editor','director','audio_id','music_volume','transition','export_resolution','filmBible','style','generationPolicy',...PRIVATE_DOCUMENT_KEYS]);
+  const productionMetadata={style:document.style,generationPolicy:copy(document.generationPolicy||{}),modelPool:copy(document.modelPool??null),filmBible};
+  const excluded=new Set(['nodes','edges','shots','timeline','editor','director','audio_id','music_volume','transition','export_resolution','filmBible','style','generationPolicy','modelPool',...PRIVATE_DOCUMENT_KEYS]);
   const episodeMetadata=Object.fromEntries(Object.entries(document).filter(([key])=>!excluded.has(key)).map(([key,value])=>[key,copy(value)]));
   return {parts,episodeMetadata,productionMetadata};
 }

@@ -1,4 +1,5 @@
 import type { GenerationPolicy } from "./generationPolicy.ts";
+import {defaultProjectModelPool,type ProjectModelPool} from './modelAccess.ts';
 import { invalidate } from "./graph.ts";
 import { setProjectVisualStyle } from "./filmBible/versioning.ts";
 
@@ -30,6 +31,7 @@ export type ProjectSetupDraft = {
   platform: string;
   brief: string;
   generationPolicy: GenerationPolicy;
+  modelPool: ProjectModelPool;
   bible: ProjectBibleFields;
 };
 
@@ -60,6 +62,7 @@ export function defaultProjectSetupDraft(providers: Value[]): ProjectSetupDraft 
     platform: "通用短视频",
     brief: "",
     generationPolicy: defaultGenerationPolicy(providers),
+    modelPool: defaultProjectModelPool(providers),
     bible: {
       worldEra: "",
       visualTone: "",
@@ -116,6 +119,7 @@ export function projectSetupPayload(draft: ProjectSetupDraft) {
     platform: draft.platform,
     brief: draft.brief,
     generation_policy: draft.generationPolicy,
+    model_pool: draft.modelPool,
     film_bible: {
       story: compactObject({ worldEra: draft.bible.worldEra }),
       style: compactObject({

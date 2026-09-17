@@ -59,7 +59,7 @@ P5 实际字段、唯一主源和命令映射见 [P5_OBJECT_COLLABORATION.md](P5
 | `document.audio_id`/编辑导出参数 | `editor_timelines.audio_asset_id` 与 timeline export settings | Episode；asset 必须同 Production | timeline assignee 修改；导出按作品权限 | timeline revision + lease | timeline PATCH；export job 冻结 timeline revision | P5/P6 禁止 job 输入成为主源；REG-05/MEDIA-07 验证跨作品 asset 拒绝和导出可复现 |
 | `document.nodes/edges`，`patchNode()` | `graph_nodes/graph_edges` + `graph_structures` | Episode | 镜头节点继承 Shot assignee；自由节点有独立 assignee；PM/WO 接管 | 节点/结构 revision | node/edge 小命令或 structure PATCH | P5 旧 PUT 410；COLLAB-11 验证不同节点并行、同节点冲突 |
 | `filmBible.visual` 卡片/版本/绑定 | `visual_cards/visual_versions/shot_visual_bindings` | Production，绑定落到 Episode Shot | card/shot assignee 按动作；锁定版本不可原改 | card/shot revision；版本不可变 | card/version/bind/fork/lock 命令 | P5 禁止 JSON 双写；COLLAB-08/09 与 REG-02/03 |
-| `generationPolicy/style` 当前共享 context | `production_generation_policies` / Production metadata | Production | PM/WO；普通 editor 只读可选已发布模型 | revision | `PATCH .../productions/{pid}/policy` | P4/P5 退役 project PUT；MODEL-03 验证不能注入 provider/key/upstream id |
+| `modelPool/generationPolicy/style` 当前共享 context | Production metadata；`modelPool` 只存平台公开 `model_id` | Production | PM/WO 修改模型范围与首选；普通 editor 只读并只能提交范围内模型 | Production revision；新作品冻结创建时全部可用平台模型，旧作品缺字段时兼容全局目录 | `PATCH /api/productions/{pid}/context`；任务准入再次校验范围 | P4/P5 退役 project PUT；不得注入 provider/key/upstream id；平台停用仍立即失效 |
 
 UI-only 的 `selected`、视口、播放头、面板开关和 PanoramaViewer 当前查看状态继续只保存在客户端，不建立共享写对象；全景素材本身仍是受 Production 授权的 Asset。
 

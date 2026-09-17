@@ -85,7 +85,7 @@ export function VideoProductionWorkspace(props: Props) {
           <div className="video-production-fields">
             <label>Video Prompt<textarea value={row.shot.video_prompt || ""} onChange={(event) => props.onPatchShot(row.uid,{video_prompt:event.target.value})}/></label>
           <details className="video-dialogue-projection"><summary>镜头与对白摘要（最终参数请展开下方提交预览）</summary><pre>{compileVideoPrompt(row.shot.video_prompt,row.shot,row.submissionDuration)}</pre>{row.submissionDuration !== row.plannedDuration && <small>分镜计划 {row.plannedDuration} 秒；预计提交 {row.submissionDuration} 秒，以服务端预览校验为准。</small>}</details>
-            <div className="domain-fields three"><label>时长（秒）<input type="number" min="0.1" step="0.1" value={row.shot.duration ?? 3} onChange={(event) => props.onPatchShot(row.uid,{duration:Number(event.target.value)})}/></label><ModelSelector data={{...data,kind:"video"}} providers={providers} request={props.request}
+            <div className="domain-fields three"><label>时长（秒）<input type="number" min="0.1" step="0.1" value={row.shot.duration ?? 3} onChange={(event) => props.onPatchShot(row.uid,{duration:Number(event.target.value)})}/></label><ModelSelector data={{...data,kind:"video"}} providers={providers} modelPool={props.document.modelPool} request={props.request}
               onChange={patch=>props.onPatchVideoNode(row.videoNode!.id,patch)}/></div>
             <div className="video-shot-context"><span>{row.shot.action || "未填写镜头动作"}</span><small>{row.shot.camera || "未设置机位"} · 分镜 {row.plannedDuration || 0} 秒 · 提交 {row.submissionDuration || 0} 秒</small></div>
           </div>

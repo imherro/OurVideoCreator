@@ -71,7 +71,7 @@ export function ProjectSetupDialog({
           </section>
           <section>
             <h3><Settings2 size={17}/> ② 默认模型</h3>
-            <GenerationPolicyPanel value={draft.generationPolicy} providers={providers} localModels={localModels} onChange={(generationPolicy)=>patch({generationPolicy})}/>
+            <GenerationPolicyPanel value={draft.generationPolicy} modelPool={draft.modelPool} providers={providers} localModels={localModels} onChange={(generationPolicy)=>patch({generationPolicy})} onModelPoolChange={(modelPool)=>patch({modelPool})}/>
           </section>
           <section>
             <h3><BookOpen size={17}/> ③ Project Bible</h3>

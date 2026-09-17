@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import collaboration as collab, identity, model_validation, platform_models, store as s
-from .generation_policy import validate_generation_policy
+from .generation_policy import validate_generation_policy, validate_model_pool, validate_policy_in_pool
 
 router = APIRouter()
 EPISODE_FIELDS = {'brief', 'ratio', 'duration', 'videoResolution', 'videoRatio',
@@ -96,8 +96,8 @@ def episode_metadata(pid: str, body: Metadata):
 def production_metadata(production_id: str, body: Metadata):
     model_validation.reject_private_overrides(body.patch)
     patch = dict(body.patch)
-    if set(patch) - {'style','generationPolicy','filmBible'}:
-        raise HTTPException(422, '作品设置只能修改风格、模型策略和故事设定')
+    if set(patch) - {'style','generationPolicy','modelPool','filmBible'}:
+        raise HTTPException(422, '作品设置只能修改风格、模型范围、模型策略和故事设定')
     if 'filmBible' in patch and (not isinstance(patch['filmBible'], dict) or set(patch['filmBible']) - BIBLE_FIELDS):
         raise HTTPException(422, '视觉卡、版本和音色必须使用独立对象命令')
     bible=patch.get('filmBible',{})
@@ -118,6 +118,12 @@ def production_metadata(production_id: str, body: Metadata):
             raise HTTPException(409,{'type':'production_metadata','revision':row['revision']})
         collab.validate_asset_references(c,production_id,body.patch)
         context = json.loads(row['shared_context'])
+        if 'modelPool' in patch:
+            patch['modelPool'] = validate_model_pool(patch['modelPool'],platform_models.compiler_catalog(),allow_missing=False)
+        validate_policy_in_pool(
+            patch.get('generationPolicy', context.get('generationPolicy', {})),
+            patch.get('modelPool', context.get('modelPool')),
+        )
         bible = patch.pop('filmBible', None)
         old_bible=context.get('filmBible') or {}
         previous_style_version=old_bible.get('styleVersion',1)

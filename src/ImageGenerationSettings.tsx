@@ -43,7 +43,7 @@ export function ImageGenerationSettings(props:Props){
  return <details className="image-generation-settings" open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
   <summary>图片生成设置与提交规格</summary>
   {open&&<div className="image-generation-settings-body">
-   <ModelSelector data={{...data,kind:'image'}} providers={models} request={request} onChange={onChange} preserveParameters
+   <ModelSelector data={{...data,kind:'image'}} providers={models} modelPool={document.modelPool} request={request} onChange={onChange} preserveParameters
     hideControl={(name,rule,model)=>['size','ratio','aspect_ratio','seed'].includes(name)
       ||(name==='resolution'&&(['maestro','comfy'].includes(model.type)||rule.enum?.some((v:any)=>/^\d+x\d+$/.test(String(v)))))} />
    <p className="muted">切换模型保留当前图片设置；不兼容时请调整或显式恢复项目默认。设置通过原对象保存流程生效，提交前须保存成功。</p>
