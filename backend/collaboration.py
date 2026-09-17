@@ -125,12 +125,8 @@ def validate_content(kind, content):
     validation.envelope(kind, content)
 
 
-def validate_asset_references(connection, production_id, content):
-    """All persisted media references, including nested Twick/voice payloads.
-
-    A URL is not ownership evidence; the stable ID must resolve in this work.
-    Never reveal which other Production owns a rejected asset.
-    """
+def asset_references(content):
+    """Stable media IDs in the supported nested Twick/voice/object payloads."""
     references = set()
 
     def walk(value, key=''):
@@ -152,7 +148,12 @@ def validate_asset_references(connection, production_id, content):
                     references.add(match.group(1))
 
     walk(content)
-    for asset_id in sorted(references):
+    return references
+
+
+def validate_asset_references(connection, production_id, content):
+    """A URL is not ownership evidence; references must resolve in this work."""
+    for asset_id in sorted(asset_references(content)):
         if not connection.execute('''SELECT 1 FROM assets a WHERE a.id=%s AND a.production_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='asset' AND d.item_id=a.id)''',
             (asset_id, production_id)).fetchone():

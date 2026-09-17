@@ -4,6 +4,7 @@ Container lifecycle uses the existing exclusive identity barrier BEFORE any row
 locks. Ordinary independent object writes still share that barrier concurrently.
 Content, assignees and stable asset IDs are never replaced by restoration.
 """
+import json
 import time
 
 from fastapi import HTTPException
@@ -19,6 +20,20 @@ def authorize(c, kind, item_id):
         raise HTTPException(404, '内容不存在')
     identity.require_production(c, actor, production_id, 'manager')
     return production_id
+
+
+def protect_referenced_asset(c, production_id, asset_id):
+    """Caller holds the exclusive lifecycle barrier against object writes.
+
+    Check current objects, not immutable history. This also retains references
+    in recoverable episodes until those references are explicitly removed.
+    """
+    rows = c.execute('''SELECT content FROM collaboration_objects
+        WHERE production_id=%s AND NOT deleted''', (production_id,))
+    for row in rows:
+        content = json.loads(row['content'])
+        if asset_id in collab.asset_references(content):
+            raise HTTPException(409, '素材仍被作品内容引用，请先移除引用后再移入回收站。')
 
 
 def fence_owned(c, kind, rows, action):

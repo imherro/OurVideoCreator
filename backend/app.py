@@ -976,6 +976,7 @@ def delete_asset(pid:str,aid:str):
         lifecycle.authorize(c,'asset',aid)
         collaboration.project_scope(c,pid,'manager')
         row=reference_asset(pid,aid)
+        lifecycle.protect_referenced_asset(c,row['production_id'],aid)
         c.execute("INSERT INTO deleted_items(kind,item_id,project_id,deleted_at) VALUES('asset',%s,%s,%s)",(aid,row['project_id'],time.time()))
         workspace=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(row['production_id'],)).fetchone()
         identity.audit(c,'asset.trash','asset',aid,workspace_id=workspace['workspace_id'],production_id=row['production_id'])

@@ -163,13 +163,9 @@ def test_production_context_is_shared_versioned_and_episode_documents_stay_local
     # Cross-production nested IDs are deliberately concealed by the P3 ACL.
     assert rejected.status_code==404
 
-    deleted=c.delete(f'/api/projects/{second["id"]}/assets/{reference["id"]}')
-    assert deleted.status_code==200 and deleted.json()['soft'] is True
-    assert c.get(f'/api/productions/{production["id"]}/assets').json()==[]
-    assert any(item['id']==reference['id'] for item in c.get('/api/trash').json()['assets'])
-    assert (s.ASSETS/stored_asset['path']).read_bytes()==stream.getvalue()
-    restored=c.post(f'/api/trash/asset/{reference["id"]}/restore')
-    assert restored.status_code==200
+    # FINAL-FUNC-01: a live visual reference must survive attempted deletion.
+    assert c.delete(f'/api/projects/{second["id"]}/assets/{reference["id"]}').status_code==409
+    assert c.get(f'/api/assets/{reference["id"]}/file').content==stream.getvalue()
     assert [item['id'] for item in c.get(f'/api/productions/{production["id"]}/assets').json()]==[reference['id']]
     assert (s.ASSETS/stored_asset['path']).read_bytes()==stream.getvalue()
 
