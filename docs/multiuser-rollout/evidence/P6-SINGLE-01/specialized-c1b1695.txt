@@ -1,0 +1,13 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+INFO  [alembic.runtime.migration] Running upgrade 0003_platform_models -> 0004_object_collaboration, Independent collaboration objects; no legacy business-data import.
+INFO  [alembic.runtime.migration] Running upgrade 0004_object_collaboration -> 0005_owned_source_scripts, Ownership on existing source/script sources, without copying legacy content.
+INFO  [alembic.runtime.migration] Running upgrade 0005_owned_source_scripts -> 0006_job_candidate_targets, Frozen collaboration target and explicit adoption on the existing job.
+INFO  [alembic.runtime.migration] Running upgrade 0006_job_candidate_targets -> 0007_job_attempts, Task-scoped execution leases; no automatic replay of old running work.
+..SINGLE admission database wait trace: [{'pid': 17900, 'wait_event_type': 'Lock', 'wait_event': 'advisory', 'blockers': [32124]}, {'pid': 2556, 'wait_event_type': 'Lock', 'wait_event': 'advisory', 'blockers': [32124, 17900]}]
+.........SINGLE-01 ordinary editor / independent Worker ledger: {'text': 1, 'submit': 1, 'poll': 1, 'download': 1}
+......
+17 passed in 86.24s (0:01:26)

@@ -1,12 +1,20 @@
 # 多用户改造执行索引
 
+## 当前执行覆盖（2026-09-17）
+
+旧 P6 范围已被 [P6-SINGLE-01](prompts/P6_SINGLE_01_CODEX_PROMPT.md) 替代。
+当前只交付单 Worker 主链恢复、六类提交幂等及独立资源隔离，**READY_FOR_REVIEW**，未外部验收。
+固定业务 `c1b1695b6a2ef907647284bf1474a8d08537432f`：完整后端 490 passed，固定专项 17 passed（重叠不累计）。见 [简明报告](evidence/P6-SINGLE-01/REPORT.md)。
+旧多 Worker、完整配额、checkpoint 自动恢复等登记为延期，非通过。
+下方旧 P6/P5 状态文字为历史记录，不构成当前执行授权。
+
 本目录记录协作版 `imherro/OurVideoCreator` 的分阶段实施产物。冻结需求、P0–P8 提示词、验收矩阵和证据模板的完整原文在 [`../MyVideoCreator_Codex_Full_Playbook_v1.md`](../MyVideoCreator_Codex_Full_Playbook_v1.md)。
 
-已通过阶段：**P0、P1、P2、P3、P4**
+已通过阶段：**P0、P1、P2、P3、P4、P5**
 
-状态：**P5-R1 已外部通过、OVC-P5-01关闭；P5-R2 READY_FOR_REVIEW，P5整体仍未通过，不得进入 P6**。
+状态：**P5已外部通过，OVC-P5-01/02全部关闭；已授权并开始 P6-JOBS-01，不得进入 P7**。
 
-当前阶段：**P5-R2 — 迟到保存回执与宿主正文一致性**。R1通过原件见 [外部复验](reviews/P5-R1/REVIEW.md)，绑定34d646d业务/78fd14f证据。OVC-P5-02（S2）见 [外部补充结论](reviews/P5-Supplement/DECISION.md)和[完整执行提示词](prompts/P5_R2_CODEX_PROMPT.md)。R2独立业务 `aebffe364313601aceb611fbcd0ca2b01a42e29d`，49定向/195全前端及TS/build通过，见 [待验收报告](evidence/P5-R2/REPORT.md)。P5整体须等外部复验，不自行关闭02。
+当前阶段：**P6-JOBS-01 — 可靠任务执行、原子配额与管理操作闭环**。P5通过原件见 [外部复验](reviews/P5-R2/REVIEW.md)，绑定业务 `aebffe364313601aceb611fbcd0ca2b01a42e29d` / evidence `afd1eb0d3eed36b3dcd818ed0c29aec2989c2259`。完整下一任务见 [P6提示词](prompts/P6_CODEX_PROMPT.md)。P6目前仅开始，不把设计、红测或局部实现当成阶段完成。
 
 P1 首次被审查 HEAD：`5ed0afa361b0e86590cd05b9ac285d9285854635`（业务 SHA `249b5d0176971c0d6eca510cc72ae0df91b75e1f`）
 

@@ -1,6 +1,6 @@
 # 安影 · OurVideoCreator
 
-安影协作版 AI 视频创作工作室。P0–P4 已通过外部验收，当前实施 P5 对象级分工协作，尚未完成 P5 验收：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；不得公网部署或发起未经独立授权的真实付费调用。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
+安影协作版 AI 视频创作工作室。P0–P5 已通过外部验收，当前按 P6-SINGLE-01 验证单 Worker 主链与提交幂等，P6 尚未通过：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；不得公网部署或发起未经独立授权的真实付费调用。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
 
 ## 运行
 
@@ -23,7 +23,7 @@ $env:OVC_DATABASE_URL='postgresql+psycopg://用户名:密码@127.0.0.1:5432/our_
 .\Stop-Studio.ps1
 ```
 
-开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁，多 Worker 要等 P6。
+开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁。P6-SINGLE-01 继续保留单 Worker；多 Worker 与完整配额已明确延期。
 
 首次部署必须由运维使用 `python -m backend.admin_cli bootstrap-admin --phone <管理员手机号> --nickname <昵称>` 初始化平台管理员，并通过进程环境 `OVC_BOOTSTRAP_PASSWORD` 提供密码；没有默认密码，浏览器公共初始化入口已退役。后续用户通过管理员邀请注册，入组及作品授权后才能访问对应内容。当前仍只能在受控开发网络使用，不得公网部署。
 
@@ -83,7 +83,7 @@ Replicate 模型平台也可作为云端服务添加。它能运行平台提供�
 
 RunningHub 使用 `runninghub` 类型。管理员须分别配置文本服务 `https://llm.runninghub.ai/v1` 和媒体服务 `https://www.runninghub.ai`，不做隐式跨域切换。发布对应用途、上游标识及允许参数后，普通用户只选择平台模型。图片 `seedream-v5-pro` 保留最多 10 张参考图；已接通视频模式保留文生、首帧、首尾帧、多图和固定对白音频。媒体取得 taskId 后持久化并轮询 `/openapi/v2/query`。取消仅停止本地等待，远端可能继续计费；本阶段不调用真实账号或收费 API。
 
-角色跨镜头音色通过 Film Bible 的“角色固定音色”管理。先由平台管理员创建 `volcengine_speech` Provider，填写独立 Speech API Key 与协议选项 `resource_id`，并发布 audio 模型及 `voice_type` 允许枚举/默认值；普通成员只选择发布的音色。配置检查不产生费用。随后由视觉卡负责人保存声音设定、生成试听，在任务中心比较并明确采纳后再锁定版本；镜头负责人可生成本集结构化对白。生成成功只登记候选，不自动换音色或对白。对白明确采纳到镜头后，视频生成和初始剪辑才会引用选定音轨，不自动取最新候选；初剪建立 `A1 · 角色对白` 轨，并关闭相应视频片段的原始音轨以避免双重人声。豆包语音凭证与火山方舟 ARK API Key 分开管理，默认 V3 SSE 地址为 `https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse`。以上 P5 新协作链路仍待阶段浏览器验收。
+角色跨镜头音色通过 Film Bible 的“角色固定音色”管理。先由平台管理员创建 `volcengine_speech` Provider，填写独立 Speech API Key 与协议选项 `resource_id`，并发布 audio 模型及 `voice_type` 允许枚举/默认值；普通成员只选择发布的音色。配置检查不产生费用。随后由视觉卡负责人保存声音设定、生成试听，在任务中心比较并明确采纳后再锁定版本；镜头负责人可生成本集结构化对白。生成成功只登记候选，不自动换音色或对白。对白明确采纳到镜头后，视频生成和初始剪辑才会引用选定音轨，不自动取最新候选；初剪建立 `A1 · 角色对白` 轨，并关闭相应视频片段的原始音轨以避免双重人声。豆包语音凭证与火山方舟 ARK API Key 分开管理，默认 V3 SSE 地址为 `https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse`。上述 P5 协作链路已随 P5 通过；不代表真实付费供应商联调通过。
 
 ## 项目 Schema 与默认模型策略
 
@@ -91,7 +91,7 @@ RunningHub 使用 `runninghub` 类型。管理员须分别配置文本服务 `ht
 
 分镜规划默认执行两次文本调用：第一遍从剧本提取角色、角色持续状态、场景、场景持续状态和道具，形成视觉卡与版本候选；第二遍只引用第一遍产生的视觉语义键拆分镜头。服务端把语义键转换为系统 ID，校验悬空引用和类型错误，并让每个镜头绑定明确的视觉版本。成功结果先保留为候选；用户在任务中心比较并明确采纳时，才在一次事务中校验来源、结构、受影响镜头负责人及版本，写入镜头、视觉卡和图结构主源。旧锁定视觉版本、人工内容和素材保留，不将整份结果覆盖回 `Project.document`。这一阶段只调用文本模型，不生成视觉参考图。
 
-## 对象分工协作（P5，待外部验收）
+## 对象分工协作（P5，已通过外部验收）
 
 - 普通 editor 可创建允许的对象并负责自己的内容；同一集的不同镜头可分别编辑保存。镜头附属节点继承镜头权限，视觉版本及音色归视觉卡，章节和正式剧本继续使用已有关系表。
 - 顶部“对象协作”显示负责人、服务端 revision、分配代际、保存状态、审核、评论和历史。管理者修改他人内容前必须明确接管；分配和撤权使旧编辑凭证失效，成果保留。
@@ -100,7 +100,7 @@ RunningHub 使用 `runninghub` 类型。管理员须分别配置文本服务 `ht
 - AI 生成成功不代表已采纳。节点、视觉、音色、对白、章节提取、剧本、改编及分镜结果均须有权用户明确采纳；生成期间的人工编辑不会被迟到结果自动覆盖。
 - 3D 导演台截图先上传素材，再原子核验导演台/图结构版本并创建节点。业务内容经对象小接口保存，作品设置和分集元数据使用受限 PATCH；聚合 GET 仅供画布和预览读取。
 
-实现及验证映射见 [P5 对象协作契约](docs/multiuser-rollout/design/P5_OBJECT_COLLABORATION.md)。当前仍是 P5 开发和验收准备，不代表外部已通过；不包含实时逐字共编、多 Worker 或额度计费。
+实现及验证映射见 [P5 对象协作契约](docs/multiuser-rollout/design/P5_OBJECT_COLLABORATION.md)。P5 已通过，原始结论见阶段索引；不包含实时逐字共编、多 Worker 或额度计费。
 
 已锁定的视觉版本不会原地修改。用户可从它派生新版本；视觉卡会指向新版，但已有分镜继续绑定旧版，直到用户按镜头、场景或段落明确升级。升级只把现有生成结果标记为待更新，不删除素材、不自动重新生成。分镜图片任务会保存确定性的 Generation Fingerprint，覆盖镜头变量、绑定版本、风格版本、提示词编译器版本和最终 Provider/模型，用于判断当前结果是否陈旧。详细证据见 [PHASE_5_ACCEPTANCE.md](PHASE_5_ACCEPTANCE.md)。
 

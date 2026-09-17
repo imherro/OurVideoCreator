@@ -1,0 +1,378 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+INFO  [alembic.runtime.migration] Running upgrade 0003_platform_models -> 0004_object_collaboration, Independent collaboration objects; no legacy business-data import.
+INFO  [alembic.runtime.migration] Running upgrade 0004_object_collaboration -> 0005_owned_source_scripts, Ownership on existing source/script sources, without copying legacy content.
+INFO  [alembic.runtime.migration] Running upgrade 0005_owned_source_scripts -> 0006_job_candidate_targets, Frozen collaboration target and explicit adoption on the existing job.
+INFO  [alembic.runtime.migration] Running upgrade 0006_job_candidate_targets -> 0007_job_attempts, Task-scoped execution leases; no automatic replay of old running work.
+..SINGLE admission database wait trace: [{'pid': 38840, 'wait_event_type': 'Lock', 'wait_event': 'advisory', 'blockers': [40160]}, {'pid': 41728, 'wait_event_type': 'Lock', 'wait_event': 'advisory', 'blockers': [40160, 38840]}]
+.........SINGLE-01 ordinary editor / independent Worker ledger: {'text': 1, 'submit': 1, 'poll': 1, 'download': 1}
+......{"status": "passed", "phase": "complete", "error": null, "elapsed_seconds": 10.622, "last_request": {"url": "http://127.0.0.1:4956/api/jobs/job-8eb05a508f33498083d24a4b8abe635f", "method": "GET", "elapsed_seconds": 0.111}, "database": {"server_version": "18.6", "database_name": "ovc_test_41704_9221288b64c2", "schema_name": "public", "pg_backend_pid": 9380}, "task": {"id": "job-8eb05a508f33498083d24a4b8abe635f", "status": "succeeded", "phase": "已完成", "provider_job_id": null, "updated": 1789605395.6964147}, "child_logs": {"fake-provider": {"stdout": "", "stderr": ""}, "web-one": {"stdout": "INFO:     127.0.0.1:4966 - \"GET /api/health HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:4979 - \"POST /api/auth/login HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:4981 - \"POST /api/admin/model-providers HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:4985 - \"POST /api/admin/models HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:4992 - \"POST /api/projects HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:5005 - \"POST /api/projects/project-ccdf8e94158a47f892755f1d30c45472/objects HTTP/1.1\" 201 Created\nINFO:     127.0.0.1:5011 - \"POST /api/projects/project-ccdf8e94158a47f892755f1d30c45472/jobs HTTP/1.1\" 200 OK\n", "stderr": "INFO:     Started server process [32952]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:4955 (Press CTRL+C to quit)\n"}, "web-two": {"stdout": "INFO:     127.0.0.1:4975 - \"GET /api/health HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:5039 - \"GET /api/jobs/job-8eb05a508f33498083d24a4b8abe635f HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:13118 - \"GET /api/jobs/job-8eb05a508f33498083d24a4b8abe635f HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:13129 - \"GET /api/jobs/job-8eb05a508f33498083d24a4b8abe635f HTTP/1.1\" 200 OK\n", "stderr": "INFO:     Started server process [42204]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:4956 (Press CTRL+C to quit)\n"}, "worker": {"stdout": "Worker started: instance=ovc-c190ed109139b4a498a132667cf90200 data=<USER>\\AppData\\Local\\Temp\\pytest-of-kunpeng\\pytest-1864\\test_two_webs_independent_work0\\p1-data concurrency=1 mode=single-process lock_backend_pid=19440\n", "stderr": ""}, "web-one-restarted": {"stdout": "INFO:     127.0.0.1:5057 - \"GET /api/health HTTP/1.1\" 200 OK\nINFO:     127.0.0.1:13113 - \"GET /api/jobs/job-8eb05a508f33498083d24a4b8abe635f HTTP/1.1\" 200 OK\n", "stderr": "INFO:     Started server process [18104]\nINFO:     Waiting for application startup.\nINFO:     Application startup complete.\nINFO:     Uvicorn running on http://127.0.0.1:4955 (Press CTRL+C to quit)\n"}}, "web_pids": [32952, 42204, 18104], "worker_pid": 39624, "job_id": "job-8eb05a508f33498083d24a4b8abe635f", "running_before_web_restart": {"id": "job-8eb05a508f33498083d24a4b8abe635f", "submission_id": "p1-process-job-001", "project_id": "project-ccdf8e94158a47f892755f1d30c45472", "node_id": "p1-text", "kind": "text", "status": "running", "input": {"prompt": "process isolation", "model_id": "model-c1601fd3fb53461c9aff3d6527d916ab", "system_prompt": "你是中文短片编剧。根据用户需求写可拍摄的剧本，保留指定角色、人名、对白和结局。控制角色与场景数量，以可见动作推进情节，遵守目标时长。输出中文，不输出思考过程。", "target_duration": 15, "prompt_contract_origin": "submission"}, "result": null, "provider_job_id": null, "error": null, "phase": "生成剧本", "progress": null, "created": 1789605391.5822508, "updated": 1789605392.996465, "started": 1789605392.8349981, "finished": null, "telemetry": null, "scope": "episode", "production_id": "production-19124122b9d54b978e11c4a25344c55a", "workspace_id": "workspace-test-ee89917d2e5146a69fdc78269d801d75", "actor_user_id": "user-test-admin-ddaa6f1321fb41baba0a0a8f85b49123", "collaboration": {"mode": "node", "target": {"id": "object-5febc43bfb5b48beb529f79f4dbd0e64", "kind": "node", "revision": 1, "assignment_epoch": 1}, "references": [{"id": "object-8a0f9329e7774a6cbeec275df57f9d8e", "kind": "graph", "revision": 2, "assignment_epoch": 1}], "project_revision": 1, "script_reference": null, "production_revision": 1}, "submission_namespace": "job", "input_hash": "7f6ec3846e40b05024a418f0de69bff3f70104560b8b9bdca9202256976ed896", "worker_id": null, "attempt_number": 0, "lease_expires_at": null, "heartbeat_at": null, "execution_phase": "legacy"}, "running_after_web_restart": {"id": "job-8eb05a508f33498083d24a4b8abe635f", "submission_id": "p1-process-job-001", "project_id": "project-ccdf8e94158a47f892755f1d30c45472", "node_id": "p1-text", "kind": "text", "status": "running", "input": {"prompt": "process isolation", "model_id": "model-c1601fd3fb53461c9aff3d6527d916ab", "system_prompt": "你是中文短片编剧。根据用户需求写可拍摄的剧本，保留指定角色、人名、对白和结局。控制角色与场景数量，以可见动作推进情节，遵守目标时长。输出中文，不输出思考过程。", "target_duration": 15, "prompt_contract_origin": "submission"}, "result": null, "provider_job_id": null, "error": null, "phase": "生成剧本", "progress": null, "created": 1789605391.5822508, "updated": 1789605392.996465, "started": 1789605392.8349981, "finished": null, "telemetry": null, "scope": "episode", "production_id": "production-19124122b9d54b978e11c4a25344c55a", "workspace_id": "workspace-test-ee89917d2e5146a69fdc78269d801d75", "actor_user_id": "user-test-admin-ddaa6f1321fb41baba0a0a8f85b49123", "collaboration": {"mode": "node", "target": {"id": "object-5febc43bfb5b48beb529f79f4dbd0e64", "kind": "node", "revision": 1, "assignment_epoch": 1}, "references": [{"id": "object-8a0f9329e7774a6cbeec275df57f9d8e", "kind": "graph", "revision": 2, "assignment_epoch": 1}], "project_revision": 1, "script_reference": null, "production_revision": 1}, "submission_namespace": "job", "input_hash": "7f6ec3846e40b05024a418f0de69bff3f70104560b8b9bdca9202256976ed896", "worker_id": null, "attempt_number": 0, "lease_expires_at": null, "heartbeat_at": null, "execution_phase": "legacy"}, "final_job": {"id": "job-8eb05a508f33498083d24a4b8abe635f", "submission_id": "p1-process-job-001", "project_id": "project-ccdf8e94158a47f892755f1d30c45472", "node_id": "p1-text", "kind": "text", "status": "succeeded", "input": {"prompt": "process isolation", "model_id": "model-c1601fd3fb53461c9aff3d6527d916ab", "system_prompt": "你是中文短片编剧。根据用户需求写可拍摄的剧本，保留指定角色、人名、对白和结局。控制角色与场景数量，以可见动作推进情节，遵守目标时长。输出中文，不输出思考过程。", "target_duration": 15, "prompt_contract_origin": "submission"}, "result": {"text": "P1 fake response"}, "provider_job_id": null, "error": null, "phase": "已完成", "progress": 100.0, "created": 1789605391.5822508, "updated": 1789605395.6964147, "started": 1789605392.8349981, "finished": 1789605395.6964145, "telemetry": null, "scope": "episode", "production_id": "production-19124122b9d54b978e11c4a25344c55a", "workspace_id": "workspace-test-ee89917d2e5146a69fdc78269d801d75", "actor_user_id": "user-test-admin-ddaa6f1321fb41baba0a0a8f85b49123", "collaboration": {"mode": "node", "target": {"id": "object-5febc43bfb5b48beb529f79f4dbd0e64", "kind": "node", "revision": 1, "assignment_epoch": 1}, "references": [{"id": "object-8a0f9329e7774a6cbeec275df57f9d8e", "kind": "graph", "revision": 2, "assignment_epoch": 1}], "project_revision": 1, "script_reference": null, "production_revision": 1}, "submission_namespace": "job", "input_hash": "7f6ec3846e40b05024a418f0de69bff3f70104560b8b9bdca9202256976ed896", "worker_id": null, "attempt_number": 0, "lease_expires_at": null, "heartbeat_at": null, "execution_phase": "legacy"}, "fake_request_count": 1, "second_worker_exit": 2}
+...P2 metadata concurrent save PostgreSQL trace: [{'pid': 31484, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [20684]}, {'pid': 24260, 'wait_event_type': 'Lock', 'wait_event': 'tuple', 'blockers': [31484]}]
+..F.........F.P5 run batch PostgreSQL wait chain: [{'pid': 29736, 'wait_event_type': 'Lock', 'wait_event': 'advisory', 'blockers': [3560]}, {'pid': 3560, 'wait_event_type': 'Lock', 'wait_event': 'transactionid', 'blockers': [18616]}]
+.
+================================== FAILURES ===================================
+__ test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002413106CDE0>
+
+    def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(monkeypatch):
+        client = authenticated_client()
+        model = publish_test_model(client, 'p2-batch-model')
+        try:
+            production = client.post('/api/productions', json={'name': 'P2 batch rollback'}).json()
+            episode = client.post(f'/api/productions/{production["id"]}/episodes', json={'title': 'Episode'}).json()
+            source = client.post(
+                f'/api/productions/{production["id"]}/sources',
+                json={'title': 'Source', 'type': 'manual', 'metadata': {}},
+            ).json()
+            chapters = [
+                client.post(
+                    f'/api/productions/{production["id"]}/sources/{source["id"]}/chapters',
+                    json={'title': f'Chapter {index}', 'content': f'content {index}'},
+                ).json()
+                for index in (1, 2)
+            ]
+            import backend.app as app_module
+            original = app_module.create_job_record
+            calls = {'count': 0}
+
+            def injected(connection, project_id, body):
+                calls['count'] += 1
+                if calls['count'] == 2:
+                    raise RuntimeError('injected last batch item failure')
+                return original(connection, project_id, body)
+
+            monkeypatch.setattr(app_module, 'create_job_record', injected)
+            body = SourceExtractionCreate(
+                project_id=episode['id'], chapter_ids=[item['id'] for item in chapters],
+                model_id=model['id'], allow_cloud=False,
+                submission_id='p2-last-item-rollback',
+            )
+            with pytest.raises(RuntimeError, match='last batch item'):
+>               client.post(f'/api/productions/{production["id"]}/source-extractions', json=body.model_dump())
+
+tests\test_p2_postgresql.py:228:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:560: in post
+    return super().post(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1209: in post
+    return self.request(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:459: in request
+    return super().request(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:803: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:985: in send
+    response = self._send_handling_auth(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1013: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1048: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1081: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:362: in handle_request
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:359: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:450: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:395: in __get_result
+    raise self._exception
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:191: in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\contextlib.py:162: in __exit__
+    self.gen.throw(value)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_utils.py:87: in collapse_excgroups
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend\app.py:81: in auth
+    result = await call_next(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:680: in app
+    await route.handle(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:276: in handle
+    await self.app(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:134: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:120: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:674: in app
+    raw_response = await run_endpoint_function(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:330: in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\concurrency.py:32: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\to_thread.py:63: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py:2518: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py:1002: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+production_id = 'production-7569a266d59f482ba08efeab184d38e2'
+body = SourceExtractionCreate(project_id='project-30f22aee0d12400b966f7b07ced83dca', chapter_ids=['chapter-9a6d944a784a45e9b4...68c0eb0ce0a4c1bb861696516c8977d'], model_id='p2-batch-model', allow_cloud=False, submission_id='p2-last-item-rollback')
+
+    @app.post('/api/productions/{production_id}/source-extractions')
+    def extract_source_events(production_id:str,body:SourceExtractionCreate):
+        production(production_id)
+        if len(set(body.chapter_ids))!=len(body.chapter_ids):raise ValueError('不能重复选择同一章节')
+        with s.db() as c:
+            job_admission.lock(c)
+            collaboration.lock_identity(c)
+            from . import owned_content as owned
+            owned.production_scope(c,production_id,'editor')
+            owner=c.execute('SELECT id FROM projects WHERE id=%s AND production_id=%s',(body.project_id,production_id)).fetchone()
+            if not owner:raise ValueError('文本任务必须归属于当前 Production 的 Episode')
+            placeholders=','.join('%s' for _ in body.chapter_ids)
+            chapters=c.execute(f'''SELECT c.* FROM source_chapters c JOIN source_documents d ON d.id=c.source_id
+                WHERE d.production_id=%s AND c.id IN ({placeholders})
+                AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
+                AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=c.id)''',[production_id,*body.chapter_ids]).fetchall()
+            if len(chapters)!=len(body.chapter_ids):raise ValueError('所选章节不存在或不属于当前 Production')
+            # Lock the complete batch in stable order before freezing prompts. A
+            # mixed-owner batch cannot leave a partial queue behind.
+            chapter_map={cid:owned.load(c,production_id,'chapter',cid,write=True) for cid in sorted(body.chapter_ids)}
+            for chapter in chapter_map.values():collaboration.editable(c,chapter)
+            job_admission.batch_members(c,body.project_id,'source-extraction',body.submission_id,body.chapter_ids)
+            created=[]
+            for chapter_id in body.chapter_ids:
+                chapter=chapter_map[chapter_id]
+                job_body=JobCreate(node_id='source-chapter:'+chapter_id,kind='text',
+                    submission_id=body.submission_id+':'+chapter_id[:24],input={
+                        'model_id':body.model_id,'allow_cloud':body.allow_cloud,
+                        'stage':'source_analysis','prompt':f'章节标题：{chapter["title"]}\n\n原文：\n{chapter["content"]}',
+                        'source_event_extraction':{'productionId':production_id,'chapterId':chapter_id,'chapterRevision':chapter['revision'],
+                                                   'assignmentEpoch':chapter['assignment_epoch']},
+                })
+>               created.append(create_job_record(c,body.project_id,job_body,entrypoint='source-extraction'))
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               TypeError: test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events.<locals>.injected() got an unexpected keyword argument 'entrypoint'
+
+backend\app.py:1664: TypeError
+________ test_preparation_snapshot_change_rejects_whole_run[metadata] _________
+
+team = {'a': <starlette.testclient.TestClient object at 0x00000241315D85A0>, 'admin': <starlette.testclient.TestClient object...id': 'user-54b884195516499fa2dd97aa154bf239', 'b': <starlette.testclient.TestClient object at 0x0000024131549260>, ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000241317452B0>
+change = 'metadata'
+
+    @pytest.mark.parametrize('change', ['node', 'graph', 'assignment', 'metadata'])
+    def test_preparation_snapshot_change_rejects_whole_run(team, monkeypatch, change):
+        first, second = nodes(team)
+        structure = graph(team)
+        entered, release = threading.Event(), threading.Event()
+        original = object_job_candidates.lock_batch
+        def paused(*args, **kwargs):
+            entered.set()
+            assert release.wait(15)
+            return original(*args, **kwargs)
+        monkeypatch.setattr(object_job_candidates, 'lock_batch', paused)
+        before = counts(team)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(run, team)
+            try:
+                assert entered.wait(10)
+                if change == 'node':
+                    value = deepcopy(second['content']);value['node']['data']['prompt'] = 'new prompt'
+                    updated = save(team, second, value)
+                elif change == 'assignment':
+                    updated = team['admin'].post(url(team, second, '/assign'), json={
+                        **version(second), 'assignee_id': team['bid']})
+                elif change == 'graph':
+                    value = deepcopy(structure['content'])
+                    value['edges'] = [{'id': 'new-dependency', 'source': 'a-first', 'target': 'z-second'}]
+                    updated = save(team, structure, value)
+                else:
+                    project = team['admin'].get('/api/projects/'+team['pid']).json()
+                    updated = team['admin'].patch('/api/projects/'+team['pid']+'/metadata', json={
+                        'expected_revision': project['revision'], 'patch': {'brief': 'new brief'}})
+                assert updated.status_code == 200, updated.text
+            finally:
+                release.set()
+>           response = pending.result(15)
+                       ^^^^^^^^^^^^^^^^^^
+
+tests\test_p5_run_permissions.py:95:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\concurrent\futures\_base.py:443: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:395: in __get_result
+    raise self._exception
+C:\Python314\Lib\concurrent\futures\thread.py:86: in run
+    result = ctx.run(self.task)
+             ^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\thread.py:73: in run
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+tests\test_p5_run_permissions.py:32: in run
+    return team['a'].post('/api/projects/'+team['pid']+'/run', json={
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:560: in post
+    return super().post(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1209: in post
+    return self.request(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:459: in request
+    return super().request(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:803: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:985: in send
+    response = self._send_handling_auth(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1013: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1048: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\httpx2\_client.py:1081: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:362: in handle_request
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\testclient.py:359: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\from_thread.py:334: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:450: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:395: in __get_result
+    raise self._exception
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\from_thread.py:259: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\applications.py:1159: in __call__
+    await super().__call__(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:191: in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+                                   ^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\contextlib.py:162: in __exit__
+    self.gen.throw(value)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_utils.py:87: in collapse_excgroups
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:193: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend\app.py:81: in auth
+    result = await call_next(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:168: in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\base.py:144: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:680: in app
+    await route.handle(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\routing.py:276: in handle
+    await self.app(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:134: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:120: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:674: in app
+    raw_response = await run_endpoint_function(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\fastapi\routing.py:328: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend\app.py:1960: in run_workflow
+    return await run_in_threadpool(prepare_run_workflow,pid,body)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\starlette\concurrency.py:32: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\to_thread.py:63: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py:2518: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+..\..\..\AppData\Roaming\Python\Python314\site-packages\anyio\_backends\_asyncio.py:1002: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+backend\app.py:2141: in prepare_run_workflow
+    lock_batch(c,pid,[JobCreate(node_id=node['id'],kind=data['kind'],submission_id=f'{group}:{node["id"]}',input=data)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = (<psycopg.Connection [BAD] at 0x24131706990>, 'project-1868a21e54fd4f2f8059dee5f5ceabb5', [JobCreate(node_id='a-first'...5, 'id': 'production-8e62c5f2e43647129c0851171e5a5f74', 'name': 'P5 isolated collaboration', 'revision': 1, ...}, ...})
+kwargs = {}
+@py_assert1 = <bound method Event.wait of <threading.Event at 0x241313abe90: set>>
+@py_assert3 = 15, @py_assert5 = False
+@py_format7 = 'assert False\n{False = wait\n{wait = <threading.Event at 0x241313abe90: unset>.wait\n}(15)\n}'
+
+    def paused(*args, **kwargs):
+        entered.set()
+>       assert release.wait(15)
+E       assert False
+E        +  where False = wait(15)
+E        +    where wait = <threading.Event at 0x241313abe90: unset>.wait
+
+tests\test_p5_run_permissions.py:70: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p2_postgresql.py::test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events
+FAILED tests/test_p5_run_permissions.py::test_preparation_snapshot_change_rejects_whole_run[metadata]
+2 failed, 33 passed in 148.64s (0:02:28)

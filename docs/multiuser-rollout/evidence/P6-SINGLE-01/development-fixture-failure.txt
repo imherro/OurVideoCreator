@@ -1,0 +1,41 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_postgresql_baseline, PostgreSQL baseline for every retained business table.
+INFO  [alembic.runtime.migration] Running upgrade 0001_postgresql_baseline -> 0002_identity_tenancy, Invite-only identity, workspaces, production membership, and audit scope.
+INFO  [alembic.runtime.migration] Running upgrade 0002_identity_tenancy -> 0003_platform_models, Versioned platform model configuration and encrypted credentials.
+INFO  [alembic.runtime.migration] Running upgrade 0003_platform_models -> 0004_object_collaboration, Independent collaboration objects; no legacy business-data import.
+INFO  [alembic.runtime.migration] Running upgrade 0004_object_collaboration -> 0005_owned_source_scripts, Ownership on existing source/script sources, without copying legacy content.
+INFO  [alembic.runtime.migration] Running upgrade 0005_owned_source_scripts -> 0006_job_candidate_targets, Frozen collaboration target and explicit adoption on the existing job.
+INFO  [alembic.runtime.migration] Running upgrade 0006_job_candidate_targets -> 0007_job_attempts, Task-scoped execution leases; no automatic replay of old running work.
+........FSINGLE-01 ordinary editor / independent Worker ledger: {'text': 1, 'submit': 1, 'poll': 1, 'download': 1}
+......
+================================== FAILURES ===================================
+_ test_relation_entrypoints_replay_and_reject_current_owner_loss[adaptation/generate] _
+
+team = {'a': <starlette.testclient.TestClient object at 0x000001E8003D9E10>, 'admin': <starlette.testclient.TestClient object...id': 'user-e2b808be64ca49138ee42cb234acf717', 'b': <starlette.testclient.TestClient object at 0x000001E8004599D0>, ...}
+entrypoint = 'adaptation/generate'
+
+    @pytest.mark.parametrize('entrypoint',['source-extractions','script-generations','adaptation/generate'])
+    def test_relation_entrypoints_replay_and_reject_current_owner_loss(team,entrypoint):
+        from tests.test_p5_owned_content import create_chapter,content,assign,base
+        from tests.test_p5_relation_candidates import approved_plan
+        chapter=create_chapter(team);mid=s.uid('single-relation-')
+        publish_test_model(team['admin'],mid)
+        body={'model_id':mid,'submission_id':s.uid('batch-')}
+        actor=team['a']
+        if entrypoint=='source-extractions':body.update(project_id=team['pid'],chapter_ids=[chapter['id']])
+        elif entrypoint=='script-generations':
+            approved_plan(team,chapter);script=content(team,'script');body['episode_nos']=[1]
+        else:
+            body['project_id']=team['pid'];actor=team['admin']
+        path=base(team)+'/'+entrypoint
+>       first=actor.post(path,json=body);assert first.status_code==200,first.text
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: {"detail": "请先在原著资料库提取事件，再生成改编策划"}
+E       assert 400 == 200
+E        +  where 400 = <Response [400 Bad Request]>.status_code
+
+tests\test_p6_admission.py:131: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_p6_admission.py::test_relation_entrypoints_replay_and_reject_current_owner_loss[adaptation/generate]
+1 failed, 14 passed in 67.22s (0:01:07)

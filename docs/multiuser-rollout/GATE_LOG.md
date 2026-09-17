@@ -293,3 +293,23 @@ P0/P1/P2 保持通过。P3 阻塞项：`OVC-P3-01` 批量章节删除绕过 mana
 状态 **READY_FOR_REVIEW**。base `78fd14f40339e0b71908a685efb2354a0c1045ce`，固定业务 `aebffe364313601aceb611fbcd0ca2b01a42e29d`，后续docs-only证据提交。选择已授权B方案：迟到r2回执保留本地正文/r2版本，r3留待明确比较，实际host显示保存冲突；保留新增输入、独立对象保存、显式重提CAS与作用域/epoch隔离。
 
 基线严格mock CAS及真实client/host回调红测6failed/3passed，记录note-only以expected3携带v2写成r4的实际错误。固定新SHA49定向/195全部前端通过，TS/build通过，backend与已通过34d646d完全等同；未冒称重跑PG或浏览器。证据见 `evidence/P5-R2/REPORT.md`、`MATRIX.md`、`commands-aebffe3/runs.json`。历史失败、fixture失败和旧实例均保留。**OVC-P5-02只请求关闭，不自行签发P5通过。**
+
+## P5 外部通过 / 授权 P6-JOBS-01
+
+2026-09-17 主ChatGPT会话正式回复（思考9m1s）：**P5-R2通过，OVC-P5-02正式关闭，P5整体通过，允许进入P6**。OVC-P5-01保持关闭，无新增阻塞、不需P5-R3，P0–P4历史通过不变。
+
+通过业务 `aebffe364313601aceb611fbcd0ca2b01a42e29d`；通过evidence HEAD/P6 base `afd1eb0d3eed36b3dcd818ed0c29aec2989c2259`。审核原件 `reviews/P5-R2/`，下载ZIP SHA256 `e42ce0c93449ad2cade8ee06a4fe8f3df63f59ff1ef206bc5f06e4c4d1d44b66`。审核端未独立重跑项目/PG/浏览器；结论基于实际源码、提交树、测试与实施端原始证据交叉核验，执行边界保留原文。
+
+下一单一授权 **P6-JOBS-01：可靠任务执行、原子配额与管理操作闭环**。完整原件已下载、全文阅读并归档 `prompts/P6_CODEX_PROMPT.md`。P6仅开始，尚未交付；P7/P8实施、公网发布和真实付费Provider未授权。
+
+## P6 范围替代 / P6-SINGLE-01 开发中
+
+2026-09-17 用户暂停旧 P6 并完成五项交接后，在主会话确认缩减范围，随后明确要求 Codex 阅读最新完整回复及附件，按原协作模式继续。新任务为 `prompts/P6_SINGLE_01_CODEX_PROMPT.md`，只恢复单 Worker 主链、六类提交幂等及独立 FFmpeg 资源隔离。
+
+旧 P6-JOBS-01 自动执行授权撤销；多 Worker、完整配额、逐步骤恢复和管理后台延期，不计通过。P0–P5 历史通过不改写。整理前已在仓库外保存并校验 27 个变更文件及 tracked binary diff；未复制用户数据。运行时撤下配额预留/释放与 attempt 依赖，旧实验模块、迁移未启用结构和专用测试保留；不以假 reserve 或吞异常绕过失败。最终须固定业务版本做完整后端回归后送审，此时尚未验收。
+
+## P6-SINGLE-01 交付待审
+
+固定业务 `c1b1695b6a2ef907647284bf1474a8d08537432f`；完整后端退出 0，490 passed / 2 warnings，1126.57 秒；固定专项退出 0，17 passed，86.24 秒，重叠不累计。新真实 PG / 普通 editor TestClient / 独立 Worker / loopback fake 文本与异步图片 / 真 FFmpeg 导出，以及并发幂等与资源收尾均验证。两个开发回归与夹具前置失败均保留并说明，未改写历史。报告与脱敏原始输出见 `evidence/P6-SINGLE-01/REPORT.md`。
+
+状态 **READY_FOR_REVIEW**，只请求按缩减后的任务审核。前端未改，继承 P5-R2 对应证据；多 Worker、配额、自动恢复平台、P7、真实付费调用与公网部署均未实施，不预写外部 PASS。
