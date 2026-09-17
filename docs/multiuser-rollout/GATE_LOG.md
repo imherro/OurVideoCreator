@@ -1,8 +1,8 @@
 # 多用户改造外部验收记录
 
-## 当前覆盖：FINAL-FUNC-01 执行中
+## 当前覆盖：FINAL-FUNC-01 READY_FOR_REVIEW
 
-用户明确要求功能收尾、暂缓运维；ChatGPT 正式下发 `prompts/FINAL_FUNC_01_CODEX_PROMPT.md`。起点 `1ca827212bdc411c7cccf093687482f47cdc9251`，P0–P5 及 P6-SINGLE-01 历史通过保持（P6 业务 c1b1695 / evidence 026cddf）。P7-RECOVERY-01 暂缓且尚未开始。仅补验双人功能闭环并最小修复真实缺陷，旧 P6 平台继续延期；不启动原 P8 全矩阵、备份恢复、部署、容量或真实付费验证。当前尚未交付，不预写通过。
+用户明确要求功能收尾、暂缓运维；ChatGPT 正式下发 `prompts/FINAL_FUNC_01_CODEX_PROMPT.md`。起点 `1ca827212bdc411c7cccf093687482f47cdc9251`，P0–P5 及 P6-SINGLE-01 历史通过保持（P6 业务 c1b1695 / evidence 026cddf）。P7-RECOVERY-01 暂缓且尚未开始。双人浏览器链路完成，候选 `018a6049bde4e47226ff41ff3b289d3496f75446` 修复引用素材删除保护、定向 99 passed，报告 `evidence/FINAL-FUNC-01/REPORT.md`，状态仅 READY_FOR_REVIEW。旧 P6 平台继续延期；不启动原 P8 全矩阵、备份恢复、部署、容量或真实付费验证，不预写通过。
 
 开发者只能登记“已提交待审”；“通过/不通过/证据不足”由外部验收人给出并绑定具体 SHA。
 

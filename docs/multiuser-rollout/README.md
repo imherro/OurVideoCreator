@@ -2,7 +2,7 @@
 
 ## 当前执行覆盖（2026-09-17）
 
-最新用户确认“好，收尾吧”：执行 [FINAL-FUNC-01](prompts/FINAL_FUNC_01_CODEX_PROMPT.md)，当前执行中、尚未交付验收。仅补验双人功能闭环及必要缺陷修复；P7-RECOVERY-01 暂缓且未开始，运维/部署/容量/真实付费均不在范围。以下“下一任务尚未授权”是本次授权前的历史状态。
+最新用户确认“好，收尾吧”：执行 [FINAL-FUNC-01](prompts/FINAL_FUNC_01_CODEX_PROMPT.md)，当前 **READY_FOR_REVIEW**。双人真实浏览器创作至四秒 FFmpeg 导出已完成；最小修复被引用素材可删除的问题，固定候选 `018a6049bde4e47226ff41ff3b289d3496f75446` 专项 99 passed。见 [功能收尾报告](evidence/FINAL-FUNC-01/REPORT.md)。等待外部最终功能验收，不自行签发通过。P7-RECOVERY-01 暂缓且未开始，运维/部署/容量/真实付费均不在范围。以下“下一任务尚未授权”是本次授权前的历史状态。
 
 旧 P6 范围已被 [P6-SINGLE-01](prompts/P6_SINGLE_01_CODEX_PROMPT.md) 替代。
 单 Worker 主链恢复、六类提交幂等及独立资源隔离已获 **ChatGPT 外部验收通过，无需返修**。结论仅覆盖 P6-SINGLE-01，不代表旧 P6 平台整体通过。

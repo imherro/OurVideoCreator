@@ -1,0 +1,32 @@
+[
+  {
+    "command": [
+      "ffprobe",
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames:format=duration,size",
+      "-of",
+      "json",
+      "<USER>\\AppData\\Local\\Temp\\ovc-final-browser-o2j21xrq\\data\\assets\\asset-55170aa2b376478b9836d8570c431118.mp4"
+    ],
+    "exit_code": 0,
+    "stdout": "{\n    \"programs\": [\n\n    ],\n    \"stream_groups\": [\n\n    ],\n    \"streams\": [\n        {\n            \"codec_name\": \"h264\",\n            \"codec_type\": \"video\",\n            \"width\": 1280,\n            \"height\": 720,\n            \"r_frame_rate\": \"24/1\",\n            \"nb_frames\": \"96\"\n        },\n        {\n            \"codec_name\": \"aac\",\n            \"codec_type\": \"audio\",\n            \"r_frame_rate\": \"0/0\",\n            \"nb_frames\": \"189\"\n        }\n    ],\n    \"format\": {\n        \"duration\": \"4.000000\",\n        \"size\": \"13885\"\n    }\n}\n",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "ffmpeg",
+      "-v",
+      "error",
+      "-i",
+      "<USER>\\AppData\\Local\\Temp\\ovc-final-browser-o2j21xrq\\data\\assets\\asset-55170aa2b376478b9836d8570c431118.mp4",
+      "-f",
+      "null",
+      "-"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]
