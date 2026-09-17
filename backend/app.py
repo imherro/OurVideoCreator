@@ -1596,27 +1596,50 @@ def create_source_document(production_id:str,body:SourceCreate):
 
 @app.post('/api/productions/{production_id}/sources/import')
 def import_source_document(production_id:str,body:SourceImport):
+    return _import_source(production_id,body)
+
+@app.post('/api/productions/{production_id}/sources/{source_id}/chapters/import')
+def import_source_chapters(production_id:str,source_id:str,body:SourceImport):
+    return _import_source(production_id,body,source_id)
+
+def _import_source(production_id,body,existing_source_id=None):
     from .source_library import SOURCE_TYPES,split_chapters
     production(production_id)
     if body.type not in SOURCE_TYPES:raise ValueError('原著类型无效')
     if not body.title.strip():raise ValueError('原著名称不能为空')
     chapters=split_chapters(body.content)
-    source_id=s.uid('source-');now=time.time()
+    source_id=existing_source_id or s.uid('source-');now=time.time()
     with s.db() as c:
         from .owned_content import production_scope
         production_scope(c,production_id,'editor',write=True)
         actor=identity.current().user_id
-        c.execute('INSERT INTO source_documents VALUES(%s,%s,%s,%s,%s,%s,%s)',(
-            source_id,production_id,body.type,body.title.strip(),s.dumps(body.metadata),now,now,
-        ))
-        for number,(title,content) in enumerate(chapters,1):
+        if existing_source_id:
+            source=c.execute('''SELECT id FROM source_documents WHERE id=%s AND production_id=%s
+                FOR UPDATE''',(source_id,production_id)).fetchone()
+            if not source or c.execute("SELECT 1 FROM deleted_items WHERE kind='source' AND item_id=%s",(source_id,)).fetchone():
+                raise HTTPException(404,'原著不存在或已移入回收站')
+            production_scope(c,production_id,'editor')
+            start=c.execute('SELECT COALESCE(MAX(chapter_no),0)+1 value FROM source_chapters WHERE source_id=%s',(source_id,)).fetchone()['value']
+            c.execute('UPDATE source_documents SET updated=%s WHERE id=%s',(now,source_id))
+        else:
+            start=1
+            c.execute('INSERT INTO source_documents VALUES(%s,%s,%s,%s,%s,%s,%s)',(
+                source_id,production_id,body.type,body.title.strip(),s.dumps(body.metadata),now,now,
+            ))
+        first_chapter_id=None
+        for number,(title,content) in enumerate(chapters,start):
+            chapter_id=s.uid('chapter-')
+            if first_chapter_id is None:first_chapter_id=chapter_id
             c.execute('''INSERT INTO source_chapters(id,source_id,chapter_no,title,content,sort_order,
                 revision,created,updated,assignee_id,created_by,updated_by)
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(
-                s.uid('chapter-'),source_id,number,title,content,number,1,now,now,
+                chapter_id,source_id,number,title,content,number,1,now,now,
                 actor,actor,actor,
             ))
-    return {**source_document_row(production_id,source_id),'chapter_count':len(chapters)}
+        count=c.execute('''SELECT COUNT(*) value FROM source_chapters sc WHERE source_id=%s
+            AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='chapter' AND d.item_id=sc.id)''',(source_id,)).fetchone()['value']
+    return {**source_document_row(production_id,source_id),'chapter_count':count,
+            'imported_count':len(chapters),'first_chapter_id':first_chapter_id}
 
 @app.delete('/api/productions/{production_id}/sources/{source_id}')
 def delete_source_document(production_id:str,source_id:str,body:SourceDelete):

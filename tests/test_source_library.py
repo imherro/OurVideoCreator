@@ -30,6 +30,27 @@ def new_production(client):
     return production, episode
 
 
+def test_append_import_preserves_existing_source_and_chapters(source_client):
+    client=source_client
+    production,_=new_production(client);base=f'/api/productions/{production["id"]}'
+    original=client.post(base+'/sources/import',json={'title':'原著','content':'第一章 开始\n旧正文'}).json()
+    first=client.get(base+'/chapters').json()[0]
+    response=client.post(base+f'/sources/{original["id"]}/chapters/import',json={
+        'title':'追加文件','type':'markdown','content':'# 第二章\n后来\n# 第三章\n结尾'})
+    assert response.status_code==200,response.text
+    result=response.json()
+    assert result['title']=='原著' and result['chapter_count']==3 and result['imported_count']==2
+    chapters=client.get(base+'/chapters').json()
+    assert chapters[0]==first
+    assert [item['chapter_no'] for item in chapters]==[1,2,3]
+    assert result['first_chapter_id']==chapters[1]['id']
+    assert all(item['assignee_id']==first['assignee_id'] and item['revision']==1 for item in chapters)
+    assert len(client.get(base+'/sources').json())==1
+    other,_=new_production(client)
+    assert client.post(f'/api/productions/{other["id"]}/sources/{original["id"]}/chapters/import',
+        json={'title':'错作品','content':'正文'}).status_code==404
+
+
 def test_chapter_split_accepts_markdown_and_chinese_headings():
     assert split_chapters("# 第一幕\n雨夜。\n## 第二幕\n天亮。") == [
         ("第一幕", "雨夜。"),

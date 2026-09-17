@@ -30,6 +30,10 @@ export function SourceLibraryPage({
   const [chapterTitle, setChapterTitle] = useState("第一章");
   const [chapterContent, setChapterContent] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const importTarget=useRef<{productionId:string;generation:number;sourceId?:string;sourceName?:string}|null>(null);
+  const importing=useRef(false);
+  const [loadedProduction,setLoadedProduction]=useState('');
+  const ready=loadedProduction===productionId;
   const textProviders = useMemo(
     () => providers.filter((provider) => !provider.kind || provider.kind === "text"),
     [providers],
@@ -51,6 +55,7 @@ export function SourceLibraryPage({
       request(`/productions/${productionId}/source-events`),
     ]);
     if(sequence!==loadSequence.current||!store.matches(productionId,generation))return;
+    setLoadedProduction(productionId);
     setSources(nextSources);
     nextChapters.forEach((item:AnyValue)=>store.receive(item.id,item,productionId,generation));
     store.reconcileIds(nextChapters.map((item:AnyValue)=>item.id));
@@ -59,7 +64,7 @@ export function SourceLibraryPage({
     setActive((value) => value && store.value(value) ? value : nextChapters[0]?.id || "");
   }
 
-  useEffect(()=>{store.open(productionId);setChapterIds([]);setSelected(new Set());setDialog(null);
+  useEffect(()=>{store.open(productionId);setSources([]);setLoadedProduction('');setChapterIds([]);setSelected(new Set());setDialog(null);
     return()=>{loadSequence.current++;};},[productionId,store]);
   useEffect(() => { void load().catch(report); }, [productionId, refreshKey]);
   useEffect(() => {
@@ -67,13 +72,15 @@ export function SourceLibraryPage({
   }, [productionId, projectId, defaultTarget?.model_id, defaultTarget?.model_id]);
 
   function run(action: () => Promise<void>) { void action().catch(report); }
-  function openCreateSource() {
+  function openCreateSource(additional=false) {
+    if(!ready||busy||!canEdit||(sources.length>0&&!additional))return;
     setSourceName("");
     setChapterTitle("第一章");
     setChapterContent("");
     setDialog({ mode: "source" });
   }
   function openCreateChapter() {
+    if(!ready||busy||!canEdit)return;
     const source = sources.find((item) => item.id === chapter?.source_id) || sources[0];
     if (!source) return;
     setChapterTitle(`第 ${Number(source.chapter_count || 0) + 1} 章`);
@@ -104,21 +111,35 @@ export function SourceLibraryPage({
       notify(mode === "source" ? "原著和第一章已建立" : "章节已新增");
     } finally { setBusy(false); }
   }
+  function chooseImport(additional=false){
+    if(!ready||busy||!canEdit||importing.current)return;
+    importTarget.current={productionId,generation:store.generation,
+      sourceId:additional?undefined:activeSource?.id,sourceName:additional?undefined:activeSource?.title};
+    fileRef.current?.click();
+  }
   async function importFile(file: File) {
+    const target=importTarget.current;
+    if(importing.current)return;
+    if(!target||target.productionId!==productionId||!store.matches(productionId,target.generation))
+      throw new Error('作品已切换，请重新选择文件');
+    importing.current=true;
     setBusy(true);
-    const generation=store.generation;
+    const generation=target.generation;
     try {
       const content=await file.text();
       if(!store.matches(productionId,generation))return;
-      await request(`/productions/${productionId}/sources/import`, { method: "POST", body: JSON.stringify({
+      const path=target.sourceId?`/productions/${productionId}/sources/${target.sourceId}/chapters/import`:`/productions/${productionId}/sources/import`;
+      const imported=await request(path, { method: "POST", body: JSON.stringify({
         title: file.name.replace(/\.(txt|md|markdown)$/i, ""),
         type: /\.md|\.markdown$/i.test(file.name) ? "markdown" : "txt",
         content, metadata: { filename: file.name },
       }) });
       if(!store.matches(productionId,generation))return;
       await load();
-      notify(`已导入 ${file.name}`);
-    } finally { setBusy(false); }
+      if(!store.matches(productionId,generation))return;
+      setActive(imported.first_chapter_id||'');
+      notify(target.sourceId?`已向“${target.sourceName}”追加 ${imported.imported_count} 章；原有章节及未保存草稿保留`:`已导入 ${file.name}`);
+    } finally { importing.current=false;setBusy(false); }
   }
   async function saveChapter() {
     if (!chapter) return;
@@ -185,9 +206,13 @@ export function SourceLibraryPage({
       <div><span className="eyebrow">PRODUCTION SOURCE LIBRARY</span><h1>整部作品原著库</h1><p>Production 共享资料 · 章节与分集的对应关系在改编策划和单集剧本中设置。</p></div>
       <div className="settings-actions">
         <button onClick={() => run(load)} disabled={busy}><RefreshCw size={15}/>刷新</button>
-        <button onClick={() => fileRef.current?.click()} disabled={busy||!canEdit}><Upload size={15}/>导入 TXT / Markdown</button>
-        <button onClick={openCreateSource} disabled={busy||!canEdit}><FilePlus2 size={15}/>新建原著</button>
-        <button onClick={openCreateChapter} disabled={busy || !canEdit || !sources.length}><Plus size={15}/>新增章节</button>
+        <button onClick={() => chooseImport()} disabled={busy||!ready||!canEdit} title={activeSource?`追加到“${activeSource.title}”，不覆盖原有章节`:undefined}><Upload size={15}/>{activeSource?'导入章节到当前原著':'导入 TXT / Markdown'}</button>
+        <button onClick={()=>openCreateSource()} disabled={busy||!ready||!canEdit||sources.length>0}><FilePlus2 size={15}/>新建原著</button>
+        <button onClick={openCreateChapter} disabled={busy || !ready || !canEdit || !sources.length}><Plus size={15}/>新增章节</button>
+        {ready&&sources.length>0&&<details><summary>更多原著操作</summary>
+          <button disabled={busy||!canEdit} onClick={()=>openCreateSource(true)}>添加另一部原著</button>
+          <button disabled={busy||!canEdit} onClick={()=>chooseImport(true)}>导入为另一部原著</button>
+        </details>}
         <button className="danger-button" onClick={() => run(deleteActiveSource)} disabled={busy || !canManage || !activeSource} title="移入回收站，可恢复；须先接管全部章节"><Trash2 size={15}/>移除当前原著</button>
       </div>
     </header>
