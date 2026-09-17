@@ -135,7 +135,8 @@ import {
 } from "./filmBible/VisualAssetNode";
 import { visualBibleOf } from "./filmBible/types";
 import type { VoiceProfile } from "./filmBible/types";
-import { acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf, voiceParameters } from "./filmBible/voices";
+import { chooseVoiceVersion, acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf, voiceParameters } from "./filmBible/voices";
+import {resolvedVoice,voiceCardId} from './filmBible/voiceResolution';
 import { catalogVoice, CUSTOM_VOICE_ID, DOUBAO_TTS2_VOICES } from "./filmBible/voiceCatalog";
 import { StoryboardWorkspace } from "./pages/StoryboardWorkspace";
 import { VideoProductionWorkspace } from "./pages/VideoProductionWorkspace";
@@ -2422,6 +2423,9 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     localModels: system.models,
     request: api,
     voiceProfiles: voiceProfilesOf(doc),
+    onChooseVoiceVersion:(cardId,version)=>{
+      try{update(document=>chooseVoiceVersion(document,cardId,version));setNotice('音色选择已更新，请保存；相关旧视频将标为待更新')}catch(reason){report(reason)}
+    },
     onPreviewAsset: (asset) => setPreview(asset as Asset),
     onSaveVoice: (cardId, profile) => {
       try {
@@ -2468,20 +2472,22 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       } catch (reason) { report(reason); }
     },
     onGenerateCharacterDialogue: async (cardId) => {
-      const profile = voiceProfilesOf(doc)[cardId];
+      const profile = resolvedVoice(doc,{}, {characterCardId:cardId}).profile as VoiceProfile;
       const card = visualBibleOf(doc).cards[cardId];
       if (!profile || profile.status !== "locked") throw new Error("请先试听并锁定角色主音色");
       const dialogues = doc.shots.flatMap((shot) =>
         (Array.isArray(shot.dialogues) ? shot.dialogues : [])
-          .filter((dialogue: Any) => dialogue.characterCardId === cardId)
+          .filter((dialogue: Any) => voiceCardId(doc,shot,dialogue) === cardId)
           .map((dialogue: Any, index: number) => ({ shot, dialogue, index })),
       );
       if (!dialogues.length) throw new Error("本集分镜没有该角色的结构化对白；重新生成分镜规划后会自动提取对白");
       const existing = new Set(dialogues.filter(({dialogue})=>dialogue.audioVoiceVersion===profile.version
         && assets.some(asset=>asset.id===dialogue.audioAssetId&&asset.kind==='audio'
-          &&asset.metadata?.input?.dialogue?.text===dialogue.text)).map(({dialogue})=>dialogue.id));
+          &&asset.metadata?.input?.dialogue?.text===dialogue.text
+          &&(asset.metadata?.input?.dialogue?.voiceCardId||dialogue.characterCardId)===cardId)).map(({dialogue})=>dialogue.id));
       const pending = new Set(dialogues.filter(({dialogue})=>jobs.some(job=>job.input?.dialogue?.id===dialogue.id
         &&job.input.dialogue.text===dialogue.text&&job.input.dialogue.voiceVersion===profile.version
+        &&(job.input.dialogue.voiceCardId||dialogue.characterCardId)===cardId
         &&["queued","running","succeeded"].includes(job.status))).map(({dialogue})=>dialogue.id));
       const needed = dialogues.filter(({dialogue})=>!existing.has(dialogue.id) && !pending.has(dialogue.id));
       if (!needed.length) throw new Error("该角色本集对白已采纳、正在生成或有待采纳候选；请查看任务中心");
@@ -2502,7 +2508,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           output_name:`${shot.id || "分镜"} · ${card?.name || "角色"}对白 ${index+1}.mp3`,
           asset_category:"voice",
           parameters:voiceParameters(config.models,profile,performance),
-          dialogue:{id:dialogue.id,shotUid:String(shot.uid||shot.id),characterCardId:cardId,voiceVersion:profile.version,text:dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
+          dialogue:{id:dialogue.id,shotUid:String(shot.uid||shot.id),characterCardId:dialogue.characterCardId,voiceCardId:cardId,voiceVersion:profile.version,text:dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
         },
       };
       });
@@ -2512,12 +2518,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       return needed.length;
     },
     onRegenerateDialogue: async (cardId, dialogueId) => {
-      const profile = voiceProfilesOf(doc)[cardId];
+      const profile = resolvedVoice(doc,{}, {characterCardId:cardId}).profile as VoiceProfile;
       const card = visualBibleOf(doc).cards[cardId];
       if (!profile || profile.status !== "locked") throw new Error("请先试听并锁定角色主音色");
       const match = doc.shots.flatMap((shot) =>
         (Array.isArray(shot.dialogues) ? shot.dialogues : [])
-          .filter((dialogue: Any) => dialogue.characterCardId === cardId && dialogue.id === dialogueId)
+          .filter((dialogue: Any) => voiceCardId(doc,shot,dialogue) === cardId && dialogue.id === dialogueId)
           .map((dialogue: Any) => ({ shot, dialogue })),
       )[0];
       if (!match) throw new Error("该对白已不存在，请刷新后重试");
@@ -2539,7 +2545,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           output_name:`${match.shot.id || "分镜"} · ${card?.name || "角色"}对白 · 新版本.mp3`,
           asset_category:"voice",
           parameters:voiceParameters(config.models,profile,performance),
-          dialogue:{id:dialogueId,shotUid:String(match.shot.uid||match.shot.id),characterCardId:cardId,voiceVersion:profile.version,text:match.dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
+          dialogue:{id:dialogueId,shotUid:String(match.shot.uid||match.shot.id),characterCardId:match.dialogue.characterCardId,voiceCardId:cardId,voiceVersion:profile.version,text:match.dialogue.text,emotion:performance.emotion,contextTexts:performance.contextTexts},
         },
       }));
       await refresh(project.id);

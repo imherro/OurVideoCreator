@@ -2,6 +2,7 @@ import { requiresInitialStateReview } from "./graph.ts";
 import { shotIdentity } from "./storyboard.ts";
 import {videoGenerationMode} from './motionReference.ts';
 import {dialogueMode,voiceSampleRows} from './dialogueMode.ts';
+import {resolvedVoice} from './filmBible/voiceResolution.ts';
 
 type Value = Record<string, any>;
 
@@ -72,7 +73,6 @@ export function deriveVideoProductionRows(
     const motionAsset=assets.find(asset=>asset.id===shot.motionReference?.assetId&&asset.kind==='video');
     const bindings=shot.assetBindings||{};
     const hasVisualBindings=Boolean(bindings.characters?.length||bindings.scene?.versionId||bindings.props?.length);
-    const profiles = document.filmBible?.voices?.profiles || {};
     const dialogues = Array.isArray(shot.dialogues) ? shot.dialogues.filter((item: Value) => String(item.text || "").trim()) : [];
     const dialogueAudioAssets: Value[] = [];
     const plannedDuration = Math.max(0, Number(shot.duration || 0));
@@ -82,13 +82,16 @@ export function deriveVideoProductionRows(
     if (!sampleMode&&(["volcengine_ark", "runninghub"].includes(provider?.type)
       || (provider?.type === "hc_atom" && provider.capabilities?.audio_reference === true))) {
       for (const dialogue of dialogues) {
-        const profile = profiles[dialogue.characterCardId] || {};
+        let profile:Value,voiceCard:string;
+        try{const resolved=resolvedVoice(document,shot,dialogue);profile=resolved.profile;voiceCard=resolved.cardId}
+        catch(error:any){dialogueReadinessReason=error.message;break}
         if (profile.status !== "locked" || !String(profile.voiceType || "").trim()) {
           dialogueReadinessReason = `${dialogue.characterName || "角色"}尚未锁定固定音色`;
           break;
         }
         const match = assets
-          .filter((asset) => asset.kind === "audio" && asset.id === dialogue.audioAssetId && dialogue.audioVoiceVersion === Number(profile.version || 1) && asset.metadata?.input?.dialogue?.text === dialogue.text && asset.metadata?.input?.dialogue?.id === dialogue.id && Number(asset.metadata?.input?.dialogue?.voiceVersion) === Number(profile.version || 1))
+          .filter((asset) => asset.kind === "audio" && asset.id === dialogue.audioAssetId && dialogue.audioVoiceVersion === Number(profile.version || 1) && asset.metadata?.input?.dialogue?.text === dialogue.text && asset.metadata?.input?.dialogue?.id === dialogue.id && Number(asset.metadata?.input?.dialogue?.voiceVersion) === Number(profile.version || 1)
+            &&(asset.metadata?.input?.dialogue?.voiceCardId||dialogue.characterCardId)===voiceCard)
           .sort((left, right) => Number(right.created || 0) - Number(left.created || 0))[0];
         if (!match) {
           dialogueReadinessReason = `${dialogue.characterName || "角色"}的本镜对白尚未使用当前固定音色生成并明确采纳`;

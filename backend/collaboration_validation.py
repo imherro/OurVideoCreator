@@ -183,7 +183,8 @@ def visual_transition(connection, production_id, kind, content, old=None):
         prior_voice = previous.get('voice_profile')
         voice = content['voice_profile']
         from .voice_identity import is_reference_confirmation
-        if prior_voice and prior_voice.get('status') == 'locked' and voice != prior_voice and not is_reference_confirmation(prior_voice,voice):
+        from .voice_library import metadata_only
+        if prior_voice and prior_voice.get('status') == 'locked' and voice != prior_voice and not is_reference_confirmation(prior_voice,voice) and not metadata_only(prior_voice,voice):
             if not voice or voice.get('status') != 'draft' or voice.get('version', 0) <= prior_voice.get('version', 0):
                 invalid('已锁定音色不可原地修改；须显式派生新音色版本')
     else:

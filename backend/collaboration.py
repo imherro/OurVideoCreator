@@ -162,10 +162,13 @@ def validate_asset_references(connection, production_id, content):
 
 def create(connection, project_id, kind, content, *, validated=False):
     validate_content(kind, content)
-    if kind=='visual_card' and (content.get('voice_profile') or {}).get('referenceAssetId'):
+    if kind=='visual_card' and any((content.get('voice_profile') or {}).get(key) for key in ('referenceAssetId','lockedVersions','defaultVersion')):
         raise HTTPException(422,'新角色须先明确采纳试听再确认声音参考，不能直接导入确认标记')
     lock_identity(connection)
     scope = project_scope(connection, project_id, 'editor')
+    if kind=='visual_card':
+        from .voice_library import validate_state
+        validate_state(connection,scope['production_id'],content)
     validate_asset_references(connection, scope['production_id'], content)
     if not validated:
         validation.ownership(connection, {**scope, 'project_id': project_id}, kind, content)
@@ -375,16 +378,22 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     from .motion_references import invalidated_nodes, invalidate_content
     motion_rows=list(connection.execute('SELECT * FROM collaboration_objects WHERE production_id=%s AND NOT deleted',(scope['production_id'],)))
     motion_prior={row['id']:row for row in motion_rows}
-    motion_roots=[];voice_cards=set()
+    from .voice_resolution import voice_document,shot_voice_signature
+    import copy
+    voice_before=voice_document(motion_rows);voice_after=copy.deepcopy(voice_before)
+    motion_roots=[];voice_families=set()
     for item in updates:
         prior=motion_prior.get(item['id'])
         if prior and prior['kind']=='visual_card':
-            before=validation.object_content(prior).get('voice_profile') or {};after=item['content'].get('voice_profile') or {}
-            if any(before.get(key)!=after.get(key) for key in ('referenceAssetId','referenceVersion','version','status')):
-                voice_cards.add(validation.object_content(prior)['card']['id'])
+            before=validation.object_content(prior);after=item['content'];card=after['card']
+            if before.get('voice_profile')!=after.get('voice_profile') or any(before['card'].get(key)!=card.get(key) for key in ('voiceVersion','parentCardId','kind')):
+                for related in (before['card'],card):
+                    voice_families.add(related.get('parentCardId') if related['kind']=='character_state' else related['id'])
+                voice_after['filmBible']['visual']['cards'][card['id']]=card
+                voice_after['filmBible']['voices']['profiles'][card['id']]=after.get('voice_profile')
         if not prior or prior['kind']!='shot':continue
         before=validation.object_content(prior)['shot'];after=item['content'].get('shot',{})
-        if any(before.get(key)!=after.get(key) for key in ('motionReference','videoReferenceMode','dialogueMode')):
+        if any(before.get(key)!=after.get(key) for key in ('motionReference','videoReferenceMode','dialogueMode')) or shot_voice_signature(voice_before,before)!=shot_voice_signature(voice_after,after):
             motion_roots.append(after.get('videoNode') or (after.get('pipeline') or {}).get('videoNodeId'))
     affected_by_project={}
     for ep in {row['project_id'] for row in motion_rows if row['project_id']}:
@@ -393,7 +402,7 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
         for row in ep_rows:
             if row['kind']=='shot':
                 shot=validation.object_content(row)['shot']
-                if any(line.get('characterCardId') in voice_cards for line in shot.get('dialogues',[])):
+                if voice_families and shot_voice_signature(voice_before,shot)!=shot_voice_signature(voice_after,shot):
                     roots.append(shot.get('videoNode') or (shot.get('pipeline') or {}).get('videoNodeId'))
         affected=invalidated_nodes(ep_rows,roots)
         if affected:
@@ -403,6 +412,11 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     dependency_targets=set()
     for item in creates:
         validate_content(item['kind'],item['content'])
+        if item['kind']=='visual_card' and item['content']['card'].get('voiceVersion') is not None:
+            voice_families.add(item['content']['card'].get('parentCardId'))
+    voice_locks={row['id'] for row in motion_rows if row['kind']=='visual_card' and
+        (validation.object_content(row)['card']['id'] in voice_families or validation.object_content(row)['card'].get('parentCardId') in voice_families)}
+    lock_ids.update(voice_locks)
     for item in updates:
         prior=connection.execute('''SELECT kind,content FROM collaboration_objects WHERE id=%s
             AND production_id=%s AND (project_id=%s OR project_id IS NULL) AND NOT deleted''',
@@ -447,6 +461,8 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
             editable(connection, row)
             expected(row, item['expected_revision'], item['assignment_epoch'])
         locked[row['id']] = row
+    for oid in voice_locks-requested.keys():
+        expected(locked[oid],motion_prior[oid]['revision'],motion_prior[oid]['assignment_epoch'])
     if affected_by_project:
         for row in motion_rows:
             if row['kind']=='graph' and row['project_id'] in affected_by_project:
@@ -482,6 +498,8 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
         if row['kind']=='visual_card':
             from .voice_identity import validate_lock
             validate_lock(connection,row,item['content'])
+            from .voice_library import validate_state
+            validate_state(connection,row['production_id'],item['content'])
         if validation.object_key(row) != validation.envelope(row['kind'], item['content']):
             raise HTTPException(422, '对象语义编号不可修改')
         if row['kind'] == 'timeline':
@@ -540,7 +558,8 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
                 previous=validation.object_content(locked[item['id']]).get('voice_profile')
                 voice=item['content']['voice_profile']
                 from .voice_identity import is_reference_confirmation
-                if previous and previous.get('status')=='locked' and voice!=previous and not is_reference_confirmation(previous,voice):
+                from .voice_library import metadata_only
+                if previous and previous.get('status')=='locked' and voice!=previous and not is_reference_confirmation(previous,voice) and not metadata_only(previous,voice):
                     if not voice or voice.get('status')!='draft' or voice.get('version',0)<=previous.get('version',0):
                         raise HTTPException(422,'已锁定音色不可原地修改；须派生新版本')
     # Acquire creation identity locks before the final lease clock check. A

@@ -22,7 +22,8 @@ def compile_samples(document,shot,project_id,caps):
         if not str(line.get('text') or '').strip():continue
         cid=line.get('characterCardId');name=line.get('characterName') or '角色'
         if cid in seen:continue
-        profile=profiles.get(cid) or {};aid=profile.get('referenceAssetId')
+        from .voice_resolution import resolved_voice
+        voice_card,profile=resolved_voice(document,shot,line);aid=profile.get('referenceAssetId')
         if not cid or profile.get('status')!='locked' or not aid or profile.get('referenceVersion')!=profile.get('version'):
             raise ValueError(f'{name}尚未确认当前版本的声音样本，请试听并锁定角色声音参考')
         if aid not in media:
@@ -42,7 +43,7 @@ def compile_samples(document,shot,project_id,caps):
                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             if decoded.returncode:raise ValueError('声音样本格式不符或无法完整解码，请重新导出MP3/WAV')
             media[aid]={'duration':duration,'sha256':file_hash(path),'name':asset['name']}
-        samples.append({'characterCardId':cid,'characterName':name,'voiceCardId':cid,'voiceVersion':profile['version'],
+        samples.append({'characterCardId':cid,'characterName':name,'voiceCardId':voice_card,'voiceVersion':profile['version'],
                         'voiceType':profile.get('voiceType',''),'assetId':aid,'purpose':'timbre_only',
                         'media':media[aid],'index':list(media).index(aid)+1})
         seen.add(cid)

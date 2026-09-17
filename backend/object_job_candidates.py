@@ -86,6 +86,11 @@ def dependencies(state,target,mode,body):
         if row['kind']=='visual_card':
             value=object_content(row)
             if versions&value['versions'].keys() or value['card']['id'] in cards:selected.add(row['id'])
+    # State selection is a reference to the parent's immutable voice library.
+    parents={object_content(row)['card'].get('parentCardId') for row in rows
+             if row['kind']=='visual_card' and row['id'] in selected}
+    for row in rows:
+        if row['kind']=='visual_card' and object_content(row)['card']['id'] in parents:selected.add(row['id'])
     return selected,upstream
 
 
@@ -102,8 +107,10 @@ def validate_audio(rows,target,mode,body):
         dialogue=next((d for d in shot.get('dialogues',[]) if d.get('id')==marker['id']),None)
         if not dialogue or dialogue.get('characterCardId')!=marker.get('characterCardId'):
             raise HTTPException(422,'对白不属于目标镜头或角色')
-        card=next((object_content(r) for r in rows if r['kind']=='visual_card' and object_content(r)['card']['id']==marker['characterCardId']),None)
-        profile=card['voice_profile'] if card else None
+        from .voice_resolution import voice_document,resolved_voice
+        voice_card,profile=resolved_voice(voice_document(rows),shot,dialogue)
+        if (marker.get('voiceCardId') or marker['characterCardId'])!=voice_card:
+            raise HTTPException(409,'角色状态音色已变化，请重新提交')
         if not profile or profile.get('status')!='locked':raise HTTPException(422,'对白须使用已锁定的角色音色')
         if marker.get('voiceVersion')!=profile.get('version') or marker.get('text')!=dialogue.get('text'):
             raise HTTPException(409,'对白或音色版本已变化')
@@ -231,6 +238,8 @@ def adopt(c,job,body):
         marker=inp['dialogue'];dialogue=next((d for d in content['shot'].get('dialogues',[]) if d.get('id')==marker['id']),None)
         if not dialogue or dialogue.get('text')!=marker['text'] or dialogue.get('characterCardId')!=marker['characterCardId']:
             raise HTTPException(409,'对白文字或角色已变化，不能采纳旧台词音频')
+        from types import SimpleNamespace
+        validate_audio(read_project_state(c,pid)['objects'],row,'dialogue',SimpleNamespace(input=inp))
         dialogue.update(audioAssetId=asset['id'],audioJobId=job['id'],audioVoiceVersion=marker['voiceVersion'])
     else:raise HTTPException(422,'候选类型无效')
     return collab.commands(c,pid,creates=[],deletes=[],updates=[{'id':row['id'],

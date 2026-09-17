@@ -1,4 +1,5 @@
 import type { FilmBibleDocument, VoiceProfile } from "./types";
+import {lockedVoiceVersions,voiceSnapshot} from './voiceResolution.ts';
 
 export function voiceProfilesOf(document: FilmBibleDocument) {
   return document.filmBible?.voices?.profiles || {};
@@ -38,6 +39,8 @@ export function saveVoiceProfile<T extends FilmBibleDocument>(document: T, cardI
   const identityChanged = !!current && voiceIdentity(current) !== voiceIdentity(input);
   const next: VoiceProfile = {
     ...input,
+    lockedVersions: lockedVoiceVersions(current) as Record<string,VoiceProfile>,
+    defaultVersion: current?.defaultVersion ?? (current?.status==='locked'?current.version:undefined),
     cardId,
     model_id: input.model_id,
     voiceType,
@@ -93,6 +96,9 @@ export function setVoiceLocked<T extends FilmBibleDocument>(document: T, cardId:
     : current.status === "locked"
       ? { ...current, version: current.version + 1, status: "draft" as const, previewAssetId: undefined, generationJobId: undefined,referenceAssetId:undefined,referenceVersion:undefined }
       : { ...current, status: "draft" as const };
+  next.lockedVersions=lockedVoiceVersions(current) as Record<string,VoiceProfile>;
+  next.defaultVersion=current.defaultVersion??(locked||current.status==='locked'?current.version:undefined);
+  if(locked)next.lockedVersions[String(next.version)]=voiceSnapshot(next) as VoiceProfile;
   return {
     ...document,
     filmBible: {
@@ -109,5 +115,18 @@ export function voiceIdentity(profile: VoiceProfile): string {
 }
 
 export function canLockVoice(stored:VoiceProfile|undefined,draft:VoiceProfile):boolean {
-  return Boolean(stored?.previewAssetId && voiceIdentity(stored)===voiceIdentity(draft));
+  return Boolean(stored?.previewAssetId && voiceIdentity(stored)===voiceIdentity(draft)
+    &&(stored.name||'')===(draft.name||''));
+}
+
+export function chooseVoiceVersion<T extends FilmBibleDocument>(document:T,cardId:string,version?:number):T{
+ const card=document.filmBible?.visual?.cards[cardId];if(!card)throw new Error('角色不存在');
+ const state=card.kind==='character_state',base=state?card.parentCardId!:cardId;
+ const profile=voiceProfilesOf(document)[base];
+ if(version!==undefined&&!lockedVoiceVersions(profile)[String(version)])throw new Error('请选择已锁定的声音版本');
+ if(state)return {...document,filmBible:{...document.filmBible,visual:{...document.filmBible!.visual!,
+  cards:{...document.filmBible!.visual!.cards,[cardId]:{...card,voiceVersion:version}}}}} as T;
+ if(version===undefined)throw new Error('基础角色必须明确选择默认版本');
+ return {...document,filmBible:{...document.filmBible,voices:{profiles:{...voiceProfilesOf(document),
+  [cardId]:{...profile,defaultVersion:version,lockedVersions:lockedVoiceVersions(profile) as Record<string,VoiceProfile>}}}}} as T;
 }

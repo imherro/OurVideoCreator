@@ -38,7 +38,7 @@ export function MotionReferenceEditor(props:Props){
    <option value="">跟随本集（{dialogueModeLabels[document.dialogueMode||'full_dialogue']}）</option>
    {Object.entries(dialogueModeLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
   {dialogueMode(document,shot)==='voice_sample'&&<div><small>仅参考音色，不复述样本；本镜台词和情绪保持。样本时长不延长镜头。</small>
-   {voiceSampleRows(document,shot,assets).map((row:any)=><p key={row.cardId}>{row.name} · {row.ready?`已确认 V${row.profile.version}`:'缺少当前版本已确认样本'}</p>)}</div>}
+   {voiceSampleRows(document,shot,assets).map((row:any)=><p key={row.cardId}>{row.name} · {row.error||(row.ready?`已确认 V${row.profile.version}`:'缺少当前版本已确认样本')}</p>)}</div>}
   <label>视频生成模式<select value={shot.videoReferenceMode||''} onChange={event=>onPatch({videoReferenceMode:event.target.value})}>
    <option value="">跟随项目（{videoModeLabels[document.videoReferenceMode||'legacy']}）</option>
    {Object.entries(videoModeLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>

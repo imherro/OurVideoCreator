@@ -40,13 +40,15 @@ def is_reference_confirmation(before,after):
     return (before.get('status')=='locked' and not before.get('referenceAssetId')
             and after.get('referenceAssetId')==before.get('previewAssetId') and bool(before.get('previewAssetId'))
             and after.get('referenceVersion')==before.get('version')
-            and {k:v for k,v in after.items() if k not in ('referenceAssetId','referenceVersion')}==
-                {k:v for k,v in before.items() if k not in ('referenceAssetId','referenceVersion')})
+            and {k:v for k,v in after.items() if k not in ('referenceAssetId','referenceVersion','lockedVersions','defaultVersion')}==
+                {k:v for k,v in before.items() if k not in ('referenceAssetId','referenceVersion','lockedVersions','defaultVersion')})
 
 
 def validate_lock(connection,row,content):
     before=object_content(row).get('voice_profile') or {}
     profile=content.get('voice_profile') or {}
+    from .voice_library import validate_library
+    validate_library(before,profile)
     changed_reference=any(before.get(k)!=profile.get(k) for k in ('referenceAssetId','referenceVersion'))
     if profile.get('referenceVersion') is not None and not profile.get('referenceAssetId'):
         raise HTTPException(422,'声音参考版本必须关联明确采纳的试听素材')

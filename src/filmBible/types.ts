@@ -35,6 +35,7 @@ export type VisualReference = {
 };
 
 export type VisualCard = {
+  voiceVersion?: number;
   id: string;
   kind: VisualKind;
   name: string;
@@ -68,6 +69,9 @@ export type VisualBible = {
 };
 
 export type VoiceProfile = {
+  name?: string;
+  lockedVersions?: Record<string,VoiceProfile>;
+  defaultVersion?: number;
   cardId: string;
   model_id: string;
   voiceType: string;
