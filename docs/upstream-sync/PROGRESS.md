@@ -463,3 +463,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 反馈层只包裹既有 `openProject` 调用，不直接设置项目、文档或脏状态，因而保留协作版已有的未保存草稿检查、对象保存、冲突拒绝、请求代际及作用域校验。重复点击在活动切换期间被忽略；当前分集和未知目标不触发切换；无论切换成功还是失败都会退出反馈并恢复仍存在的原焦点。组件卸载不会吞掉原 `openProject` 异常，原调用链继续交给既有错误报告处理。
 
 定向 `episode_transition + workflow_shell + production_navigation + adaptation_frontend`：**20 passed / 0 failed**。全量 `npm test`：**281 passed / 0 failed / 0 skipped，1422.78ms**。`npm run build` tsc/Vite exit0，Vite **7.21秒**，主产物 `assets/index-Ca71Y38Z.js`，保留既有大 chunk 警告。`git diff --check`通过。本批纯前端，没有新增 API、后端逻辑、依赖、数据库迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。整体上游同步仍未完成，后续继续剩余冻结清单审计和未完成项。
+
+## UPSTREAM-SYNC-31：紧凑任务中心筛选
+
+按冻结上游 `8fe968d` 的界面目标适配。任务中心标题同行显示当前作品名，过长时省略并保留完整 title；只读说明独占下一行并同样保留完整 title。任务范围、类型、状态三个既有筛选器改为一行三列，作品范围列略宽，所有 label/select 都允许收缩并限制在面板宽度内，不再让第三项无条件换到下一行。
+
+本批没有修改任务加载、作品授权、跨集/整部作品作用域、状态枚举、候选采纳、取消/恢复或刷新逻辑。现有筛选函数及六种持久任务状态回归继续通过；紧凑布局只改变标记结构和 CSS，不产生任务、自动重试或费用。
+
+定向 `task_center + job_detail + episode_transition`：**10 passed / 0 failed**；新增契约断言验证作品名省略、说明 title、三列比例及 select 宽度边界。全量 `npm test`：**282 passed / 0 failed / 0 skipped，1619.59ms**。`npm run build` tsc/Vite exit0，Vite **7.29秒**，产物 `assets/index-CyImXyGr.js` / `assets/index-EH1HLD0z.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。

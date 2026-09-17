@@ -120,8 +120,9 @@ export function TaskCenter({
 
   return <section className="task-center">
     <header className="task-center-header">
-      <div><span className="eyebrow">TASK CENTER</span><h2>任务中心</h2><p>{productionName} · 直接读取现有生成任务，不会自动重试或产生费用。</p></div>
+      <div><span className="eyebrow">TASK CENTER</span><h2>任务中心<span className="task-center-production" title={productionName}>{productionName}</span></h2></div>
       <button className="quiet" disabled={loading} onClick={() => void load()}><RefreshCw className={loading ? "spin" : ""} size={15}/>刷新</button>
+      <p title="直接读取现有生成任务，不会自动重试或产生费用。">直接读取现有生成任务，不会自动重试或产生费用。</p>
     </header>
     <div className="task-center-filters" aria-label="任务筛选">
       <label>任务范围<select value={filters.episodeId} onChange={(event) => setFilters((value) => ({ ...value, episodeId: event.target.value }))}><option value="">全部范围</option><option value="production">整部作品</option>{episodes.map((episode) => <option key={episode.id} value={episode.id}>EP{String(episode.episode_no).padStart(2,"0")} · {episode.episode_title || episode.name}</option>)}</select></label>

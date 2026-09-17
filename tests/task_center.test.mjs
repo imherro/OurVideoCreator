@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   deriveTaskCenterRows,
   filterTaskCenterRows,
   taskShotLabel,
 } from "../src/taskCenter.ts";
+
+const taskCenterComponent = readFileSync(new URL("../src/pages/TaskCenter.tsx", import.meta.url), "utf8");
+const taskCenterStyles = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
 
 const episodes = [
   { id: "ep-1", production_id: "prod", episode_no: 1, episode_title: "第一集", name: "第一集" },
@@ -75,4 +79,12 @@ test("production jobs are labelled and filtered independently from their storage
   assert.equal(taskShotLabel(rows[0]), "原著事件提取 · 第五章");
   assert.deepEqual(filterTaskCenterRows(rows, { episodeId: "production", kind: "", status: "" }).length, 1);
   assert.deepEqual(filterTaskCenterRows(rows, { episodeId: "ep-2", kind: "", status: "" }).length, 0);
+});
+
+test("task center keeps all three filters visible in one compact bounded row", () => {
+  assert.match(taskCenterComponent, /<h2>任务中心<span className="task-center-production" title=\{productionName\}>/);
+  assert.match(taskCenterComponent, /<p title="直接读取现有生成任务，不会自动重试或产生费用。">/);
+  assert.match(taskCenterStyles, /\.task-center-filters\{[^}]*grid-template-columns:minmax\(0,1\.4fr\) repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(taskCenterStyles, /\.task-center-filters select\{[^}]*width:100%[^}]*min-width:0[^}]*max-width:100%/);
+  assert.match(taskCenterStyles, /\.task-center-production\{[^}]*text-overflow:ellipsis/);
 });
