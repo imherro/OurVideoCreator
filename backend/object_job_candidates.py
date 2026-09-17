@@ -224,6 +224,8 @@ def adopt(c,job,body):
             raise HTTPException(409,'音色版本已变化或锁定，请先派生可编辑版本')
         if profile.get('model_id')!=inp['model_id'] or profile.get('voiceType')!=inp['voice_type']:
             raise HTTPException(409,'音色身份已变化，不能采纳其他音色的试听')
+        from .voice_identity import validate_adoption
+        validate_adoption(c,target,profile)
         profile.update(previewAssetId=asset['id'],generationJobId=job['id'])
     elif mode=='dialogue':
         marker=inp['dialogue'];dialogue=next((d for d in content['shot'].get('dialogues',[]) if d.get('id')==marker['id']),None)

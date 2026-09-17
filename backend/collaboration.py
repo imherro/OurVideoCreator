@@ -451,6 +451,9 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
         row = locked[item['id']]
         validate_content(row['kind'], item['content'])
         validate_asset_references(connection, row['production_id'], item['content'])
+        if row['kind']=='visual_card':
+            from .voice_identity import validate_lock
+            validate_lock(connection,row,item['content'])
         if validation.object_key(row) != validation.envelope(row['kind'], item['content']):
             raise HTTPException(422, '对象语义编号不可修改')
         if row['kind'] == 'timeline':

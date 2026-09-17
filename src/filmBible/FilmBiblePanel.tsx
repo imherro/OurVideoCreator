@@ -19,7 +19,7 @@ import type {
   VisualVersionStatus,
   VoiceProfile,
 } from "./types.ts";
-import { defaultVoiceProfile } from "./voices.ts";
+import { defaultVoiceProfile, canLockVoice } from "./voices.ts";
 import { catalogVoice, CUSTOM_VOICE_ID, DOUBAO_TTS2_VOICES } from "./voiceCatalog.ts";
 import { projectCharacterDialogueRows } from "./dialogueAssets.ts";
 import { visualKindLabels, visualStatusLabels } from "./types.ts";
@@ -412,7 +412,7 @@ export function FilmBiblePanel({
               {voiceDraft.status !== "locked" && <button onClick={()=>onSaveVoice(card.id,voiceDraft)}>保存声音设定</button>}
               {voiceDraft.status !== "locked" && <button className="primary" disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateVoice(card.id,voiceDraft).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}>{voiceBusy?<LoaderCircle className="spin" size={14}/>:<Volume2 size={14}/>}生成试听</button>}
               {storedVoice?.previewAssetId && <button className="secondary" onClick={()=>{const asset=assets.find((item)=>item.id===storedVoice.previewAssetId);if(asset)onPreviewAsset(asset);}}>试听声音</button>}
-              {storedVoice?.status === "locked" ? <button onClick={()=>onLockVoice(card.id,false)}>创建新声音版本</button> : storedVoice?.previewAssetId ? <button onClick={()=>onLockVoice(card.id,true)}>锁定主音色 V{storedVoice.version}</button> : null}
+                {storedVoice?.status === "locked" ? <button onClick={()=>onLockVoice(card.id,false)}>创建新声音版本</button> : storedVoice?.previewAssetId ? <button disabled={!canLockVoice(storedVoice,voiceDraft)} title={!canLockVoice(storedVoice,voiceDraft)?'声音设置已修改，请保存并重新生成试听':''} onClick={()=>onLockVoice(card.id,true)}>锁定主音色 V{storedVoice.version}</button> : null}
               {storedVoice?.status === "locked" && <button className="primary" disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateCharacterDialogue(card.id).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}><Volume2 size={14}/>生成本集全部对白</button>}
             </div>
             <p className="muted">{storedVoice ? `声音 V${storedVoice.version} · ${storedVoice.status === "locked" ? "已锁定" : "草稿"}` : "保存并试听后可锁定为角色主音色。"}</p>

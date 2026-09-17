@@ -1294,6 +1294,9 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         binding=platform_models.resolve(c,model_id,body.kind,submitted_input,
             document=state['document'] if state else {},node_id=body.node_id)
         selected=platform_models.config_for_binding(c,binding)
+        if target.get('mode')=='voice':
+            from .voice_identity import validate_parameters
+            validate_parameters(c,target['target'],binding.parameters)
     if selected and selected['type']=='minimax':
         from .minimax_video import payload
         if body.kind!='video':raise ValueError('MiniMax 原生服务仅支持视频节点')

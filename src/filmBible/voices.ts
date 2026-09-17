@@ -35,7 +35,7 @@ export function saveVoiceProfile<T extends FilmBibleDocument>(document: T, cardI
   if (!input.model_id) throw new Error("请选择豆包语音服务");
   if (!voiceType) throw new Error("音色 ID 不能为空");
   if (!previewText) throw new Error("试听台词不能为空");
-  const identityChanged = !!current && (current.model_id !== input.model_id || current.voiceType !== voiceType);
+  const identityChanged = !!current && voiceIdentity(current) !== voiceIdentity(input);
   const next: VoiceProfile = {
     ...input,
     cardId,
@@ -65,7 +65,9 @@ export function acceptVoiceResult<T extends FilmBibleDocument>(document: T, job:
   const asset = job.result?.assets?.find((item: Record<string, any>) => item.kind === "audio");
   if (!descriptor?.cardId || !asset?.id) return document;
   const current = voiceProfilesOf(document)[descriptor.cardId];
-  if (!current || current.version !== descriptor.version) return document;
+  if (!current || current.status === 'locked' || current.version !== descriptor.version
+      || (descriptor.identity && descriptor.identity !== voiceIdentity(current))
+      || (current.generationJobId && current.generationJobId !== job.id)) return document;
   return {
     ...document,
     filmBible: {
@@ -96,4 +98,14 @@ export function setVoiceLocked<T extends FilmBibleDocument>(document: T, cardId:
       voices: { profiles: { ...voiceProfilesOf(document), [cardId]: next } },
     },
   } as T;
+}
+
+/** Preview text and delivery settings are part of the audition, not just its preset ID. */
+export function voiceIdentity(profile: VoiceProfile): string {
+  return JSON.stringify([profile.model_id,String(profile.voiceType||'').trim(),String(profile.previewText||'').trim(),
+    Math.max(-50,Math.min(100,Number(profile.parameters?.speechRate)||0)),String(profile.parameters?.emotion||'').trim()]);
+}
+
+export function canLockVoice(stored:VoiceProfile|undefined,draft:VoiceProfile):boolean {
+  return Boolean(stored?.previewAssetId && voiceIdentity(stored)===voiceIdentity(draft));
 }
