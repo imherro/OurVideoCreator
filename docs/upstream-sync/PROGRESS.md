@@ -82,4 +82,12 @@
 
 ## 后续队列
 
-前三组完成自测，其余仍未全部移植。下一组研究编译后错误stale标记，以及当前EP素材范围/标签等创作界面需求，再处理媒体参数、多模态/音色、直接剧本。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+### UPSTREAM-SYNC-04：无对白视频编译后误标过期（已完成）
+
+来源 `cdf1dec`。协作版 `src/graph.ts` 的旧自动采纳函数仅剩导入、没有工作链路调用；实际写入位于服务端 `object_job_candidates.adopt`，故没有照搬前端自动修复/回写旧结果。通过真实PG、普通编辑者的提交和明确采纳API复现：正常无对白视频被时长编译追加提示词，采纳后 `stale=True`，专项 **1 failed / 2 passed，14.50秒**。生成媒体来自本地FFmpeg，没有Provider调用。
+
+服务端编译器现在写入自己生成的 `shot_video_projection`，冻结原节点提示词。采纳比较源提示词与源提示词，不比较追加了时长要求的编译文本；仍检查generation_revision和原对象/依赖/权限版本。仅靠布尔编译标记跳过提示词检查会漏掉不更新generation_revision的API编辑，本项目没有采用该简化。调用者伪造的同名标记先被移除，未绑定镜头或非视频任务不能借标记绕过判断。生成成功不自动写回、修改后须显式accept_stale、依赖版本检查全部保持。
+
+`python -m pytest tests/test_upstream_compiled_candidates.py tests/test_video_dialogue.py tests/test_p5_object_candidates.py tests/test_p4_submission_execution.py -q` → **31 passed，90.47秒，exit0**。含真实提交/采纳接口正常、改提示词但不改generation_revision、改generation_revision三种情况，及既有迟到候选/越权/依赖变化回归；编译器还验证伪造标记不会被保留。未重跑浏览器、前端或全量后端，本批没有前端代码变更；`git diff --check`通过。没有新依赖、迁移、页面或收费调用；不在GET中修复旧数据，不修改历史验收结论。`READY_FOR_REVIEW`，按用户指示无需外部ChatGPT审核。
+
+前四组完成自测，其余仍未全部移植。下一组处理当前EP素材范围/标签及同作品跨集剪辑导出的实际兼容问题，再处理媒体参数、多模态/音色、直接剧本。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

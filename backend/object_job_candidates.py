@@ -193,8 +193,13 @@ def adopt(c,job,body):
         node=content['node'] if row['kind']=='node' else next((n for n in content['nodes'] if n['id']==job['node_id']),None)
         if not node or node['data'].get('kind')!=job['kind']:raise HTTPException(409,'目标节点已变化')
         data=node['data'];data['resultJob']=job['id']
-        data['stale']=(not inp.get('reference_compiler') and not inp.get('dialogue_projection')
-                       and data.get('prompt')!=inp.get('prompt')) or data.get('generation_revision',0)!=inp.get('generation_revision',0)
+        projection=inp.get('shot_video_projection')
+        if job['kind']=='video' and isinstance(projection,dict) and projection.get('version')=='shot-video/v1' and 'sourcePrompt' in projection:
+            prompt_changed=data.get('prompt')!=projection['sourcePrompt']
+        else:
+            prompt_changed=(not inp.get('reference_compiler') and not inp.get('dialogue_projection')
+                            and data.get('prompt')!=inp.get('prompt'))
+        data['stale']=prompt_changed or data.get('generation_revision',0)!=inp.get('generation_revision',0)
         if job['kind']=='text':data['text']=str(result.get('text') or '')
         elif asset:
             data['assetId']=asset['id']

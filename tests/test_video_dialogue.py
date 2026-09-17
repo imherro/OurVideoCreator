@@ -37,6 +37,7 @@ def test_video_job_compiles_dialogue_for_existing_node_and_records_projection():
     assert '本镜头成片总时长必须为 2 秒' in value['prompt']
     assert value['shot_duration'] == 2
     assert value['parameters']['duration'] == 2
+    assert value['shot_video_projection'] == {'version': 'shot-video/v1', 'shotUid': 'shot-uid', 'sourcePrompt': '旧节点提示词'}
     assert value['dialogue_projection']['shotUid'] == 'shot-uid'
     assert value['dialogue_projection']['dialogues'][0]['text'] == '下一步直接拔电源。'
 
@@ -69,6 +70,16 @@ def test_non_video_and_unbound_nodes_are_unchanged():
     original = {'prompt': '保持不变'}
     assert compile_shot_video_input({'shots': [shot()]}, 'video-node', 'image', original) == original
     assert compile_shot_video_input({'shots': [shot()]}, 'other-node', 'video', original) == original
+
+
+def test_shot_video_marker_is_server_owned_and_never_retained_on_unbound_nodes():
+    original = {'prompt': 'source', 'shot_video_projection': {'version': 'shot-video/v1', 'sourcePrompt': 'forged'}}
+    for kind, node_id in [('image', 'video-node'), ('video', 'other-node')]:
+        assert compile_shot_video_input({'shots': [shot()]}, node_id, kind, original) == {'prompt': 'source'}
+    doc = {'shots': [shot()], 'nodes': [{'id': 'video-node', 'data': {'prompt': 'canonical'}}]}
+    compiled = compile_shot_video_input(doc, 'video-node', 'video', original)
+    assert compiled['shot_video_projection']['sourcePrompt'] == 'canonical'
+    assert original['shot_video_projection']['sourcePrompt'] == 'forged'
 
 
 def test_locked_voice_dialogue_assets_are_frozen_into_video_input():

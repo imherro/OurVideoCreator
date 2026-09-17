@@ -61,6 +61,8 @@ def compile_video_prompt(base_prompt, shot):
 def compile_shot_video_input(document, node_id, kind, input_value, production_context=None, parameter_rules=None):
     """Freeze canonical shot timing and dialogue into every video submission."""
     result = dict(input_value)
+    # Compiler provenance is server-owned, never a caller-provided stale bypass.
+    result.pop('shot_video_projection', None)
     if kind != 'video':
         return result
     if production_context is not None:
@@ -89,6 +91,14 @@ def compile_shot_video_input(document, node_id, kind, input_value, production_co
         base_prompt, shot,
     )
     result = _apply_duration(result, provider_duration, shot_duration, parameter_rules)
+    node = next((node for node in document.get('nodes', []) if node.get('id') == node_id), None)
+    result['shot_video_projection'] = {
+        'version': 'shot-video/v1',
+        'shotUid': str(shot.get('uid') or shot.get('id') or ''),
+        # Compare editable source to source, not the duration-expanded prompt.
+        # Retain real edits even when an API client omits generation_revision.
+        'sourcePrompt': (node.get('data') or {}).get('prompt') if node else input_value.get('prompt'),
+    }
     dialogues = [item for item in (shot.get('dialogues') or []) if isinstance(item, dict) and str(item.get('text') or '').strip()]
     if dialogues:
         result['dialogue_projection'] = {
