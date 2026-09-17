@@ -99,6 +99,8 @@ def validate_audio(rows,target,mode,body):
     inp=body.input
     if mode=='voice':
         profile=object_content(target)['voice_profile'];marker=inp['voice_profile']
+        from .voice_reference_uploads import require_tts
+        require_tts(profile)
         if not profile or profile.get('status')=='locked':raise HTTPException(422,'请先派生可编辑音色版本，再生成试听')
         if marker.get('version')!=profile.get('version'):raise HTTPException(409,'音色版本已变化')
         text=profile.get('previewText')
@@ -109,6 +111,8 @@ def validate_audio(rows,target,mode,body):
             raise HTTPException(422,'对白不属于目标镜头或角色')
         from .voice_resolution import voice_document,resolved_voice
         voice_card,profile=resolved_voice(voice_document(rows),shot,dialogue)
+        from .voice_reference_uploads import require_tts
+        require_tts(profile)
         if (marker.get('voiceCardId') or marker['characterCardId'])!=voice_card:
             raise HTTPException(409,'角色状态音色已变化，请重新提交')
         if not profile or profile.get('status')!='locked':raise HTTPException(422,'对白须使用已锁定的角色音色')

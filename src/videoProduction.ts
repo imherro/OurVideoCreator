@@ -85,6 +85,7 @@ export function deriveVideoProductionRows(
         let profile:Value,voiceCard:string;
         try{const resolved=resolvedVoice(document,shot,dialogue);profile=resolved.profile;voiceCard=resolved.cardId}
         catch(error:any){dialogueReadinessReason=error.message;break}
+        if(profile.source?.type==='uploaded'){dialogueReadinessReason='上传声音不能自动逐句合成，请选择音色样本参考';break}
         if (profile.status !== "locked" || !String(profile.voiceType || "").trim()) {
           dialogueReadinessReason = `${dialogue.characterName || "角色"}尚未锁定固定音色`;
           break;

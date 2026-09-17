@@ -169,6 +169,8 @@ def create(connection, project_id, kind, content, *, validated=False):
     if kind=='visual_card':
         from .voice_library import validate_state
         validate_state(connection,scope['production_id'],content)
+        from .voice_reference_uploads import validate_profile
+        validate_profile(connection,scope['production_id'],None,content.get('voice_profile'))
     validate_asset_references(connection, scope['production_id'], content)
     if not validated:
         validation.ownership(connection, {**scope, 'project_id': project_id}, kind, content)

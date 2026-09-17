@@ -928,11 +928,12 @@ def production_assets(production_id:str,category:str|None=None,kind:str|None=Non
         return [asset_public(s.unpack(row)) for row in rows]
 
 @app.post('/api/projects/{pid}/assets')
-async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
+async def upload(pid:str,file:UploadFile=File(...),category:str='other',voice_reference:bool=False):
     owner=project(pid)
     category=asset_category(category)
     name=Path(file.filename or 'asset').name
     ext=Path(name).suffix.lower()
+    if voice_reference and ext not in ('.mp3','.wav'):raise ValueError('声音样本仅支持MP3/WAV')
     allowed={'.png':'image','.jpg':'image','.jpeg':'image','.webp':'image','.mp4':'video','.webm':'video','.mov':'video','.wav':'audio','.mp3':'audio','.m4a':'audio','.srt':'subtitle'}
     if ext not in allowed: raise HTTPException(400,'支持 PNG/JPG/WebP、MP4/WebM/MOV、WAV/MP3/M4A、SRT')
     aid=s.uid('asset-'); path=s.asset_path(aid,ext); total=0
@@ -940,6 +941,7 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
         with path.open('wb') as out:
             while chunk:=await file.read(1024*1024):
                 total+=len(chunk)
+                if voice_reference and total>30*1024**2:raise HTTPException(413,'声音样本不能超过30 MB')
                 if total>2*1024**3: raise HTTPException(413,'单个素材不能超过 2GB')
                 out.write(chunk)
         metadata={'bytes':total}
@@ -952,6 +954,9 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
         elif allowed[ext] in ('video','audio'):
             from .media import probe
             metadata.update(await asyncio.to_thread(probe,path))
+        if voice_reference:
+            from .voice_reference_uploads import validate_file
+            metadata.update(await asyncio.to_thread(validate_file,path))
         with s.db() as c:
             # Upload/probe occurs outside the transaction. Recheck live access
             # before registering material after potentially long file I/O.
@@ -965,6 +970,35 @@ async def upload(pid:str,file:UploadFile=File(...),category:str='other'):
 
 class AssetUpdate(StrictBody):
     category:str
+
+class VoiceReferenceAdmission(StrictBody):
+    authorized:bool=Field(default=False,strict=True)
+
+@app.post('/api/projects/{pid}/assets/{aid}/voice-reference')
+def admit_voice_reference(pid:str,aid:str,body:VoiceReferenceAdmission):
+    if not body.authorized:raise ValueError('请确认拥有该声音的使用权或已获授权')
+    with s.db() as c:collaboration.project_scope(c,pid,'editor')
+    asset=reference_asset(pid,aid)
+    path=(s.ASSETS/asset['path']).resolve()
+    if asset['kind']!='audio' or not path.is_relative_to(s.ASSETS.resolve()) or not path.is_file():
+        raise ValueError('请选择当前作品可访问的音频素材')
+    from .voice_reference_uploads import validate_file
+    from .motion_references import file_hash
+    from datetime import datetime,timezone
+    metadata=validate_file(path);digest=file_hash(path)
+    with s.db() as c:
+        # Decode outside locks; recheck membership and soft deletion before admission.
+        collaboration.lock_identity(c);scope=collaboration.project_scope(c,pid,'editor')
+        row=c.execute('''SELECT * FROM assets WHERE id=%s AND production_id=%s
+            AND NOT EXISTS(SELECT 1 FROM deleted_items WHERE kind='asset' AND item_id=assets.id) FOR UPDATE''',
+            (aid,scope['production_id'])).fetchone()
+        if not row or row['path']!=asset['path']:raise HTTPException(409,'声音素材已变化，请刷新后重试')
+        previous=s.unpack(row).get('metadata') or {};receipt=previous.get('voice_reference')
+        if receipt and receipt.get('sha256')!=digest:raise HTTPException(409,'已确认样本文件发生变化，请重新上传')
+        receipt=receipt or {'authorized_at':datetime.now(timezone.utc).isoformat(),
+            'declared_by':identity.current().user_id,'declaration':'user_declared','sha256':digest}
+        c.execute('UPDATE assets SET metadata=%s WHERE id=%s',(s.dumps({**previous,**metadata,'voice_reference':receipt}),aid))
+    return asset_public(asset_row(aid))
 
 @app.patch('/api/projects/{pid}/assets/{aid}')
 def update_asset(pid:str,aid:str,body:AssetUpdate):

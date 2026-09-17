@@ -135,7 +135,7 @@ import {
 } from "./filmBible/VisualAssetNode";
 import { visualBibleOf } from "./filmBible/types";
 import type { VoiceProfile } from "./filmBible/types";
-import { chooseVoiceVersion, acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf, voiceParameters } from "./filmBible/voices";
+import { requireTtsVoice, chooseVoiceVersion, acceptVoiceResult, saveVoiceProfile, setVoiceLocked, voiceProfilesOf, voiceParameters } from "./filmBible/voices";
 import {resolvedVoice,voiceCardId} from './filmBible/voiceResolution';
 import { catalogVoice, CUSTOM_VOICE_ID, DOUBAO_TTS2_VOICES } from "./filmBible/voiceCatalog";
 import { StoryboardWorkspace } from "./pages/StoryboardWorkspace";
@@ -2423,6 +2423,18 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     localModels: system.models,
     request: api,
     voiceProfiles: voiceProfilesOf(doc),
+    onAdmitVoice:async(value)=>{
+      const generation=collaboration.current!.drafts.generation;
+      let aid:string;
+      if(typeof value==='string')aid=value;
+      else{const form=new FormData();form.append('file',value);
+        const uploaded=await api(`/projects/${project.id}/assets?category=voice&voice_reference=true`,{method:'POST',body:form});aid=uploaded.id;}
+      if(current.current.project?.id!==project.id||collaboration.current!.drafts.generation!==generation)throw new Error('作品已切换，已上传素材保留，请在原作品重新选择');
+      const asset=await api(`/projects/${project.id}/assets/${aid}/voice-reference`,send('POST',{authorized:true}));
+      if(current.current.project?.id!==project.id||collaboration.current!.drafts.generation!==generation)throw new Error('作品已切换，声音素材保留，未修改角色');
+      setAssets(items=>[asset,...items.filter(item=>item.id!==asset.id)]);
+      setNotice('声音样本已校验；请保存声音草稿、试听后明确锁定');return asset;
+    },
     onChooseVoiceVersion:(cardId,version)=>{
       try{update(document=>chooseVoiceVersion(document,cardId,version));setNotice('音色选择已更新，请保存；相关旧视频将标为待更新')}catch(reason){report(reason)}
     },
@@ -2434,6 +2446,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       } catch (reason) { report(reason); }
     },
     onGenerateVoice: async (cardId, profile) => {
+      requireTtsVoice(profile);
       const generation = collaboration.current!.drafts.generation;
       const card = visualBibleOf(doc).cards[cardId];
       if (!card) throw new Error("角色资产卡不存在");
@@ -2473,6 +2486,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     },
     onGenerateCharacterDialogue: async (cardId) => {
       const profile = resolvedVoice(doc,{}, {characterCardId:cardId}).profile as VoiceProfile;
+      requireTtsVoice(profile);
       const card = visualBibleOf(doc).cards[cardId];
       if (!profile || profile.status !== "locked") throw new Error("请先试听并锁定角色主音色");
       const dialogues = doc.shots.flatMap((shot) =>
@@ -2519,6 +2533,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     },
     onRegenerateDialogue: async (cardId, dialogueId) => {
       const profile = resolvedVoice(doc,{}, {characterCardId:cardId}).profile as VoiceProfile;
+      requireTtsVoice(profile);
       const card = visualBibleOf(doc).cards[cardId];
       if (!profile || profile.status !== "locked") throw new Error("请先试听并锁定角色主音色");
       const match = doc.shots.flatMap((shot) =>

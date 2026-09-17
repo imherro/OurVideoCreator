@@ -69,6 +69,8 @@ export type VisualBible = {
 };
 
 export type VoiceProfile = {
+  source?: {type:'doubao_tts'} | {type:'uploaded';originalAssetId:string;authorizedAt:string};
+  description?: string;
   name?: string;
   lockedVersions?: Record<string,VoiceProfile>;
   defaultVersion?: number;

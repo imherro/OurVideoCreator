@@ -18,6 +18,7 @@ export function defaultVoiceProfile(cardId: string, model_id = "", defaults:Reco
 }
 
 export function voiceParameters(models:Record<string,any>[],profile:VoiceProfile,performance?:{emotion:string;contextTexts:string[]}){
+ requireTtsVoice(profile);
  const model=models.find(item=>item.id===profile.model_id&&item.kind==='audio');
  if(!model)throw new Error('所选平台语音模型已停用或未发布，请重新选择');
  const rules=model.rules||{},parameters={...model.defaults};
@@ -33,24 +34,28 @@ export function saveVoiceProfile<T extends FilmBibleDocument>(document: T, cardI
   const current = voiceProfilesOf(document)[cardId];
   const voiceType = input.voiceType.trim();
   const previewText = input.previewText.trim();
-  if (!input.model_id) throw new Error("请选择豆包语音服务");
-  if (!voiceType) throw new Error("音色 ID 不能为空");
-  if (!previewText) throw new Error("试听台词不能为空");
+  const uploaded=input.source?.type==='uploaded'?input.source:undefined;
+  if(uploaded){if(!uploaded.originalAssetId||!uploaded.authorizedAt)throw new Error('请选择声音样本并确认使用权');}
+  else{
+    if (!input.model_id) throw new Error("请选择豆包语音服务");
+    if (!voiceType) throw new Error("音色 ID 不能为空");
+    if (!previewText) throw new Error("试听台词不能为空");
+  }
   const identityChanged = !!current && voiceIdentity(current) !== voiceIdentity(input);
   const next: VoiceProfile = {
     ...input,
     lockedVersions: lockedVoiceVersions(current) as Record<string,VoiceProfile>,
     defaultVersion: current?.defaultVersion ?? (current?.status==='locked'?current.version:undefined),
     cardId,
-    model_id: input.model_id,
-    voiceType,
-    previewText,
+    model_id: uploaded?'':input.model_id,
+    voiceType:uploaded?'':voiceType,
+    previewText:uploaded?'':previewText,
     version: identityChanged ? current.version + 1 : Math.max(1, input.version || 1),
     status: identityChanged ? "draft" : input.status,
-    previewAssetId: identityChanged ? undefined : input.previewAssetId,
+    previewAssetId: uploaded?uploaded.originalAssetId:identityChanged ? undefined : input.previewAssetId,
     referenceAssetId: identityChanged ? undefined : input.referenceAssetId,
     referenceVersion: identityChanged ? undefined : input.referenceVersion,
-    generationJobId: identityChanged ? undefined : input.generationJobId,
+    generationJobId: uploaded||identityChanged ? undefined : input.generationJobId,
     parameters: {
       speechRate: Math.max(-50, Math.min(100, Number(input.parameters?.speechRate) || 0)),
       emotion: String(input.parameters?.emotion || "").trim(),
@@ -70,7 +75,7 @@ export function acceptVoiceResult<T extends FilmBibleDocument>(document: T, job:
   const asset = job.result?.assets?.find((item: Record<string, any>) => item.kind === "audio");
   if (!descriptor?.cardId || !asset?.id) return document;
   const current = voiceProfilesOf(document)[descriptor.cardId];
-  if (!current || current.status === 'locked' || current.version !== descriptor.version
+  if (!current || current.status === 'locked' || current.source?.type==='uploaded' || current.version !== descriptor.version
       || (descriptor.identity && descriptor.identity !== voiceIdentity(current))
       || (current.generationJobId && current.generationJobId !== job.id)) return document;
   return {
@@ -110,13 +115,18 @@ export function setVoiceLocked<T extends FilmBibleDocument>(document: T, cardId:
 
 /** Preview text and delivery settings are part of the audition, not just its preset ID. */
 export function voiceIdentity(profile: VoiceProfile): string {
+  if(profile.source?.type==='uploaded')return JSON.stringify(['uploaded',profile.source.originalAssetId]);
   return JSON.stringify([profile.model_id,String(profile.voiceType||'').trim(),String(profile.previewText||'').trim(),
     Math.max(-50,Math.min(100,Number(profile.parameters?.speechRate)||0)),String(profile.parameters?.emotion||'').trim()]);
 }
 
 export function canLockVoice(stored:VoiceProfile|undefined,draft:VoiceProfile):boolean {
   return Boolean(stored?.previewAssetId && voiceIdentity(stored)===voiceIdentity(draft)
-    &&(stored.name||'')===(draft.name||''));
+    &&(stored.name||'')===(draft.name||'')&&(stored.description||'')===(draft.description||''));
+}
+
+export function requireTtsVoice(profile:VoiceProfile):void{
+ if(profile.source?.type==='uploaded')throw new Error('上传声音仅提供音色参考，不能自动逐句合成；请选择音色样本参考');
 }
 
 export function chooseVoiceVersion<T extends FilmBibleDocument>(document:T,cardId:string,version?:number):T{

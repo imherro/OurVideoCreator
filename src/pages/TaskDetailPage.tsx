@@ -123,7 +123,7 @@ export function TaskDetailPage({ jobId, request }: { jobId: string; request: (pa
         {job.kind==='video'&&job.input?.video_spec&&<section><h3>视频参考清单（任务创建时冻结）</h3>
           <p>模式：{job.input.video_spec.generation_mode?.actual} · 计划 {job.input.video_spec.planned_shot_duration} 秒 · 提交 {job.input.video_spec.shot_duration} 秒</p>
           <ul>{(job.input.video_spec.reference_manifest||[]).map((item:Value)=><li key={`${item.kind}:${item.index}`}>{item.kind} {item.index} · {item.name} · {item.purpose||item.audio||''}</li>)}</ul>
-          {(job.input.video_spec.voice_samples||[]).map((sample:Value)=><p key={sample.characterCardId}>{sample.characterName} · 声音 V{sample.voiceVersion} → 音频 {sample.index}（只参考音色，不播放样本台词）</p>)}
+          {(job.input.video_spec.voice_samples||[]).map((sample:Value)=><p key={sample.characterCardId}>{sample.characterName} · {sample.source==='uploaded'?'上传声音':'生成试听'} V{sample.voiceVersion} → 音频 {sample.index}（只参考音色，不播放样本台词）</p>)}
           {(job.input.video_spec.motion_warnings||[]).map((warning:string)=><p key={warning}>{warning}</p>)}
           <pre className="debug-block">{JSON.stringify(job.input.video_spec.parameters,null,2)}</pre></section>}
         {job.kind==='image'&&job.input?.image_spec&&<section><h3>图片提交规格（任务创建时冻结）</h3>

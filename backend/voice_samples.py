@@ -43,7 +43,14 @@ def compile_samples(document,shot,project_id,caps):
                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             if decoded.returncode:raise ValueError('声音样本格式不符或无法完整解码，请重新导出MP3/WAV')
             media[aid]={'duration':duration,'sha256':file_hash(path),'name':asset['name']}
+        if (profile.get('source') or {}).get('type')=='uploaded':
+            asset=common.assets_by_ids({'project_id':project_id},[aid])[0]
+            receipt=(asset.get('metadata') or {}).get('voice_reference') or {}
+            if (profile['source'].get('originalAssetId')!=aid or not receipt.get('authorized_at')
+                or profile['source'].get('authorizedAt')!=receipt['authorized_at'] or media[aid]['sha256']!=receipt.get('sha256')):
+                raise ValueError('上传声音样本与已确认文件不一致，请重新上传并确认')
         samples.append({'characterCardId':cid,'characterName':name,'voiceCardId':voice_card,'voiceVersion':profile['version'],
+                        **({'source':profile['source']['type']} if profile.get('source') else {}),
                         'voiceType':profile.get('voiceType',''),'assetId':aid,'purpose':'timbre_only',
                         'media':media[aid],'index':list(media).index(aid)+1})
         seen.add(cid)

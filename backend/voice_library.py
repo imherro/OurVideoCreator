@@ -17,6 +17,8 @@ def validate_library(before,after):
         raise HTTPException(422,'声音版本或状态无效')
     if not isinstance(after.get('name',''),str) or len(after.get('name',''))>100:
         raise HTTPException(422,'声音版本名称不超过100字')
+    if not isinstance(after.get('description',''),str) or len(after.get('description',''))>500:
+        raise HTTPException(422,'声音说明不超过500字')
     history=locked_versions(before)
     if after.get('status')=='locked':
         key=str(after.get('version'));current=voice_snapshot(after)

@@ -6,6 +6,8 @@ from .collaboration_document import object_content
 
 def identity(profile):
     profile=profile or {}
+    if (profile.get('source') or {}).get('type')=='uploaded':
+        return ('uploaded',profile['source'].get('originalAssetId'))
     parameters=profile.get('parameters') or {}
     return (profile.get('model_id'),str(profile.get('voiceType') or '').strip(),
             str(profile.get('previewText') or '').strip(),parameters.get('speechRate') or 0,
@@ -49,6 +51,9 @@ def validate_lock(connection,row,content):
     profile=content.get('voice_profile') or {}
     from .voice_library import validate_library
     validate_library(before,profile)
+    from .voice_reference_uploads import validate_profile,uploaded
+    validate_profile(connection,row['production_id'],before,profile)
+    if uploaded(profile):return
     changed_reference=any(before.get(k)!=profile.get(k) for k in ('referenceAssetId','referenceVersion'))
     if profile.get('referenceVersion') is not None and not profile.get('referenceAssetId'):
         raise HTTPException(422,'声音参考版本必须关联明确采纳的试听素材')

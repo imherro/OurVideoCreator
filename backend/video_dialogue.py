@@ -160,6 +160,8 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
         card_id = str(dialogue.get('characterCardId') or '')
         from .voice_resolution import resolved_voice
         voice_card,profile = resolved_voice(document,shot,dialogue)
+        from .voice_reference_uploads import require_tts
+        require_tts(profile)
         if profile.get('status') != 'locked' or not str(profile.get('voiceType') or '').strip():
             name = str(dialogue.get('characterName') or '角色')
             raise ValueError(f'{name}尚未锁定固定音色，请先在塑角造景中设置并锁定')

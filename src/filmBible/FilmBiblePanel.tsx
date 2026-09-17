@@ -21,6 +21,7 @@ import type {
 } from "./types.ts";
 import { defaultVoiceProfile, canLockVoice } from "./voices.ts";
 import {lockedVoiceVersions,resolvedVoice} from './voiceResolution.ts';
+import {UploadedVoiceFields} from './UploadedVoiceFields';
 import { catalogVoice, CUSTOM_VOICE_ID, DOUBAO_TTS2_VOICES } from "./voiceCatalog.ts";
 import { projectCharacterDialogueRows } from "./dialogueAssets.ts";
 import { visualKindLabels, visualStatusLabels } from "./types.ts";
@@ -67,6 +68,7 @@ export function FilmBiblePanel({
   request,
   voiceProfiles,
   onSaveVoice,
+  onAdmitVoice,
   onChooseVoiceVersion,
   onGenerateVoice,
   onLockVoice,
@@ -106,6 +108,7 @@ export function FilmBiblePanel({
   request: (path: string) => Promise<any>;
   voiceProfiles: Record<string, VoiceProfile>;
   onSaveVoice: (cardId: string, profile: VoiceProfile) => void;
+  onAdmitVoice?: (value:File|string)=>Promise<Record<string,any>>;
   onChooseVoiceVersion: (cardId:string,version?:number)=>void;
   onGenerateVoice: (cardId: string, profile: VoiceProfile) => Promise<void>;
   onLockVoice: (cardId: string, locked: boolean) => void;
@@ -401,7 +404,7 @@ export function FilmBiblePanel({
             disabled={card.kind==='character'&&!!storedVoice&&JSON.stringify(voiceDraft)!==JSON.stringify(storedVoice)}
             value={card.kind==='character_state'?card.voiceVersion??'':storedVoice?.defaultVersion??(storedVoice?.status==='locked'?storedVoice.version:'')}
             onChange={event=>onChooseVoiceVersion(card.id,event.target.value?Number(event.target.value):undefined)}>
-            <option value="" disabled={card.kind!=='character_state'}>{card.kind==='character_state'?'继承基础角色默认音色':'请先生成并锁定声音'}</option>
+            <option value="" disabled={card.kind!=='character_state'}>{card.kind==='character_state'?'继承基础角色默认音色':'请先保存并锁定声音'}</option>
             {Object.values(voiceLibrary).map(voice=><option key={voice.version} value={voice.version}>{voice.name||catalogVoice(voice.voiceType)?.name||'角色声音'} · V{voice.version}</option>)}
           </select></label>
           {card.kind==='character'&&storedVoice&&JSON.stringify(voiceDraft)!==JSON.stringify(storedVoice)&&<small>请先保存声音草稿，再切换默认版本。</small>}
@@ -409,7 +412,7 @@ export function FilmBiblePanel({
           {voiceProblem&&<p className="error">{voiceProblem}</p>}
           {activeVoice?.referenceAssetId&&<button onClick={()=>{const asset=assets.find(item=>item.id===activeVoice.referenceAssetId);if(asset)onPreviewAsset(asset)}}>试听当前生效音色</button>}
           {card.kind==='character_state'&&<>
-            {card.voiceVersion!==undefined&&<button disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError('');void onGenerateCharacterDialogue(card.id).catch(error=>setVoiceError(error.message)).finally(()=>setVoiceBusy(false))}}>生成此状态的本集对白</button>}
+            {activeVoice?.source?.type==='uploaded'?<p className="muted">当前为上传声音，请使用音色样本参考；不能逐句合成对白。</p>:card.voiceVersion!==undefined&&<button disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError('');void onGenerateCharacterDialogue(card.id).catch(error=>setVoiceError(error.message)).finally(()=>setVoiceBusy(false))}}>生成此状态的本集对白</button>}
             {dialogueRows.map(row=><p key={row.id}>第{row.shotOrder}镜 · {row.text} · {row.status==='ready'?'已采纳':'待生成或采纳'}</p>)}
             {voiceError&&<p className="error">{voiceError}</p>}
           </>}
@@ -417,8 +420,19 @@ export function FilmBiblePanel({
         {card.kind === "character" && <>
           <hr />
           <div className="film-bible-section-title"><b>角色固定音色</b><small>跨镜头统一对白声纹</small></div>
-          {!speechProviders.length ? <p className="warning-text">暂无已发布的语音模型，请联系平台管理员配置模型和允许音色。</p> : <>
+          <>
+            <label>声音来源<select value={voiceDraft.source?.type||'doubao_tts'} disabled={voiceDraft.status==='locked'} onChange={event=>setVoiceDraft({...voiceDraft,
+              source:event.target.value==='uploaded'?{type:'uploaded',originalAssetId:'',authorizedAt:''}:{type:'doubao_tts'},
+              previewAssetId:undefined,referenceAssetId:undefined,referenceVersion:undefined,generationJobId:undefined})}>
+              <option value="doubao_tts">豆包生成试听</option><option value="uploaded">上传声音</option>
+            </select></label>
             <label>声音版本名称<input maxLength={100} value={voiceDraft.name||''} disabled={voiceDraft.status==='locked'} placeholder="例如：常态男声、变身女声" onChange={event=>setVoiceDraft({...voiceDraft,name:event.target.value})}/></label>
+            <label>声音说明<textarea maxLength={500} value={voiceDraft.description||''} disabled={voiceDraft.status==='locked'} placeholder="可选：声音特征、适用状态" onChange={event=>setVoiceDraft({...voiceDraft,description:event.target.value})}/></label>
+            {voiceDraft.source?.type==='uploaded'?<UploadedVoiceFields key={card.id} assets={assets} disabled={voiceDraft.status==='locked'}
+              onAdmit={onAdmitVoice||(()=>Promise.reject(new Error('当前页面未接通声音上传')))}
+              onSelect={asset=>setVoiceDraft(current=>({...current,source:{type:'uploaded',originalAssetId:asset.id,authorizedAt:asset.metadata.voice_reference.authorized_at},
+                previewAssetId:asset.id,generationJobId:undefined,referenceAssetId:undefined,referenceVersion:undefined}))}/>:<>
+            {!speechProviders.length&&<p className="warning-text">暂无已发布的语音模型；可使用上传声音，或联系平台管理员配置模型和允许音色。</p>}
             <label>平台语音模型<select value={voiceDraft.model_id} disabled={voiceDraft.status === "locked"}
               onChange={event=>{const model=speechProviders.find(item=>item.id===event.target.value);
                 setVoiceDraft({...voiceDraft,model_id:event.target.value,voiceType:model?.defaults?.voice_type||"",parameters:{speechRate:model?.defaults?.speech_rate??0,emotion:model?.defaults?.emotion||""}});}}>
@@ -435,15 +449,19 @@ export function FilmBiblePanel({
               {speechProviders.find(item=>item.id===voiceDraft.model_id)?.rules?.speech_rate&&<label>语速<select value={voiceDraft.parameters.speechRate} disabled={voiceDraft.status === "locked"} onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,speechRate:Number(event.target.value)}})}><option value={-25}>较慢</option><option value={0}>正常</option><option value={25}>较快</option></select></label>}
               {speechProviders.find(item=>item.id===voiceDraft.model_id)?.rules?.emotion&&<label>情绪<input value={voiceDraft.parameters.emotion} disabled={voiceDraft.status === "locked"} placeholder="留空自动演绎" onChange={(event)=>setVoiceDraft({...voiceDraft,parameters:{...voiceDraft.parameters,emotion:event.target.value}})}/></label>}
             </div>
+            </>}
             <div className="film-bible-actions">
               {voiceDraft.status !== "locked" && <button onClick={()=>onSaveVoice(card.id,voiceDraft)}>保存声音设定</button>}
-              {voiceDraft.status !== "locked" && <button className="primary" disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateVoice(card.id,voiceDraft).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}>{voiceBusy?<LoaderCircle className="spin" size={14}/>:<Volume2 size={14}/>}生成试听</button>}
+              {voiceDraft.status !== "locked" && voiceDraft.source?.type!=='uploaded' && <button className="primary" disabled={voiceBusy||!speechProviders.length} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateVoice(card.id,voiceDraft).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}>{voiceBusy?<LoaderCircle className="spin" size={14}/>:<Volume2 size={14}/>}生成试听</button>}
+              {voiceDraft.source?.type==='uploaded'&&voiceDraft.previewAssetId&&voiceDraft.previewAssetId!==storedVoice?.previewAssetId&&<button onClick={()=>{const asset=assets.find(item=>item.id===voiceDraft.previewAssetId);if(asset)onPreviewAsset(asset)}}>试听所选样本（未锁定）</button>}
               {storedVoice?.previewAssetId && <button className="secondary" onClick={()=>{const asset=assets.find((item)=>item.id===storedVoice.previewAssetId);if(asset)onPreviewAsset(asset);}}>试听声音</button>}
                 {storedVoice?.status === "locked" ? <button onClick={()=>onLockVoice(card.id,false)}>创建新声音版本</button> : storedVoice?.previewAssetId ? <button disabled={!canLockVoice(storedVoice,voiceDraft)} title={!canLockVoice(storedVoice,voiceDraft)?'请先保存声音设置；试听参数改变时需重新生成试听':''} onClick={()=>onLockVoice(card.id,true)}>锁定主音色 V{storedVoice.version}</button> : null}
                 {storedVoice?.status==='locked'&&storedVoice.previewAssetId&&!storedVoice.referenceAssetId&&<button onClick={()=>onLockVoice(card.id,true)}>将已采纳试听确认为声音参考</button>}
                 {storedVoice?.referenceAssetId&&<small>已确认声音参考 V{storedVoice.referenceVersion}；仅音色参考，不复述样本。</small>}
-              {activeVoice?.status === "locked" && <button className="primary" disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateCharacterDialogue(card.id).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}><Volume2 size={14}/>使用默认 V{activeVoice.version} 生成本集对白</button>}
+              {activeVoice?.status === "locked" && activeVoice.source?.type!=='uploaded' && <button className="primary" disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onGenerateCharacterDialogue(card.id).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}><Volume2 size={14}/>使用默认 V{activeVoice.version} 生成本集对白</button>}
             </div>
+            {voiceDraft.source?.type==='uploaded'&&voiceDraft.source.originalAssetId&&<p>已选样本：{assets.find(item=>item.id===(voiceDraft.source?.type==='uploaded'?voiceDraft.source.originalAssetId:''))?.name||'请查看素材库'}</p>}
+            {activeVoice?.source?.type==='uploaded'&&<p className="muted">{activeVoice.status==='locked'?'当前默认为上传声音':'上传声音草稿需先试听并锁定'}，仅用于视频音色样本参考；不能自动逐句合成，不会回退到其他音色。</p>}
             <p className="muted">{storedVoice ? `声音 V${storedVoice.version} · ${storedVoice.status === "locked" ? "已锁定" : "草稿"}` : "保存并试听后可锁定为角色主音色。"}</p>
             <div className="voice-dialogue-heading">
               <b>本集对白</b>
@@ -460,12 +478,12 @@ export function FilmBiblePanel({
                 <div className="voice-dialogue-state">
                   <span className={`voice-state ${row.status}`}>{statusLabel}</span>
                   {row.asset && <button className="secondary" onClick={()=>onPreviewAsset(row.asset!)}><Volume2 size={13}/>试听</button>}
-                  {!(["queued","running","syncing"] as string[]).includes(row.status) && <button disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onRegenerateDialogue(card.id,row.id).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}>{row.status === "ready" ? "重新生成" : "生成"}</button>}
+                  {activeVoice?.source?.type!=='uploaded'&&!(["queued","running","syncing"] as string[]).includes(row.status) && <button disabled={voiceBusy} onClick={()=>{setVoiceBusy(true);setVoiceError("");void onRegenerateDialogue(card.id,row.id).catch((reason)=>setVoiceError(reason?.message||String(reason))).finally(()=>setVoiceBusy(false));}}>{row.status === "ready" ? "重新生成" : "生成"}</button>}
                 </div>
               </div>;
             })}</div>}
             {voiceError && <p className="error">{voiceError}</p>}
-          </>}
+          </>
         </>}
         <hr />
         <h3>主参考图</h3>
