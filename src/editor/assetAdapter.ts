@@ -63,11 +63,12 @@ export function assetToTwickElement(
 }
 
 function trackType(asset: EditorAsset) {
-  return asset.kind === "audio" ? "audio" : "video";
+  return asset.kind === "audio" ? "audio" : "element";
 }
 
-function nextTrackName(editor: TimelineEditor, type: "video" | "audio") {
-  return `${type === "video" ? "V" : "A"}${editor.getTracksByType(type).length + 1}`;
+function nextTrackName(editor: TimelineEditor, type: "element" | "audio") {
+  const count = editor.getTracksByType(type).length + (type === 'element' ? editor.getTracksByType('video').length : 0);
+  return `${type === "element" ? "V" : "A"}${count + 1}`;
 }
 
 /**

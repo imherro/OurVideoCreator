@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Pause, Play, X } from "lucide-react";
-import { timelineDuration, timelinePosition, type Clip } from "./timeline";
+import { clipSourceTime, timelineDuration, timelinePosition, type Clip } from "./timeline";
 import "./timelinePreview.css";
 
 type Asset = {
@@ -92,7 +92,8 @@ export function TimelinePreview({
     const element = video.current;
     if (!element || !position) return;
     element.volume = Math.max(0, Math.min(1, position.clip.volume ?? 1));
-    const target = Number(position.clip.start || 0) + position.offset;
+    element.playbackRate = Number(position.clip.playbackRate ?? 1);
+    const target = clipSourceTime(position.clip, position.offset);
     if (element.readyState >= 1 && Math.abs(element.currentTime - target) > 0.25)
       element.currentTime = target;
     if (playing && element.paused)
@@ -158,8 +159,8 @@ export function TimelinePreview({
               playsInline
               preload="auto"
               onLoadedMetadata={(event) => {
-                event.currentTarget.currentTime =
-                  Number(position?.clip.start || 0) + (position?.offset || 0);
+                event.currentTarget.playbackRate = Number(position?.clip.playbackRate ?? 1);
+                if (position) event.currentTarget.currentTime = clipSourceTime(position.clip, position.offset);
               }}
               onWaiting={() => {
                 setBuffering(true);

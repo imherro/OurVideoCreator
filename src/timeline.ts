@@ -1,4 +1,5 @@
-export type Clip={id:string;asset_id:string;start:number;duration:number;volume?:number};
+export type Clip={id:string;asset_id:string;start:number;duration:number;volume?:number;playbackRate?:number};
+export function clipSourceTime(clip:Clip, offset:number){return Number(clip.start||0)+offset*Number(clip.playbackRate??1)}
 export function timelinePosition(clips:Clip[],time:number){
   let begin=0;
   for(let index=0;index<clips.length;index++){

@@ -27,7 +27,9 @@ def object_key(row):
 
 
 def legacy_projection(timeline):
-    track = next((track for track in timeline.get('tracks', []) if track.get('type') == 'video'), {})
+    track = next((track for track in timeline.get('tracks', [])
+                  if track.get('type') == 'video' or (track.get('type') == 'element'
+                  and any(item.get('type') in {'video', 'image'} for item in track.get('elements', [])))), {})
     clips = []
     for element in track.get('elements', []):
         if element.get('type') not in {'video', 'image'}:
@@ -37,6 +39,8 @@ def legacy_projection(timeline):
         clips.append({'id': element['id'], 'asset_id': metadata.get('assetId') or props.get('srcAssetId') or '',
                       'start': props.get('time') or 0, 'duration': max(0, element['e'] - element['s']),
                       'volume': props.get('volume', 1)})
+        if props.get('playbackRate', 1) != 1:
+            clips[-1]['playbackRate'] = props['playbackRate']
     return clips
 
 

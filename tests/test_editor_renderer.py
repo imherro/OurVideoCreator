@@ -13,6 +13,40 @@ def element(asset_id='asset-1', start=0, end=1):
     }
 
 
+@pytest.mark.parametrize('rate', [0.5, 1, 2])
+def test_generic_two_clip_render_keeps_second_clip_and_full_duration(tmp_path, rate):
+    import subprocess
+    from backend import store as s
+    from backend.media import ffmpeg_executable, probe
+    s.init()
+    ffmpeg = ffmpeg_executable()
+    assets = {}
+    elements = []
+    for index, color in enumerate(['red', 'blue']):
+        path = tmp_path / (color + '.mp4')
+        result = subprocess.run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i',
+            f'color=c={color}:s=64x64:r=24:d=1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(path)],
+            capture_output=True, timeout=20)
+        assert result.returncode == 0, result.stderr
+        assets[color] = {'id': color, 'project_id': 'p', 'kind': 'video', 'absolute_path': str(path)}
+        elements.append({'id': color, 'type': 'video', 's': index / rate, 'e': (index + 1) / rate,
+            'props': {'srcAssetId': color, 'time': 0, 'playbackRate': rate, 'volume': 0},
+            'frame': {'x': 0, 'y': 0, 'size': [64, 64]}, 'mediaDuration': 1})
+    timeline = {'version': 2, 'metadata': {'custom': {'timelineDuration': 60}},
+                'tracks': [{'id': 'v1', 'type': 'element', 'elements': elements}]}
+    plan = EditorRenderCompiler('p', timeline, (64, 64), tmp_path, assets.get, probe).compile(ffmpeg, tmp_path / 'out.mp4')
+    assert plan.duration == 2 / rate
+    rendered = subprocess.run(plan.args, capture_output=True, timeout=30)
+    assert rendered.returncode == 0, rendered.stderr
+    for time, channel in [(.5 / rate, 0), (1.5 / rate, 2)]:
+        frame = subprocess.run([ffmpeg, '-v', 'error', '-ss', str(time), '-i', str(tmp_path / 'out.mp4'),
+            '-frames:v', '1', '-vf', 'scale=1:1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'],
+            capture_output=True, timeout=20)
+        assert frame.returncode == 0, frame.stderr
+        assert len(frame.stdout) == 3
+        assert frame.stdout[channel] > 200 and sum(frame.stdout) - frame.stdout[channel] < 40, frame.stdout
+
+
 def test_editor_compiler_rejects_cross_project_assets(tmp_path):
     project = {'version': 2, 'tracks': [{'id': 'v1', 'name': 'V1', 'elements': [element()]}]}
     compiler = EditorRenderCompiler(

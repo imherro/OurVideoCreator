@@ -6,6 +6,8 @@ import {equalContent} from '../objectDrafts.ts';
 
 type Value=Record<string,any>;
 const EXPORT_KEYS=['transition','export_resolution','music_volume'] as const;
+const primaryVisualTrack=(timeline:ProjectJSON)=>timeline.tracks.find(item=>item.type==='video'||
+  (item.type==='element'&&item.elements.some(element=>['video','image'].includes(element.type))));
 
 export function importLegacyTimeline(clips: Clip[], assets: EditorAsset[], ratio='16:9', audioId?: string): ProjectJSON {
   const size = editorResolution(ratio);
@@ -14,23 +16,25 @@ export function importLegacyTimeline(clips: Clip[], assets: EditorAsset[], ratio
     const asset = assets.find(item => item.id === clip.asset_id);
     if (!asset || !['video','image'].includes(asset.kind)) throw new Error('旧剪辑引用的画面素材不存在');
     const start = Number(clip.start), duration = Number(clip.duration);
+    const playbackRate = Number(clip.playbackRate ?? 1);
+    if (!Number.isFinite(playbackRate) || playbackRate < 0.25 || playbackRate > 4) throw new Error('播放速度超出支持范围');
     if (!Number.isFinite(start) || start < 0 || !Number.isFinite(duration) || duration <= 0) {
       throw new Error('旧剪辑时长或素材入点无效');
     }
     const mediaDuration = Number(asset.metadata?.duration);
-    if (asset.kind === 'video' && (!Number.isFinite(mediaDuration) || start + duration > mediaDuration + 0.08)) {
+    if (asset.kind === 'video' && (!Number.isFinite(mediaDuration) || start + duration * playbackRate > mediaDuration + 0.08)) {
       throw new Error('旧剪辑超出原视频时长');
     }
     const begin = cursor;
     cursor += duration;
     return {id:clip.id,trackId:'t-legacy-v1',type:asset.kind as 'video'|'image',name:asset.name,s:begin,e:cursor,
-      props:{src:asset.url,srcAssetId:asset.id,time:start,playbackRate:1,volume:clip.volume ?? 1},
+      props:{src:asset.url,srcAssetId:asset.id,time:start,playbackRate,volume:clip.volume ?? 1},
       metadata:{assetId:asset.id,assetSource:'my-video-creator',legacyClipId:clip.id},
       frame:{x:0,y:0,size:[size.width,size.height]},objectFit:'cover',
       ...(asset.kind === 'video' ? {mediaDuration} : {})};
   });
   const timeline: ProjectJSON = {version:2,backgroundColor:'#000000',
-    tracks:[{id:'t-legacy-v1',name:'V1 · 导入旧剪辑',type:'video',elements}]};
+    tracks:[{id:'t-legacy-v1',name:'V1 · 导入旧剪辑',type:'element',elements}]};
   if (audioId && cursor > 0) {
     const audio = assets.find(item => item.id === audioId && item.kind === 'audio');
     if (!audio) throw new Error('旧剪辑背景音乐不存在');
@@ -46,11 +50,12 @@ export function importLegacyTimeline(clips: Clip[], assets: EditorAsset[], ratio
 
 /** A read-only convenience view; it cannot represent overlays or mixed audio. */
 export function legacyTimelineProjection(timeline: ProjectJSON): Clip[] {
-  const track = timeline.tracks.find(item => item.type === 'video');
+  const track = primaryVisualTrack(timeline);
   return (track?.elements || []).filter(item => ['video','image'].includes(item.type)).map(item => ({
     id:item.id,asset_id:String(item.metadata?.assetId || item.props?.srcAssetId || ''),
     start:Number(item.props?.time || 0),duration:Math.max(0,Number(item.e)-Number(item.s)),
     volume:Number(item.props?.volume ?? 1),
+    ...(Number(item.props?.playbackRate ?? 1) !== 1 ? {playbackRate:Number(item.props?.playbackRate)} : {}),
   }));
 }
 
@@ -79,7 +84,7 @@ export function reconcileTimelineEdit(before:Value,after:Value,assets:EditorAsse
   const timeline:ProjectJSON=structuredClone(before.editor?.timeline||importLegacyTimeline(before.timeline||[],assets,before.ratio,before.audio_id));
   if(clipsChanged){
     const imported=importLegacyTimeline(after.timeline||[],assets,after.ratio);
-    let track=timeline.tracks.find(item=>item.type==='video');
+    let track=primaryVisualTrack(timeline);
     if(!track){track=imported.tracks[0];timeline.tracks.unshift(track);}
     else{
       const old=track.elements.filter(item=>['video','image'].includes(item.type)),byId=new Map(old.map(item=>[item.id,item]));

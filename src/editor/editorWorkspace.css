@@ -29,3 +29,6 @@
 .mvc-editor-workspace .twick-editor-loading-spinner{display:none}
 
 .mvc-editor-workspace .twick-editor-view-section{min-height:240px}
+.mvc-editor-duration{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px;color:#b8c0c4}
+.mvc-editor-duration input{max-width:76px;padding:5px}.mvc-editor-duration select{max-width:140px;padding:5px}
+.mvc-editor-actionbar{min-height:42px;height:auto;flex-wrap:wrap}.mvc-editor-actionbar>span{min-width:150px}

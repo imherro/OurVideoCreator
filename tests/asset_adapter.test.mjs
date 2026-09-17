@@ -60,7 +60,7 @@ test("project assets append to a typed track and remain movable clips", () => {
   const first = addAssetToTimeline(editor, asset, resolution, { append: true });
   const second = addAssetToTimeline(editor, { ...asset, id: "asset-video-2" }, resolution, { append: true });
   assert.equal(tracks.length, 1);
-  assert.equal(tracks[0].getType(), "video");
+  assert.equal(tracks[0].getType(), "element");
   assert.deepEqual([first.getStart(), first.getEnd()], [0, 5.2]);
   assert.deepEqual([second.getStart(), second.getEnd()], [5.2, 10.4]);
   assert.equal(refreshes, 2);

@@ -300,7 +300,7 @@ export function setTextStyle(
 }
 
 export function addTrack(editor: TimelineEditor, type: "video" | "audio" | "text" | "caption") {
-  const trackType = type === "text" ? "element" : type;
+  const trackType = type === "text" || type === "video" ? "element" : type;
   const index = editor.getTracksByType(trackType).length + 1;
   const prefix = type === "video" ? "V" : type === "audio" ? "A" : type === "caption" ? "字幕" : "T";
   return editor.addTrack(`${prefix}${index}`, trackType);

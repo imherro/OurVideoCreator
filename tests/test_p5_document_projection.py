@@ -2,7 +2,18 @@ import copy
 
 import pytest
 
-from backend.collaboration_document import compose
+from backend.collaboration_document import compose, legacy_projection
+
+
+def test_generic_visual_projection_skips_titles_and_retains_speed_without_mutation():
+    timeline = {'version': 2, 'tracks': [
+        {'type': 'element', 'elements': [{'id': 'title', 'type': 'text', 's': 0, 'e': 2}]},
+        {'type': 'element', 'elements': [{'id': 'clip', 'type': 'video', 's': 0, 'e': 8,
+          'props': {'time': 0, 'playbackRate': .5, 'srcAssetId': 'video'}}]}]}
+    before = copy.deepcopy(timeline)
+    assert legacy_projection(timeline) == [{'id': 'clip', 'asset_id': 'video', 'start': 0,
+                                           'duration': 8, 'volume': 1, 'playbackRate': .5}]
+    assert timeline == before
 
 
 def test_old_document_carriers_cannot_overwrite_object_sources():

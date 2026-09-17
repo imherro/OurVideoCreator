@@ -18,6 +18,7 @@ import { EditorShortcuts } from "./EditorShortcuts";
 import { planInitialTimeline } from "./initialTimeline";
 import { addAssetToTimeline } from "./assetAdapter";
 import { TimelineInputSync } from "./timelineInputSync";
+import {timelineWorkspaceDuration, withTimelineWorkspaceDuration} from './timelineDuration';
 import { TIMELINE_DROP_MEDIA_TYPE } from "@twick/video-editor";
 import "./editorWorkspace.css";
 
@@ -28,6 +29,7 @@ type EditorWorkspaceProps = {
   editor?: EditorDocument;
   assets: EditorAsset[];
   ratio: string;
+  duration: number;
   shots: Record<string, any>[];
   nodes: Record<string, any>[];
   audioId?: string;
@@ -65,6 +67,30 @@ function TimelinePersistence({
   return null;
 }
 
+function TimelineDurationFloor({projectDuration}: {projectDuration: number}) {
+  const {editor, totalDuration, changeLog} = useTimelineContext();
+  const [value, setValue] = useState(() => timelineWorkspaceDuration(editor.getProject(), projectDuration));
+  const dirty = useRef(false);
+  useEffect(() => {
+    const floor = timelineWorkspaceDuration(editor.getProject(), projectDuration);
+    if (!dirty.current) setValue(floor);
+    // View state only: loading a remote document must never publish a write.
+    if (Math.abs(totalDuration - floor) > 0.001) editor.getContext().setTotalDuration(floor);
+  }, [changeLog, editor, projectDuration, totalDuration]);
+  const commit = () => {
+    if (!dirty.current) return;
+    dirty.current = false;
+    const project = withTimelineWorkspaceDuration(editor.getProject(), value, projectDuration);
+    setValue(timelineWorkspaceDuration(project, projectDuration));
+    editor.setMetadata(project.metadata || {});
+  };
+  return <label className="mvc-editor-duration" title="工作区长度不裁切素材，也不延长导出；最短为影片目标时长及现有内容长度">
+    时间线 <input aria-label="时间线工作区时长" type="number" min={5} step={1} value={value}
+      onChange={event => {dirty.current = true; setValue(Number(event.target.value));}}
+      onBlur={commit} onKeyDown={event => {if (event.key === 'Enter') event.currentTarget.blur();}} /> 秒
+  </label>;
+}
+
 function EditorSurface({
   productionName,
   episodeLabel,
@@ -74,6 +100,7 @@ function EditorSurface({
   nodes,
   audioId,
   musicVolume,
+  duration,
   onChange,
   onExport,
 }: {
@@ -85,11 +112,13 @@ function EditorSurface({
   nodes: Record<string, any>[];
   audioId?: string;
   musicVolume?: number;
+  duration: number;
   onChange: EditorWorkspaceProps["onChange"];
   onExport: EditorWorkspaceProps["onExport"];
 }) {
   const { editor, videoResolution, changeLog, setSelectedItem } = useTimelineContext();
-  const { getCurrentTime } = useLivePlayerContext();
+  const { getCurrentTime, setCurrentTime, setSeekTime } = useLivePlayerContext();
+  const [durationMode, setDurationMode] = useState<'preserve' | 'fit'>('preserve');
   const [message, setMessage] = useState("编辑会随当前项目自动保存");
   const surfaceRef = useRef<HTMLDivElement>(null);
 
@@ -114,7 +143,7 @@ function EditorSurface({
       surfaceRef.current?.querySelectorAll<HTMLElement>(".twick-track-header-content").forEach((header, index) => {
         const track = tracks[index];
         if (!track) return;
-        const type = track.getType();
+        const type = track.getType() === 'element' && track.getElements().some(item => ['video', 'image'].includes(item.getType())) ? 'video' : track.getType();
         const number = (counters.get(type) || 0) + 1;
         counters.set(type, number);
         const label = type === "video" ? `V${number}` : type === "audio" ? `A${number}` : type === "caption" ? "字幕" : type === "text" || type === "element" ? `T${number}` : "空";
@@ -164,7 +193,7 @@ function EditorSurface({
 
   function generateInitialEdit() {
     const plan = planInitialTimeline(
-      { shots, nodes, assets, resolution: videoResolution, audioId, musicVolume },
+      { shots, nodes, assets, resolution: videoResolution, audioId, musicVolume, durationMode, targetDuration: duration },
       () => crypto.randomUUID(),
     );
     if (plan.issues.length) {
@@ -185,7 +214,9 @@ function EditorSurface({
       return;
     }
     editor.loadProject(plan.timeline);
-    setMessage(`已按分镜顺序建立 ${plan.clipCount} 个镜头的初剪`);
+    setCurrentTime(0);
+    setSeekTime(0);
+    setMessage(`已完整保留 ${plan.clipCount} 个镜头，共 ${plan.outputDuration.toFixed(2)} 秒${durationMode === 'fit' ? `（画面与已采纳对白同步 ${plan.playbackRate.toFixed(2)} 倍速）` : ''}`);
   }
 
   return (
@@ -196,6 +227,13 @@ function EditorSurface({
         <button className="primary compact" onClick={generateInitialEdit}>
           <Sparkles size={15} /> 生成初剪
         </button>
+        <label className="mvc-editor-duration">初剪
+          <select aria-label="初剪时长模式" value={durationMode} onChange={event => setDurationMode(event.target.value as 'preserve' | 'fit')}>
+            <option value="preserve">完整镜头</option>
+            <option value="fit">匹配 {duration} 秒</option>
+          </select>
+        </label>
+        <TimelineDurationFloor projectDuration={duration} />
         <span><b>{productionName} · {episodeLabel}</b>　{message}</span>
         <EditorToolbar assets={assets} onMessage={setMessage} onExport={onExport} />
       </div>
@@ -222,6 +260,7 @@ export function EditorWorkspace({
   editor,
   assets,
   ratio,
+  duration,
   shots,
   nodes,
   audioId,
@@ -255,6 +294,7 @@ export function EditorWorkspace({
             nodes={nodes}
             audioId={audioId}
             musicVolume={musicVolume}
+            duration={duration}
             onChange={onChange}
             onExport={onExport}
           />

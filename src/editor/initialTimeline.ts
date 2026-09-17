@@ -7,6 +7,9 @@ export type InitialTimelinePlan = {
   timeline: ProjectJSON;
   issues: string[];
   clipCount: number;
+  naturalDuration: number;
+  outputDuration: number;
+  playbackRate: number;
 };
 
 export function planInitialTimeline(
@@ -17,6 +20,8 @@ export function planInitialTimeline(
     resolution,
     audioId,
     musicVolume = 0.3,
+    durationMode = 'preserve',
+    targetDuration,
   }: {
     shots: Value[];
     nodes: Value[];
@@ -24,6 +29,8 @@ export function planInitialTimeline(
     resolution: Size;
     audioId?: string;
     musicVolume?: number;
+    durationMode?: 'preserve' | 'fit';
+    targetDuration?: number;
   },
   newId: () => string,
 ): InitialTimelinePlan {
@@ -47,23 +54,15 @@ export function planInitialTimeline(
       issues.push(`${label}输入已变更，请核对并重新生成`);
       return;
     }
-    const plannedDuration = Number(shot.duration);
     const mediaDuration = Number(asset.metadata?.duration);
     if (
-      !Number.isFinite(plannedDuration) ||
-      plannedDuration <= 0 ||
       !Number.isFinite(mediaDuration) ||
       mediaDuration <= 0
     ) {
       issues.push(`${label}时长无效`);
       return;
     }
-    if (plannedDuration > mediaDuration + 0.08) {
-      issues.push(`${label}需要 ${plannedDuration} 秒，素材仅 ${mediaDuration.toFixed(2)} 秒`);
-      return;
-    }
-
-    const duration = Math.min(plannedDuration, mediaDuration);
+    const duration = mediaDuration;
     const elementId = `e-${newId()}`;
     const shotStart = cursor;
     const dialogueAssets: EditorAsset[] = (Array.isArray(shot.dialogues) ? shot.dialogues : []).flatMap((dialogue: Value) => {
@@ -124,8 +123,29 @@ export function planInitialTimeline(
     cursor += duration;
   });
 
+  const naturalDuration = cursor;
+  let playbackRate = 1;
+  if (durationMode === 'fit') {
+    const target = Number(targetDuration);
+    if (!Number.isFinite(target) || target <= 0) issues.push('匹配目标时长必须大于 0 秒');
+    else if (cursor > 0) {
+      const rate = cursor / target;
+      // Match the actual FFmpeg renderer's supported speed range. Never silently
+      // clamp it: that would discard frames or desynchronize adopted dialogue.
+      if (rate < 0.25 || rate > 4) issues.push('目标时长要求的速度超出支持范围（0.25–4 倍）');
+      else {
+        playbackRate = rate;
+        for (const element of [...elements, ...dialogueElements]) {
+          element.s /= rate;
+          element.e /= rate;
+          element.props = {...element.props, playbackRate: rate};
+        }
+        cursor = target;
+      }
+    }
+  }
   const tracks: TrackJSON[] = [
-    { id: "t-v1", name: "V1 · AI 初剪", type: "video", elements },
+    { id: "t-v1", name: "V1 · AI 初剪", type: "element", elements },
   ];
   if (dialogueElements.length) tracks.push({ id: "t-dialogue", name: "A1 · 角色对白", type: "audio", elements: dialogueElements });
 
@@ -181,5 +201,5 @@ export function planInitialTimeline(
     assets,
   );
 
-  return { timeline, issues, clipCount: elements.length };
+  return { timeline, issues, clipCount: elements.length, naturalDuration, outputDuration: cursor, playbackRate };
 }

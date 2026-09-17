@@ -26,7 +26,7 @@ test("AI storyboard produces an ordered Twick V1 with stable source links", () =
   assert.equal(plan.timeline.tracks[0].name, "V1 · AI 初剪");
   assert.deepEqual(
     plan.timeline.tracks[0].elements.map((element) => [element.s, element.e]),
-    [[0, 3], [3, 8]],
+    [[0, 4], [4, 9.2]],
   );
   assert.deepEqual(
     plan.timeline.tracks[0].elements.map((element) => [element.metadata.shotId, element.metadata.nodeId, element.metadata.assetId]),
@@ -55,7 +55,7 @@ test("initial edit preserves video original audio and adds configured looping mu
   assert.equal(plan.timeline.tracks[1].type, "audio");
   assert.equal(plan.timeline.tracks[1].elements[0].props.loop, true);
   assert.equal(plan.timeline.tracks[1].elements[0].props.volume, 0.4);
-  assert.equal(plan.timeline.tracks[1].elements[0].e, 5);
+  assert.equal(plan.timeline.tracks[1].elements[0].e, 5.2);
 });
 
 test("initial edit accepts historical shots that only store pipeline video node ids", () => {
@@ -74,7 +74,7 @@ test("initial edit accepts historical shots that only store pipeline video node 
   assert.equal(plan.timeline.tracks[0].elements[0].metadata.assetId, "asset-pipeline");
 });
 
-test("initial edit rejects missing, stale, and overlong shot media", () => {
+test("initial edit rejects missing/stale media but retains complete media despite longer shot plan", () => {
   const assets = [
     { id: "video", name: "镜头", kind: "video", url: "/v", metadata: { duration: 4 } },
   ];
@@ -94,8 +94,9 @@ test("initial edit rejects missing, stale, and overlong shot media", () => {
     },
     () => "id",
   );
-  assert.equal(plan.clipCount, 0);
-  assert.equal(plan.issues.length, 3);
+  assert.equal(plan.clipCount, 1);
+  assert.equal(plan.timeline.tracks[0].elements[0].e, 4);
+  assert.equal(plan.issues.length, 2);
 });
 
 test("fixed character dialogue becomes an audio track and replaces generated video audio", () => {

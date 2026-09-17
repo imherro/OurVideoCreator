@@ -24,6 +24,35 @@ def test_real_aggregate_reads_objects_and_legacy_put_is_gone_even_for_owner(team
     assert team['a'].get('/api/projects/'+team['pid']).json()['document']['shots'][0]['description']=='v2'
 
 
+def test_generic_timeline_round_trip_keeps_speed_and_requires_lease_and_assignment(team):
+    import io
+    from PIL import Image
+    image = io.BytesIO()
+    Image.new('RGB', (4, 4), 'red').save(image, format='PNG')
+    upload = team['a'].post(f"/api/projects/{team['pid']}/assets",
+                           files={'file': ('frame.png', image.getvalue(), 'image/png')})
+    assert upload.status_code == 200, upload.text
+    asset = upload.json()['id']
+    row = create(team, kind='timeline')
+    timeline = {'version': 2, 'metadata': {'custom': {'timelineDuration': 20}}, 'tracks': [
+        {'id': 'v1', 'type': 'element', 'elements': [{'id': 'clip', 'trackId': 'v1', 'type': 'image',
+          's': 0, 'e': 8, 'props': {'srcAssetId': asset, 'time': 0, 'playbackRate': .5, 'volume': .4},
+          'metadata': {'assetId': asset}}]}]}
+    content = {'timeline': timeline}
+    assert save(team, row, content).status_code == 409
+    response = team['a'].post(url(team, row, '/lease'), json={'action': 'acquire', 'assignment_epoch': row['assignment_epoch']})
+    assert response.status_code == 200, response.text
+    lease = response.json()
+    auth = {'lease_token': lease['token'], 'lease_epoch': lease['lease_epoch']}
+    assert save(team, row, content, client=team['b'], **auth).status_code == 403
+    saved = save(team, row, content, **auth)
+    assert saved.status_code == 200, saved.text
+    reread = team['viewer'].get('/api/projects/' + team['pid']).json()['document']
+    assert reread['editor']['timeline'] == timeline
+    assert reread['timeline'] == [{'id': 'clip', 'asset_id': asset, 'start': 0, 'duration': 8, 'volume': .4, 'playbackRate': .5}]
+    assert team['a'].get(url(team, row)).json()['revision'] == saved.json()['revision']
+
+
 def test_visual_version_and_voice_immutability_survive_new_card_version(team):
     content={'card':{'id':'card-test','name':'Actor','kind':'character','currentVersionId':'v1','parentCardId':None,'status':'active'},
         'versions':{'v1':{'id':'v1','cardId':'card-test','version':1,'parentVersionId':None,'status':'locked',

@@ -35,7 +35,12 @@ export function readEditorTimeline(editor?: EditorDocument): ProjectJSON {
   if (!editor || editor.version !== 1 || !Array.isArray(editor.timeline?.tracks)) {
     return structuredClone(EMPTY_EDITOR_TIMELINE);
   }
-  return structuredClone(editor.timeline);
+  const timeline = structuredClone(editor.timeline);
+  // Twick's video-track handler applies absolute start time twice for later
+  // clips. Generic tracks schedule each visual at its absolute start instead.
+  // This is a read adapter; TimelineInputSync must not publish it as a user edit.
+  timeline.tracks = timeline.tracks.map(track => track.type === 'video' ? {...track, type: 'element'} : track);
+  return timeline;
 }
 
 function mediaAssetForElement(
