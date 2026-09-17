@@ -107,19 +107,19 @@ def register(job,path,name=None,category=None,asset_source='generated'):
             with Image.open(target) as img: metadata.update(width=img.width,height=img.height)
         elif kind in ('audio','video'):
             metadata.update(probe(target))
+        semantic=category or job.get('input',{}).get('asset_category') or ('shot' if kind in ('image','video') else 'other')
+        if semantic not in {'character','scene','prop','shot','music','sfx','voice','reference','other'}:raise ValueError('生成素材分类无效')
+        result={'id':aid,'url':f'/api/assets/{aid}/file','name':name or source.name,'kind':kind,'category':semantic,'source':asset_source}
+        if fingerprint:result['generationFingerprint']=fingerprint
         with s.db() as c:
-            state=c.execute('SELECT status FROM jobs WHERE id=%s',(job['id'],)).fetchone()
+            state=c.execute('SELECT status FROM jobs WHERE id=%s FOR UPDATE',(job['id'],)).fetchone()
             if not state or state['status']=='cancelled':raise InterruptedError('结果登记前任务已取消')
             origin=c.execute('SELECT production_id FROM projects WHERE id=%s',(job['project_id'],)).fetchone()
             if not origin:raise ValueError('生成任务所属项目不存在')
-            semantic=category or job.get('input',{}).get('asset_category') or ('shot' if kind in ('image','video') else 'other')
-            if semantic not in {'character','scene','prop','shot','music','sfx','voice','reference','other'}:raise ValueError('生成素材分类无效')
             c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(aid,job['project_id'],name or source.name,kind,target.name,mime,s.dumps(metadata),time.time(),semantic,asset_source,origin['production_id']))
     except BaseException:
         target.unlink(missing_ok=True)
         raise
-    result={'id':aid,'url':f'/api/assets/{aid}/file','name':name or source.name,'kind':kind,'category':semantic,'source':asset_source}
-    if fingerprint:result['generationFingerprint']=fingerprint
     return result
 
 

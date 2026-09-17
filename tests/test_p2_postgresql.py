@@ -212,11 +212,11 @@ def test_db04_last_batch_item_failure_rolls_back_jobs_private_rows_and_events(mo
         original = app_module.create_job_record
         calls = {'count': 0}
 
-        def injected(connection, project_id, body):
+        def injected(connection, project_id, body, **kwargs):
             calls['count'] += 1
             if calls['count'] == 2:
                 raise RuntimeError('injected last batch item failure')
-            return original(connection, project_id, body)
+            return original(connection, project_id, body, **kwargs)
 
         monkeypatch.setattr(app_module, 'create_job_record', injected)
         body = SourceExtractionCreate(

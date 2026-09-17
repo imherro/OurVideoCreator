@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from . import store as s
-from . import identity, platform_models, model_validation, provider_egress, collaboration
+from . import identity, platform_models, model_validation, provider_egress, collaboration, job_admission
 from .instance_identity import describe as describe_instance
 from .prompts import TEMPLATES
 from .generation_policy import default_platform_policy, validate_generation_policy
@@ -1151,23 +1151,30 @@ def save_platform_prompt_template(tid:str,body:PromptTemplateSave):
     from .prompt_library import save
     return save(tid,body)
 
-def create_job_record(c,pid,body,*,object_state=None):
+def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     from .job_contracts import freeze_prompt_contract
     from .job_candidates import freeze_relation
     model_validation.reject_private_overrides(body.input)
     submitted_input=body.input
     body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
-    old=c.execute('SELECT * FROM jobs WHERE submission_id=%s',(body.submission_id,)).fetchone()
-    if old:
-        if old['project_id']!=pid: raise HTTPException(409,'提交标识冲突')
-        if old['node_id']!=body.node_id or old['kind']!=body.kind or json.loads(old['input'])!=body.input:
-            raise HTTPException(409,'同一提交标识不能对应不同输入')
-        return s.unpack(old)
+    job_admission.lock(c)
+    owner,actor=job_admission.scope(c,pid,entrypoint)
     target=freeze_relation(c,pid,body)
     if not target:
         from .object_job_candidates import freeze
         target=freeze(c,pid,body,object_state)
+    old=c.execute('''SELECT * FROM jobs WHERE workspace_id=%s AND actor_user_id=%s
+        AND submission_namespace=%s AND submission_id=%s''',
+        (owner['workspace_id'],actor.user_id,entrypoint,body.submission_id)).fetchone()
+    if old:
+        if old['project_id']!=pid or old['node_id']!=body.node_id or old['kind']!=body.kind:
+            raise HTTPException(409,'同一提交标识不能对应不同目标')
+        state=object_state or read_project_state(c,pid)
+        original=job_admission.replay_binding(c,old,body,state['document'] if state else {})
+        if old['input_hash']!=job_admission.fingerprint(pid,body,target,original):
+            raise HTTPException(409,'同一提交标识不能对应不同输入、对象版本或分配')
+        return s.unpack(old)
     if body.input.get('visual_reference') is not None:
         active=c.execute("""SELECT * FROM jobs
             WHERE project_id=%s AND node_id=%s AND kind=%s AND status IN ('queued','running')
@@ -1271,19 +1278,17 @@ def create_job_record(c,pid,body,*,object_state=None):
                 raise ValueError('图像来源必须属于本任务的已验证上游')
         else:
             raise ValueError('图像参考来源无效')
-    owner=c.execute('''SELECT e.production_id,p.workspace_id FROM projects e
-        JOIN productions p ON p.id=e.production_id WHERE e.id=%s''',(pid,)).fetchone()
-    if not owner:raise HTTPException(404,'制作集不存在')
     scope='production' if body.input.get('stage') in ('source_analysis','adaptation_generation') else 'episode'
     jid=s.uid('job-'); now=time.time()
-    actor=identity.current(False)
-    c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id)
-        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id if actor else None))
+    input_hash=job_admission.fingerprint(pid,body,target,binding)
+    c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id,submission_namespace,input_hash)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id,entrypoint,input_hash))
     if binding:
         platform_models.bind_job(c,jid,binding)
     if target:
         c.execute('UPDATE jobs SET collaboration=%s WHERE id=%s',(s.dumps(target),jid))
-    return s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone())
+    job=s.unpack(c.execute('SELECT * FROM jobs WHERE id=%s',(jid,)).fetchone())
+    return job
 
 class AudioBatchCreate(StrictBody):
     jobs:list[JobCreate]=Field(min_length=1,max_length=100)
@@ -1296,11 +1301,12 @@ def submit_audio_batch(pid:str,body:AudioBatchCreate):
     if len({job.submission_id for job in body.jobs})!=len(body.jobs):
         raise ValueError('批次提交标识不能重复')
     with s.db() as c:
+        job_admission.lock(c)
         # All validation, frozen bindings and events share one transaction.
         state=read_project_state(c,pid)
         from .object_job_candidates import lock_batch
         lock_batch(c,pid,body.jobs,state)
-        results=[create_job_record(c,pid,job,object_state=state) for job in body.jobs]
+        results=[create_job_record(c,pid,job,object_state=state,entrypoint='audio-batch') for job in body.jobs]
         for result in results:
             s.event(pid,{'type':'job','id':result['id']},connection=c)
     return {'jobs':results,'count':len(results)}
@@ -1312,13 +1318,14 @@ def submit(pid:str,body:JobCreate):
     with s.db() as c:
         project_state=read_project_state(c,pid)
     from .reference_compiler import compile_shot_image_input
+    compiler_models=job_admission.compiler_catalog(pid,'job',body.submission_id)
     prepared_input=compile_shot_image_input(
         project_state['episode_document'],body.node_id,body.kind,body.input,
-        platform_models.compiler_catalog(),
+        compiler_models,
         production_context=project_state['production_context'],
     )
     from .video_dialogue import bind_fixed_dialogue_audio, compile_shot_video_input
-    selected_provider=next((item for item in platform_models.compiler_catalog() if item.get('id')==prepared_input.get('model_id')),None)
+    selected_provider=next((item for item in compiler_models if item.get('id')==prepared_input.get('model_id')),None)
     prepared_input=compile_shot_video_input(
         project_state['episode_document'],body.node_id,body.kind,prepared_input,
         production_context=project_state['production_context'],
@@ -1335,6 +1342,7 @@ def submit(pid:str,body:JobCreate):
         prepared_input={**prepared_input,'target_duration':saved_project['document'].get('duration',15)}
     body=body.model_copy(update={'input':prepared_input})
     with s.db() as c:
+        job_admission.lock(c)
         if body.input.get('reference_compiler'):
             current_revision=c.execute('''SELECT e.revision,p.revision production_revision
                 FROM projects e JOIN productions p ON p.id=e.production_id
@@ -1626,6 +1634,7 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
     production(production_id)
     if len(set(body.chapter_ids))!=len(body.chapter_ids):raise ValueError('不能重复选择同一章节')
     with s.db() as c:
+        job_admission.lock(c)
         collaboration.lock_identity(c)
         from . import owned_content as owned
         owned.production_scope(c,production_id,'editor')
@@ -1641,6 +1650,7 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
         # mixed-owner batch cannot leave a partial queue behind.
         chapter_map={cid:owned.load(c,production_id,'chapter',cid,write=True) for cid in sorted(body.chapter_ids)}
         for chapter in chapter_map.values():collaboration.editable(c,chapter)
+        job_admission.batch_members(c,body.project_id,'source-extraction',body.submission_id,body.chapter_ids)
         created=[]
         for chapter_id in body.chapter_ids:
             chapter=chapter_map[chapter_id]
@@ -1651,7 +1661,7 @@ def extract_source_events(production_id:str,body:SourceExtractionCreate):
                     'source_event_extraction':{'productionId':production_id,'chapterId':chapter_id,'chapterRevision':chapter['revision'],
                                                'assignmentEpoch':chapter['assignment_epoch']},
             })
-            created.append(create_job_record(c,body.project_id,job_body))
+            created.append(create_job_record(c,body.project_id,job_body,entrypoint='source-extraction'))
         for item in created:
             s.event(body.project_id,{'type':'job','id':item['id']},connection=c)
     return {'jobs':created,'count':len(created)}
@@ -1772,6 +1782,7 @@ def approve_adaptation(production_id:str,body:RevisionAction):
 def generate_adaptation(production_id:str,body:TextGenerationCreate):
     from .adaptation import adaptation_fingerprint,source_fingerprint,source_snapshot
     with s.db() as c:
+        job_admission.lock(c)
         from . import owned_content as owned
         owned.production_scope(c,production_id,'manager',write=True)
         c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
@@ -1795,7 +1806,7 @@ def generate_adaptation(production_id:str,body:TextGenerationCreate):
                 'format':format_value,
             },
         })
-        result=create_job_record(c,body.project_id,job_body)
+        result=create_job_record(c,body.project_id,job_body,entrypoint='adaptation')
         s.event(body.project_id,{'type':'job','id':result['id']},connection=c)
     return result
 
@@ -1899,6 +1910,7 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
     from .adaptation import adaptation_fingerprint,ensure_episode_for_plan,script_to_api,validate_source_references
     if len(set(body.episode_nos))!=len(body.episode_nos):raise ValueError('不能重复选择同一集')
     with s.db() as c:
+        job_admission.lock(c)
         from . import owned_content as owned
         owned.production_scope(c,production_id,'editor',write=True)
         c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
@@ -1906,6 +1918,8 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
         if context['adaptationPlan']['status']!='approved':raise ValueError('请先批准改编策划，再生成逐集剧本')
         plan_map={item['episodeNo']:item for item in context['episodePlans']}
         fingerprint=adaptation_fingerprint(context);created=[]
+        batch_project=ensure_episode_for_plan(c,production_id,body.episode_nos[0])
+        job_admission.batch_members(c,batch_project['id'],'script-generation',body.submission_id,body.episode_nos)
         for episode_no in body.episode_nos:
             plan=plan_map.get(episode_no)
             if not plan:raise ValueError(f'第 {episode_no:02d} 集不在分集规划中')
@@ -1932,7 +1946,7 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
                         'chapterVersions':[{'id':item['id'],'revision':item['revision'],'assignment_epoch':item['assignment_epoch']} for item in chapters],
                     },
             })
-            created.append(create_job_record(c,project_row['id'],job_body))
+            created.append(create_job_record(c,project_row['id'],job_body,entrypoint='script-generation'))
         for item in created:
             s.event(item['project_id'],{'type':'job','id':item['id']},connection=c)
     return {'jobs':created,'count':len(created)}
@@ -1959,7 +1973,7 @@ def prepare_run_workflow(pid,body):
     plan=execution_plan(
         p['document'],body.get('node_ids'),body.get('include_descendants') is True,exact,
     )
-    providers={x['id']:x for x in platform_models.compiler_catalog()}
+    providers={x['id']:x for x in job_admission.compiler_catalog(pid,'canvas-run',group,batch=True)}
     # Validate the entire batch before submitting its first runnable node.
     for node,_ in plan:
         data=node.get('data',{})
@@ -2121,9 +2135,11 @@ def prepare_run_workflow(pid,body):
         prepared.append((node,parents,data,reference_sources))
     jobs_by_node={};created=[]
     with s.db() as c:
+        job_admission.lock(c)
         from .object_job_candidates import lock_batch
         lock_batch(c,pid,[JobCreate(node_id=node['id'],kind=data['kind'],submission_id=f'{group}:{node["id"]}',input=data)
                          for node,_,data,_ in prepared],project_state)
+        job_admission.batch_members(c,pid,'canvas-run',group,[node['id'] for node,_,_,_ in prepared])
         if any(data.get('reference_compiler') for _,_,data,_ in prepared):
             current_revision=c.execute('''SELECT e.revision,p.revision production_revision
                 FROM projects e JOIN productions p ON p.id=e.production_id
@@ -2145,7 +2161,7 @@ def prepare_run_workflow(pid,body):
                  if item['type']=='upstream_node' else item)
                 for item in reference_sources
             ]
-            result=create_job_record(c,pid,JobCreate(node_id=node['id'],kind=kind,submission_id=f'{group}:{node["id"]}',input=data),object_state=project_state)
+            result=create_job_record(c,pid,JobCreate(node_id=node['id'],kind=kind,submission_id=f'{group}:{node["id"]}',input=data),object_state=project_state,entrypoint='canvas-run')
             jobs_by_node[node['id']]=result['id'];created.append(result['id'])
         for jid in created:
             s.event(pid,{'type':'job','id':jid},connection=c)
@@ -2168,7 +2184,7 @@ def read_job(jid:str):
 def cancel(jid:str):
     job=read_job(jid)
     if job['status'] in ('queued','running','interrupted'):
-        s.job_update(jid,status='cancelled',phase='已请求取消，等待运行引擎释放')
+        s.job_update(jid,control=True,status='cancelled',phase='已请求取消，等待运行引擎释放')
         # Re-read after cancellation so a provider handle attached between the
         # initial read and this state change is visible to remote cancellation.
         job=read_job(jid)
@@ -2178,7 +2194,7 @@ def cancel(jid:str):
                 with s.db() as c:
                     provider=platform_models.load_job_provider(c,jid,remote=True)
             except ValueError:
-                s.cancelled_phase(jid,'本地已取消；原模型凭证/配置不可用，未换账号取消远端任务，请人工核对')
+                s.cancelled_phase(jid,'本地已取消；原模型凭证/配置不可用，未换账号取消远端任务，请人工核对',control=True)
         from .provider_redaction import protect
         with protect(provider.get('api_key','') if provider else ''), provider_egress.before_call(lambda: platform_models.check_job_call(jid)):
             if provider and provider.get('type')=='replicate':
@@ -2188,18 +2204,18 @@ def cancel(jid:str):
                 from .providers.volcengine_ark import cancel as cancel_ark
                 remote_cancelled=cancel_ark(job,provider)
                 if remote_cancelled is True:
-                    s.cancelled_phase(jid,'已取消本地等待，并已请求供应商取消远端任务')
+                    s.cancelled_phase(jid,'已取消本地等待，并已请求供应商取消远端任务',control=True)
                 elif remote_cancelled is False:
-                    s.cancelled_phase(jid,'本地已取消；供应商可能继续生成并产生费用')
+                    s.cancelled_phase(jid,'本地已取消；供应商可能继续生成并产生费用',control=True)
             elif provider and provider.get('type')=='hc_atom':
                 from .providers.hc_atom import cancel as cancel_hc
                 remote_cancelled=cancel_hc(job,provider)
                 if remote_cancelled is True:
-                    s.cancelled_phase(jid,'已取消本地等待，并已请求幻场 AI 取消远端任务')
+                    s.cancelled_phase(jid,'已取消本地等待，并已请求幻场 AI 取消远端任务',control=True)
                 elif remote_cancelled is False:
-                    s.cancelled_phase(jid,'本地已取消；幻场 AI 远端任务可能继续生成并产生费用')
+                    s.cancelled_phase(jid,'本地已取消；幻场 AI 远端任务可能继续生成并产生费用',control=True)
             elif provider and provider.get('type')=='runninghub':
-                s.cancelled_phase(jid,'本地已取消；RunningHub 远端任务可能继续生成并产生费用')
+                s.cancelled_phase(jid,'本地已取消；RunningHub 远端任务可能继续生成并产生费用',control=True)
         with s.db() as c:
             scope=c.execute('SELECT workspace_id,production_id FROM jobs WHERE id=%s',(jid,)).fetchone()
             identity.audit(c,'job.cancel','job',jid,workspace_id=scope['workspace_id'],production_id=scope['production_id'])

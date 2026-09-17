@@ -4,6 +4,7 @@ import json
 import mimetypes
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -557,7 +558,7 @@ class Worker:
         items=inp.get('timeline',[])
         if not items: raise ValueError('时间线没有镜头')
         executable=ffmpeg_executable()
-        work=s.DATA/job['id']; work.mkdir(exist_ok=True)
+        work=Path(tempfile.mkdtemp(prefix=f"{job['id']}-a{job.get('attempt_number',0)}-",dir=s.DATA))
         try:
             def production_asset(asset_id):
                 with s.db() as c:
@@ -611,12 +612,13 @@ class Worker:
             self.run_process(job,args,work/'export.log','输出 MP4')
             return {'assets':[register(job,output,'成片.mp4')]}
         finally:
-            # All paths are rooted in this job's private work directory.
-            if work.parent==s.DATA and work.name==job['id']: shutil.rmtree(work,ignore_errors=True)
+            # This exact directory belongs to this execution only. A late
+            # attempt must never remove a replacement's FFmpeg intermediates.
+            if work.parent==s.DATA: shutil.rmtree(work,ignore_errors=True)
 
     def export_editor(self,job):
         inp=job['input']; executable=ffmpeg_executable()
-        work=s.DATA/job['id']; work.mkdir(exist_ok=True)
+        work=Path(tempfile.mkdtemp(prefix=f"{job['id']}-a{job.get('attempt_number',0)}-",dir=s.DATA))
         try:
             width,height=(int(x) for x in inp.get('resolution','1280x720').split('x'))
             def lookup(asset_id):
@@ -644,13 +646,21 @@ class Worker:
                 'audio_count':plan.audio_count,'text_count':plan.text_count,
             }}
         finally:
-            if work.parent==s.DATA and work.name==job['id']:shutil.rmtree(work,ignore_errors=True)
+            if work.parent==s.DATA:shutil.rmtree(work,ignore_errors=True)
     def run_process(self,job,args,log_path,phase):
         self.progress(job,phase)
         with log_path.open('w',encoding='utf-8') as log:
             proc=subprocess.Popen(args,cwd=log_path.parent,stdout=log,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-            while proc.poll() is None:
-                if self.cancelled(job):
-                    proc.terminate(); proc.wait(timeout=10); raise InterruptedError()
-                time.sleep(0.3)
+            try:
+                while proc.poll() is None:
+                    if self.cancelled(job):raise InterruptedError()
+                    time.sleep(0.3)
+            finally:
+                # Includes DB errors, not only a user cancellation.
+                # Popen identifies the one child this invocation owns.
+                if proc.poll() is None:
+                    proc.terminate()
+                    try:proc.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        proc.kill();proc.wait(timeout=10)
         if proc.returncode: raise ValueError('导出失败：'+log_path.read_text(encoding='utf-8',errors='replace')[-600:])

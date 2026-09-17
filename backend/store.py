@@ -84,16 +84,20 @@ def _notify_job(connection, project_id, job_id, *, force=False):
     _event(connection, project_id, {'type':'job','id':job_id})
     return True
 
-def unpack(row):
+def unpack(row, *, execution=False):
     if row is None:
         return None
     data = dict(row)
+    if not execution:
+        data.pop('attempt_token', None)
     for key in ('document','input','result','metadata','payload','telemetry','collaboration'):
         if key in data and data[key] is not None:
             data[key] = json.loads(data[key])
     return data
 
-def job_update(job_id, **fields):
+def job_update(job_id, *, control=False, **fields):
+    if 'provider_job_id' in fields and scrub(fields['provider_job_id'])!=fields['provider_job_id']:
+        raise ValueError('供应商返回了不安全的任务编号，请人工核对远端状态')
     fields = scrub(fields)
     allowed = {'status','result','provider_job_id','error','phase','progress','telemetry'}
     assert fields.keys() <= allowed
@@ -104,33 +108,48 @@ def job_update(job_id, **fields):
     fields['updated'] = time.time()
     with db() as c:
         # Cancellation wins over late provider completions.
+        if control:
+            # The authenticated cancellation command cannot write results/handles.
+            if fields.get('status')!='cancelled' or not fields.keys() <= {'status','phase','finished','updated'}:
+                raise ValueError('控制命令只能取消任务')
         current = c.execute('SELECT * FROM jobs WHERE id=%s FOR UPDATE',(job_id,)).fetchone()
+        handle_changed=bool(fields.get('provider_job_id'))
+        if current and fields.get('provider_job_id'):
+            _attach_provider_handle(c,current,fields['provider_job_id'])
+        # A late empty handle is not permission to erase a durable remote ID.
+        fields.pop('provider_job_id',None)
         if not current or current['status'] in ('cancelled','succeeded'):
             return False
         c.execute('UPDATE jobs SET '+','.join(f'{k}=%s' for k in fields)+' WHERE id=%s',(*fields.values(),job_id))
-        force = bool(fields.keys() & {'status','error','provider_job_id'})
+        force = handle_changed or bool(fields.keys() & {'status','error'})
         _notify_job(c, current['project_id'], job_id, force=force)
     return True
 
 def attach_provider_job_id(job_id, provider_job_id):
     """Persist a paid upstream handle even if cancellation raced its response."""
-    if scrub(provider_job_id) != provider_job_id:
-        raise ValueError("供应商返回了不安全的任务编号，已阻止持久化，请人工核对远端状态")
     with db() as c:
-        current=c.execute('SELECT project_id,status,provider_job_id FROM jobs WHERE id=%s FOR UPDATE',(job_id,)).fetchone()
+        current=c.execute('SELECT * FROM jobs WHERE id=%s FOR UPDATE',(job_id,)).fetchone()
         if not current:raise ValueError('任务不存在，无法保存供应商任务编号')
-        existing=current['provider_job_id']
-        if existing and existing!=provider_job_id:raise ValueError('供应商任务编号冲突，请人工核对')
-        if not existing:
-            c.execute('UPDATE jobs SET provider_job_id=%s,updated=%s WHERE id=%s',(provider_job_id,time.time(),job_id))
-        _event(c,current['project_id'],{'type':'job','id':job_id})
+        _attach_provider_handle(c,current,provider_job_id)
     return current['status']
 
-def cancelled_phase(job_id, phase):
+
+def _attach_provider_handle(c, current, provider_job_id):
+    """Caller holds the job row lock; cancellation must retain a remote ID."""
+    if not isinstance(provider_job_id,str) or not provider_job_id.strip() or scrub(provider_job_id)!=provider_job_id:
+        raise ValueError('供应商返回了无效或不安全的任务编号，请人工核对远端状态')
+    existing=current['provider_job_id']
+    if existing and existing!=provider_job_id:raise ValueError('供应商任务编号冲突，请人工核对')
+    if not existing:
+        c.execute('UPDATE jobs SET provider_job_id=%s,updated=%s WHERE id=%s',
+                  (provider_job_id,time.time(),current['id']))
+    _event(c,current['project_id'],{'type':'job','id':current['id']})
+
+def cancelled_phase(job_id, phase, *, control=False):
     phase = scrub(phase)
     with db() as c:
-        current=c.execute("SELECT project_id FROM jobs WHERE id=%s AND status='cancelled'",(job_id,)).fetchone()
-        if not current:return False
+        current=c.execute('SELECT * FROM jobs WHERE id=%s FOR UPDATE',(job_id,)).fetchone()
+        if not current or current['status']!='cancelled':return False
         c.execute('UPDATE jobs SET phase=%s,updated=%s WHERE id=%s',(phase,time.time(),job_id))
         _event(c,current['project_id'],{'type':'job','id':job_id})
     return True
