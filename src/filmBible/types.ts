@@ -36,6 +36,7 @@ export type VisualReference = {
 
 export type VisualCard = {
   voiceVersion?: number;
+  aliases?: string[];
   id: string;
   kind: VisualKind;
   name: string;

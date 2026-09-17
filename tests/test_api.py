@@ -904,7 +904,8 @@ def test_graph_storyboard_defaults_to_two_pass_film_bible(authenticated):
     jobs=c.get('/api/projects/'+p['id']+'/jobs').json()
     assert jobs[0]['input']['film_bible'] is True
     assert jobs[0]['input']['target_duration']==15
-    assert jobs[0]['input']['schema_version']=='film-bible-storyboard/v1'
+    assert jobs[0]['input']['schema_version']=='film-bible-storyboard/v2'
+    assert jobs[0]['input']['storyboard_visual_context']['version']=='production-visual-reuse/v1'
     assert [stage['id'] for stage in jobs[0]['input']['prompt_stages']]==['visual_bible','bound_storyboard']
     assert all(stage['system_prompt'] for stage in jobs[0]['input']['prompt_stages'])
     assert all(stage['response_schema'] for stage in jobs[0]['input']['prompt_stages'])

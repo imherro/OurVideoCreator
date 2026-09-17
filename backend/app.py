@@ -1297,8 +1297,11 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     model_validation.reject_private_overrides(body.input)
     body.input.pop('image_spec',None)  # Read-only projection, never trust caller metadata.
     body.input.pop('video_spec',None)
+    body.input.pop('storyboard_visual_context',None)
     submitted_input=body.input
-    body.input=freeze_prompt_contract(body.kind,body.input)
+    film_bible_storyboard=body.kind=='storyboard' and body.input.get('film_bible')
+    if not film_bible_storyboard:
+        body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
     job_admission.lock(c)
     owner,actor=job_admission.scope(c,pid,entrypoint)
@@ -1306,6 +1309,10 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     if not target:
         from .object_job_candidates import freeze
         target=freeze(c,pid,body,object_state)
+    if film_bible_storyboard:
+        # object_job_candidates.freeze has now captured the canonical visual
+        # objects under their revisions and production visual binding guard.
+        body.input=freeze_prompt_contract(body.kind,body.input)
     old=c.execute('''SELECT * FROM jobs WHERE workspace_id=%s AND actor_user_id=%s
         AND submission_namespace=%s AND submission_id=%s''',
         (owner['workspace_id'],actor.user_id,entrypoint,body.submission_id)).fetchone()

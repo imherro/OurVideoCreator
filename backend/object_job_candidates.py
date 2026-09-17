@@ -1,4 +1,5 @@
 """Frozen targets for existing canvas, shot, visual and voice generation paths."""
+from copy import deepcopy
 import json
 import time
 from fastapi import HTTPException
@@ -61,6 +62,10 @@ def dependencies(state,target,mode,body):
         for row in rows:
             if row['kind']=='shot':
                 selected.add(row['id']);prior_nodes|=node_ids('shot',object_content(row))
+            elif row['kind']=='visual_card':
+                # The first pass may reuse any production-wide visual identity,
+                # not only cards already bound in this Episode.
+                selected.add(row['id'])
         affected={e['target'] for e in structure['edges'] if e['source'] in prior_nodes}
         for row in rows:
             owned_nodes=node_ids(row['kind'],object_content(row))
@@ -146,11 +151,32 @@ def freeze(c,pid,body,state=None):
     prior={r['id']:r for r in snapshot['objects']}
     locked={oid:collab.load(c,pid,oid,write=True) for oid in sorted(selected)}
     for oid,row in locked.items():collab.expected(row,prior[oid]['revision'],prior[oid]['assignment_epoch'])
+    visual_catalog_objects=None
+    if mode=='storyboard':
+        # Follow collaboration.commands lock order: object rows first, then the
+        # production visual binding guard. Re-read the identity set so a card
+        # created between the initial projection and row locks cannot be missed.
+        c.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
+                  ('visual-bindings:'+scope['production_id'],))
+        visual_catalog_objects=sorted(row['id'] for row in c.execute(
+            "SELECT id FROM collaboration_objects WHERE production_id=%s AND kind='visual_card' AND NOT deleted",
+            (scope['production_id'],)))
+        expected_catalog=sorted(r['id'] for r in snapshot['objects'] if r['kind']=='visual_card')
+        if visual_catalog_objects!=expected_catalog:
+            raise HTTPException(409,'作品视觉资产在生成准备期间已变化，请重新提交')
+        visual=deepcopy(((snapshot['document'].get('filmBible') or {}).get('visual') or {'cards':{},'versions':{}}))
+        body.input={**body.input,'storyboard_visual_context':{
+            'version':'production-visual-reuse/v1',
+            'production_id':scope['production_id'],
+            'production_revision':production['revision'],
+            'visual':visual,
+        }}
     target=locked[target['id']];collab.editable(c,target)
     validate_audio(list(locked.values()),target,mode,body)
     binding={'target':ref(target),'mode':mode,'references':[ref(r) for oid,r in locked.items() if oid!=target['id']],
              'script_reference':script_ref,'project_revision':project['revision'],'production_revision':production['revision']}
     if mode=='storyboard':binding['replacement_shots']=sorted(r['id'] for r in snapshot['objects'] if r['kind']=='shot')
+    if mode=='storyboard':binding['visual_catalog_objects']=visual_catalog_objects
     return binding
 
 
@@ -173,6 +199,9 @@ def adopt(c,job,body):
     if mode=='export':raise HTTPException(422,'导出仅登记素材，无需写回创作对象')
     if mode=='storyboard' and 'replacement_shots' not in binding:
         raise HTTPException(410,'旧分镜候选没有完整镜头版本快照，请重新生成')
+    if mode=='storyboard' and ('visual_catalog_objects' not in binding or
+            not (job['input'].get('storyboard_visual_context') or {}).get('version')):
+        raise HTTPException(410,'旧分镜候选没有完整视觉目录快照，请重新生成')
     production=c.execute('SELECT revision FROM productions WHERE id=%s FOR SHARE',(job['production_id'],)).fetchone()
     project=c.execute('SELECT revision FROM projects WHERE id=%s FOR SHARE',(pid,)).fetchone()
     if production['revision']!=binding['production_revision'] or project['revision']!=binding['project_revision']:
@@ -184,6 +213,14 @@ def adopt(c,job,body):
     refs={r['id']:r for r in binding.get('references',[])}
     locked={oid:collab.load(c,pid,oid,write=True) for oid in sorted({target['id'],*refs})}
     for oid,r in refs.items():collab.expected(locked[oid],r['revision'],r['assignment_epoch'])
+    if mode=='storyboard':
+        c.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
+                  ('visual-bindings:'+job['production_id'],))
+        current_visual_ids=sorted(item['id'] for item in c.execute(
+            "SELECT id FROM collaboration_objects WHERE production_id=%s AND kind='visual_card' AND NOT deleted",
+            (job['production_id'],)))
+        if current_visual_ids!=binding['visual_catalog_objects']:
+            raise HTTPException(409,'作品视觉资产集合已变化，请重新生成分镜候选')
     row=locked[target['id']];collab.editable(c,row);collab.expected(row,body.expected_revision,body.assignment_epoch)
     if not body.accept_stale and (body.expected_revision!=target['revision'] or body.assignment_epoch!=target['assignment_epoch']):
         raise HTTPException(409,'目标已变化，请比较候选后明确采纳旧结果')

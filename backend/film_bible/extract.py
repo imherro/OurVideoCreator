@@ -1,6 +1,7 @@
 import json
 from .models import VISUAL_BIBLE_SCHEMA,BOUND_STORYBOARD_SCHEMA,VISUAL_EXTRACTOR_PROMPT,STORYBOARD_DIRECTOR_PROMPT
-from .validate import normalize_visual_bible,normalize_bound_storyboard
+from .reuse import normalize_reusable_visual,visual_user_prompt
+from .validate import normalize_bound_storyboard
 
 def _json(text,label):
     value=text.strip()
@@ -24,23 +25,24 @@ def _contract(contracts, stage_id, system_prompt, response_schema):
     return stage.get('system_prompt') or system_prompt,stage.get('response_schema') or response_schema
 
 
-def extract_storyboard(script,target_duration,provider_id,model_id,request,contracts=None,report=None):
+def extract_storyboard(script,target_duration,provider_id,model_id,request,contracts=None,report=None,existing_visual=None):
     """One user action, two internal text passes. No media provider is called."""
     visual_system,visual_schema=_contract(contracts,'visual_bible',VISUAL_EXTRACTOR_PROMPT,VISUAL_BIBLE_SCHEMA)
     storyboard_system,storyboard_schema=_contract(contracts,'bound_storyboard',STORYBOARD_DIRECTOR_PROMPT,BOUND_STORYBOARD_SCHEMA)
-    visual_text=request(visual_system,script,visual_schema,'提取视觉圣经','visual_bible')
+    visual_user=visual_user_prompt(script,existing_visual)
+    visual_text=request(visual_system,visual_user,visual_schema,'提取视觉圣经','visual_bible')
     try:
-        bible,key_ids=normalize_visual_bible(_visual(_json(visual_text,'视觉圣经')),provider_id,model_id);visual_repair_count=0
+        bible,key_ids=normalize_reusable_visual(_visual(_json(visual_text,'视觉圣经')),existing_visual,provider_id,model_id);visual_repair_count=0
         if report:report('visual_bible','validated')
     except (ValueError,TypeError) as exc:
         if report:report('visual_bible','needs_repair',str(exc))
-        repair=script+'\n\n上次视觉圣经未通过校验：'+str(exc)+'\n请修正并输出完整 JSON。上次结果：\n'+visual_text[:24000]
+        repair=visual_user+'\n\n上次视觉圣经未通过校验：'+str(exc)+'\n请修正并输出完整 JSON。上次结果：\n'+visual_text[:24000]
         visual_text=request(visual_system,repair,visual_schema,'修正视觉圣经','visual_bible_repair')
         try:
-            bible,key_ids=normalize_visual_bible(_visual(_json(visual_text,'视觉圣经')),provider_id,model_id);visual_repair_count=1
+            bible,key_ids=normalize_reusable_visual(_visual(_json(visual_text,'视觉圣经')),existing_visual,provider_id,model_id);visual_repair_count=1
             if report:report('visual_bible_repair','validated')
         except (ValueError,TypeError) as final:raise ValueError('视觉圣经修正后仍不符合要求：'+str(final)) from final
-    allowed=[{'key':key,'kind':bible['cards'][card_id]['kind'],'name':bible['cards'][card_id]['name'],'spec':bible['versions'][version_id]['spec']} for key,(card_id,version_id) in key_ids.items()]
+    allowed=[{'key':key,'kind':bible['cards'][card_id]['kind'],'name':bible['cards'][card_id]['name'],'spec':bible['versions'][version_id]['spec'],'invariants':bible['versions'][version_id]['invariants']} for key,(card_id,version_id) in key_ids.items()]
     duration=f'\n镜头总时长必须为 {target_duration} 秒，误差不超过 0.5 秒。' if target_duration else ''
     user='剧本：\n'+script+'\n\n只允许引用以下视觉卡：\n'+json.dumps(allowed,ensure_ascii=False)+duration
     text=request(storyboard_system,user,storyboard_schema,'基于视觉圣经拆解分镜','bound_storyboard')

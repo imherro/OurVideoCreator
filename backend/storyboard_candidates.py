@@ -21,9 +21,24 @@ def incoming(job):
     return result
 
 
+def prepared(state,result):
+    """Remap candidate identities against the latest locked shared visual set."""
+    from .film_bible.reuse import merge_candidate_visual
+    existing=((state['document'].get('filmBible') or {}).get('visual') or {'cards':{},'versions':{}})
+    candidate=((result.get('filmBible') or {}).get('visual') or {})
+    try:
+        visual,shots=merge_candidate_visual(existing,candidate,result['shots'])
+    except (ValueError,TypeError) as error:
+        raise HTTPException(422,str(error)) from error
+    value=deepcopy(result);value['shots']=shots
+    if candidate:
+        value['filmBible']={**(value.get('filmBible') or {}),'visual':visual}
+    return value
+
+
 def impact(c,job):
     """Read-only comparison details; authoritative writes recheck frozen rows."""
-    state=read_project_state(c,job['project_id']);result=incoming(job)
+    state=read_project_state(c,job['project_id']);result=prepared(state,incoming(job))
     ids={shot['id'] for shot in result['shots']}
     rows=[r for r in state['objects'] if r['kind']=='shot']
     removed=[r for r in rows if object_content(r)['shot']['id'] not in ids]
@@ -66,6 +81,7 @@ def new_node(kind,shot,document,models):
 def adopt(c,job,body,locked,target):
     pid=job['project_id'];binding=job['collaboration'];result=incoming(job)
     state=read_project_state(c,pid)
+    result=prepared(state,result)
     old_rows=[r for r in state['objects'] if r['kind']=='shot']
     if sorted(r['id'] for r in old_rows)!=binding['replacement_shots']:
         raise HTTPException(409,'本集镜头集合已变化，请重新生成分镜候选')
