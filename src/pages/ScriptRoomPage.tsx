@@ -7,7 +7,7 @@ import type {OwnedContentDrafts} from '../ownedContentDrafts';
 type Value = Record<string, any>;
 
 export function ScriptRoomPage({
-  productionId, currentEpisodeNo, providers, defaultTarget, refreshKey = 0, request, notify, report, onChanged, onSelectEpisode, onEnterEpisode,
+  productionId, currentEpisodeNo, onFocusEpisode, providers, defaultTarget, refreshKey = 0, request, notify, report, onChanged, onSelectEpisode, onEnterEpisode,
   store,actorId,canManage,canEdit,onAddEpisode,
 }: {
   productionId: string; currentEpisodeNo: number; providers: Value[]; defaultTarget?: Value; refreshKey?: number;
@@ -15,6 +15,7 @@ export function ScriptRoomPage({
   request: (path: string, options?: RequestInit) => Promise<any>;
   notify: (message: string) => void; report: (error: unknown) => void;
   onChanged: (projectId?: string) => void | Promise<void>;
+  onFocusEpisode: (episodeNo:number)=>void;
   onSelectEpisode: (episodeNo: number) => void | Promise<void>;
   onEnterEpisode: (episodeNo: number) => void | Promise<void>;
   onAddEpisode?:()=>void;
@@ -62,7 +63,7 @@ export function ScriptRoomPage({
     activeRef.current=episodeNo;setActive(episodeNo);
     const value=await request(`/productions/${productionId}/episode-scripts/${episodeNo}`);
     if(selected!==selection.current||!store.matches(productionId,generation))return;
-    store.receive(String(episodeNo),value,productionId,generation);redraw();
+    store.receive(String(episodeNo),value,productionId,generation);onFocusEpisode(episodeNo);redraw();
   }
   useEffect(()=>{store.open(productionId);setItems([]);setSelected(new Set());
     return()=>{listSequence.current++;selection.current++;};},[productionId,store]);

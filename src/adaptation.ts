@@ -51,6 +51,25 @@ export function createEpisodePlans(count: number, targetDuration: number, previo
   });
 }
 
+export function appendEpisodeForChapter(previous: EpisodePlan[], targetDuration: number, chapterId = "") {
+  const plans = createEpisodePlans(previous.length + 1, targetDuration, previous);
+  if (chapterId) plans[plans.length - 1] = { ...plans[plans.length - 1], sourceChapterRefs: [chapterId] };
+  return plans;
+}
+
+// A production-scoped planning focus may point at a plan whose Episode project
+// has not been created yet.  Prefer that focus; otherwise lead the user to the
+// first unfinished and unprotected plan instead of silently returning to EP01.
+export function resolvePlanningEpisode(
+  plans: Pick<EpisodePlan, "episodeNo" | "status">[],
+  preferred?: number,
+  protectedEpisodeNos: number[] = [],
+) {
+  if (preferred && plans.some((plan) => plan.episodeNo === preferred)) return preferred;
+  return plans.find((plan) => plan.status !== "approved" && !protectedEpisodeNos.includes(plan.episodeNo))?.episodeNo
+    || plans[0]?.episodeNo || 0;
+}
+
 export function normalizeEpisodeSelection(values: Iterable<number>, episodeCount: number) {
   return [...new Set(values)]
     .filter((value) => Number.isInteger(value) && value >= 1 && value <= episodeCount)

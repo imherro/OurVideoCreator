@@ -675,8 +675,9 @@ function Studio() {
 function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }) {
   const sourceDrafts=useRef(new OwnedContentDrafts('chapter'));
   const scriptDrafts=useRef(new OwnedContentDrafts('script'));
-  const ownedUnsaved=()=>sourceDrafts.current.unsaved||scriptDrafts.current.unsaved;
-  function requireOwnedSaved(){if(ownedUnsaved())throw new Error('原著或剧本仍有未保存草稿；请回到对应页面保存、比较或明确放弃后再切换作品/分集。');}
+  const adaptationDirty=useRef(false);
+  const ownedUnsaved=()=>sourceDrafts.current.unsaved||scriptDrafts.current.unsaved||adaptationDirty.current;
+  function requireOwnedSaved(){if(ownedUnsaved())throw new Error('原著、改编或剧本仍有未保存草稿；请回到对应页面保存、比较或明确放弃后再切换作品/分集。');}
   useEffect(()=>{
     const guard=(event:BeforeUnloadEvent)=>{if(ownedUnsaved()){event.preventDefault();event.returnValue='';}};
     window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
@@ -707,6 +708,9 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     (workspace: Any) => workspace.id === activeWorkspaceId && workspace.role === "owner",
   );
   const [workflowStage, setWorkflowStage] = useState<WorkflowStage>(initialWorkflowStage);
+  // Production-scoped planning focus also represents plans whose Episode
+  // project has not been created yet, so adaptation and script stay aligned.
+  const [planningEpisodeFocus,setPlanningEpisodeFocus]=useState<Record<string,number>>({});
   const [selected, setSelected] = useState<string | null>(null),
     [view, setView] = useState(defaultViewForStage(initialWorkflowStage)),
     [panel, setPanel] = useState<string | null>(null),
@@ -774,6 +778,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     next: WorkflowStage,
     historyMode: "push" | "replace" | "none" = "push",
   ) {
+    if(next!==workflowStageRef.current&&workflowStageRef.current==='adaptation'&&adaptationDirty.current){
+      setNotice('改编策划仍有未保存修改；请先保存，或在改编页点“刷新”明确放弃后再切换阶段。');
+      if(historyMode==='none')window.history.replaceState(null,"",workflowStageUrl(window.location.href,workflowStageRef.current));
+      return;
+    }
     if(next!==workflowStageRef.current&&ownedUnsaved())setNotice('原著/剧本草稿已保留在当前作品；返回对应页面后可以继续保存或比较。');
     workflowStageRef.current = next;
     setWorkflowStage(next);
@@ -904,7 +913,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     // Update the imperative snapshot before scheduling React state changes.
     // This prevents an autosave tick from pairing the new project id with the
     // previous project's document while the project switch is being rendered.
+    const previousProject=current.current.project;
     current.current = { project: openedProject, doc: projectedDocument };
+    if(previousProject?.production_id===p.production_id&&previousProject.id!==p.id){
+      setPlanningEpisodeFocus(known=>known[p.production_id]===p.episode_no?known:{...known,[p.production_id]:p.episode_no});
+    }
     nodeMeasurements.current.clear();
     setLayoutVersion((value) => value + 1);
     setProject(openedProject);
@@ -2905,14 +2918,19 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "adaptation" ? (
           <AdaptationPage
+            key={project.production_id}
             productionId={project.production_id}
             projectId={project.id}
+            focusedEpisodeNo={planningEpisodeFocus[project.production_id]||project.episode_no}
+            onSelectEpisode={(episodeNo)=>setPlanningEpisodeFocus(known=>known[project.production_id]===episodeNo
+              ?known:{...known,[project.production_id]:episodeNo})}
             providers={config.models}
             defaultTarget={(doc as Any).generationPolicy?.text}
             refreshKey={workflowDataRevision.adaptation}
             request={api}
             notify={setNotice}
             report={report}
+            onDirtyChange={(value)=>{adaptationDirty.current=value;}}
             onOpenSource={() => activateWorkflowStage("source")}
             onRevision={(nextRevision) => {
               productionRevision.current = nextRevision;
@@ -2923,10 +2941,13 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         ) : workflowStage === "script" ? (
           <ScriptRoomPage
             onAddEpisode={()=>{const production=productions.find(item=>item.id===project.production_id);if(production)setEpisodeSetupProduction(production);}}
+            key={project.production_id}
             store={scriptDrafts.current} actorId={session.user.id}
             canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
-            currentEpisodeNo={project.episode_no}
+            currentEpisodeNo={planningEpisodeFocus[project.production_id]||project.episode_no}
+            onFocusEpisode={(episodeNo)=>setPlanningEpisodeFocus(known=>known[project.production_id]===episodeNo
+              ?known:{...known,[project.production_id]:episodeNo})}
             providers={config.models}
             defaultTarget={(doc as Any).generationPolicy?.text}
             refreshKey={workflowDataRevision.script}
@@ -2940,6 +2961,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             onSelectEpisode={async (episodeNo) => {
               const episode = currentEpisodes.find((item) => item.episode_no === episodeNo);
               if (episode && episode.id !== project.id) await openProject(episode.id);
+              setPlanningEpisodeFocus(known=>known[project.production_id]===episodeNo
+                ?known:{...known,[project.production_id]:episodeNo});
             }}
             onEnterEpisode={async (episodeNo) => {
               const hierarchy = await refreshProductionHierarchy();

@@ -419,3 +419,17 @@ Worker复用原文本候选通道，按单集Schema严格验证并保存episodeP
 实际验证：新专项 `tests/test_script_generation_continuity.py` **4 passed，18.88秒**；修正批量回归采纳顺序后，新专项加原失败用例 **5 passed，22.01秒**。最终真实隔离PostgreSQL联合 `test_script_generation_continuity.py test_p5_relation_candidates.py test_adaptation.py test_p6_admission.py test_direct_script_assist.py` **42 passed，174.74秒**，覆盖前集/Bible变化、通用入口伪造、依赖行锁、成片保护、任务准入、直接剧本与原候选回归。前端 `npm test` **272 passed / 0 failed / 0 skipped，1600.28ms**；`npm run build` exit0，Vite **7.03秒**，保留既有大chunk警告。
 
 本批无新增依赖、数据库迁移、后台页面或配置；未运行真实付费Provider、完整业务浏览器E2E或全量后端。测试使用模拟文本返回。整体同步仍未完成，后续继续核对原著/改编/剧本页面同步、视觉历史复用与恢复及其余冻结清单。
+
+## UPSTREAM-SYNC-27：原著章节分配与改编/剧本选集同步
+
+按冻结上游 `62d4b09` 与 `1cb7a94` 的业务意图适配，没有复制其单机页面状态。改编页新增作品内分集导航、原著章节分配索引、把未分配章节加入当前规划或建立下一集规划；新增规划只形成本地草稿，仍须通过原有 production revision 保存，不能直接建立 Episode、跳过审核或触发 AI。受成片保护的分集在导航中明确标识，加入当前集的快捷操作禁用，最终保护仍由服务端实施。
+
+改编与剧本页共用作品级私有选集焦点，包括尚未建立 Episode 的规划；保存后从改编切到剧本仍进入同一集。切换真实 Episode 时同步焦点，不把选集写成共享数据。无首选项时优先未批准且未受保护的规划，而不是总回到 EP01。
+
+协作草稿保护强于上游：后台刷新可以更新章节索引，但不能覆盖未保存策划；若服务器规划基线已变化则显示提示，只能保存并接受服务端版本检查，或点刷新明确确认放弃。改编草稿没有持久 Draft Store，因此未保存时阻止切换阶段、作品或分集，并纳入 beforeunload；保存后正常导航。刷新、保存、审核和生成的迟到响应均验证组件仍存活且仍属于同一作品，不能更新新页面的 revision、通知或继续第二段生成请求。原著页继续使用已有关系草稿和请求代际机制，没有换回上游较弱的页面布尔 dirty 状态。
+
+前端最终 `npm test`：**276 passed / 0 failed / 0 skipped，1661.55ms**。最终 `npm run build`：tsc/Vite exit0，Vite **7.07秒**，产物 `assets/index-BjNoHSE2.js`，保留既有大 chunk 警告。真实隔离 PostgreSQL 定向回归 `test_adaptation_scope.py test_adaptation.py test_source_library.py test_source_append.py`：**24 passed，78.79秒**；测试服务只使用任务自建数据库，没有操作验收数据。
+
+computer-use 隔离组件检查使用内存 Mock：初始焦点为 EP03；输入未保存核心前提后切剧本被阻止；模拟服务器规划变化后本地文字保持并显示远端更新提示；另一干净实例从未分配章节建立并保存 EP04，切到剧本室后仍为 EP04 且保留该章节引用。隔离页没有 API 代理、业务库或 Provider，不冒充登录后的完整业务 E2E；测试后已关闭页面与临时 Vite 服务。
+
+`git diff --check`通过。本批无新增运行依赖、数据库迁移、平台配置或后台页面；未调用真实付费 Provider，未运行全量后端。整体同步仍未完成，后续继续视觉历史复用/恢复、分集切换反馈和剩余冻结清单审计。

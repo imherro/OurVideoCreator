@@ -35,7 +35,7 @@ function App(){const [setup,setSetup]=useState(true),[active,setActive]=useState
  return <main><p role="status">{notice} · 起点：{mode} · 当前导航：{stage}</p><p id="assist-counter">辅助提交 0 次</p>
  {!setup&&<WorkflowStageNav active={stage} directCreation={mode==='direct'} onChange={setStage}/>}
  {setup?<ProjectSetupDialog providers={[]} localModels={[]} onCreate={async draft=>{setMode(draft.creationMode);setSetup(false)}}/>:
-  <ScriptRoomPage productionId="mock" currentEpisodeNo={active} providers={[{id:'mock-text',kind:'text',name:'隔离 Mock 文本模型'}]} defaultTarget={{model_id:'mock-text'}} store={store} actorId="me" canManage canEdit request={request}
+  <ScriptRoomPage productionId="mock" currentEpisodeNo={active} onFocusEpisode={setActive} providers={[{id:'mock-text',kind:'text',name:'隔离 Mock 文本模型'}]} defaultTarget={{model_id:'mock-text'}} store={store} actorId="me" canManage canEdit request={request}
    notify={setNotice} report={error=>setNotice(String(error))} onChanged={()=>{}} onSelectEpisode={setActive} onEnterEpisode={no=>setNotice('进入分镜规划 EP'+no)} onAddEpisode={()=>setAdding(true)}/>}
  {adding&&<EpisodeSetupDialog name="隔离作品" next={3} defaultMode={mode} onClose={()=>setAdding(false)}
    onCreate={async(title,nextMode)=>{setNotice(`新增请求：${title} · ${nextMode} · 不调用AI`);setAdding(false);}}/>}
