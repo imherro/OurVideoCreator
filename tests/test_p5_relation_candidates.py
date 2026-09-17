@@ -174,8 +174,15 @@ def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(t
 def test_two_candidates_same_revision_pg_waiters_only_one_adoption(team,monkeypatch):
     chapter=create_chapter(team)
     model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
-    jobs=[extraction(team,[chapter],model).json()['jobs'][0] for _ in range(2)]
-    for job in jobs:complete_without_network(monkeypatch,job,{'events':[EVENT]})
+    jobs=[]
+    # Generate sequentially without adopting: completed candidates may coexist
+    # at one revision, but a second active extraction is now rejected.
+    for _ in range(2):
+        response=extraction(team,[chapter],model)
+        assert response.status_code==200,response.text
+        job=response.json()['jobs'][0]
+        complete_without_network(monkeypatch,job,{'events':[EVENT]})
+        jobs.append(job)
     with ThreadPoolExecutor(max_workers=2) as pool:
         with s.db() as c:
             c.execute('SELECT id FROM source_chapters WHERE id=%s FOR UPDATE',(chapter['id'],))

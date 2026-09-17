@@ -34,6 +34,11 @@ export function SourceLibraryPage({
   const importing=useRef(false);
   const [loadedProduction,setLoadedProduction]=useState('');
   const ready=loadedProduction===productionId;
+  const [extracting,setExtracting]=useState<Set<string>>(new Set());
+  const [extractionReady,setExtractionReady]=useState(false);
+  const extractionSubmitting=useRef(false);
+  const extractionSnapshotEpoch=useRef(0);
+  const selectedExtractingCount=[...selected].filter(id=>extracting.has(id)).length;
   const textProviders = useMemo(
     () => providers.filter((provider) => !provider.kind || provider.kind === "text"),
     [providers],
@@ -67,6 +72,24 @@ export function SourceLibraryPage({
   useEffect(()=>{store.open(productionId);setSources([]);setLoadedProduction('');setChapterIds([]);setSelected(new Set());setDialog(null);
     return()=>{loadSequence.current++;};},[productionId,store]);
   useEffect(() => { void load().catch(report); }, [productionId, refreshKey]);
+  useEffect(()=>{
+    let disposed=false;
+    let polling=false;
+    setExtractionReady(false);setExtracting(new Set());
+    async function refresh(){
+      if(polling)return;
+      polling=true;
+      const epoch=extractionSnapshotEpoch.current;
+      try{
+        const result=await request(`/productions/${productionId}/source-extractions`);
+        if(!disposed&&epoch===extractionSnapshotEpoch.current){setExtracting(new Set(result.chapter_ids));setExtractionReady(true);}
+      }catch{if(!disposed&&epoch===extractionSnapshotEpoch.current)setExtractionReady(false);}
+      finally{polling=false;}
+    }
+    void refresh();
+    const timer=window.setInterval(()=>{void refresh();},5000);
+    return()=>{disposed=true;window.clearInterval(timer);};
+  },[productionId]);
   useEffect(() => {
     setProviderId(defaultProviderId);
   }, [productionId, projectId, defaultTarget?.model_id, defaultTarget?.model_id]);
@@ -183,21 +206,26 @@ export function SourceLibraryPage({
     } finally { setBusy(false); }
   }
   async function extract() {
-    if (!selected.size) return;
+    if (busy||!ready||!extractionReady||!canEdit||extractionSubmitting.current||!selected.size||selectedExtractingCount) return;
     if([...selected].some(id=>store.drafts.entries.get(id)?.state!=='saved'))throw new Error('请先保存所选章节，再提取事件');
     const provider = textProviders.find((item) => item.id === providerId);
     const modelId = provider?.id || "";
     if (!provider) throw new Error("请先为作品配置平台文本模型；系统不会自动选择其他付费模型");
     if (!modelId) throw new Error("请选择已发布的平台文本模型");
     if (!window.confirm(`将分析 ${selected.size} 个章节\n模型：${provider.name} / ${modelId}\n确认创建文本任务？`)) return;
+    extractionSubmitting.current=true;
+    const generation=store.generation,submittedIds=[...selected];
     setBusy(true);
     try {
       await request(`/productions/${productionId}/source-extractions`, { method: "POST", body: JSON.stringify({
-        project_id: projectId, chapter_ids: [...selected], model_id: modelId,
+        project_id: projectId, chapter_ids: submittedIds, model_id: modelId,
         submission_id: `source-${Date.now()}`,
       }) });
-      notify(`已创建 ${selected.size} 个事件提取任务，可在任务中心查看`);
-    } finally { setBusy(false); }
+      if(!store.matches(productionId,generation))return;
+      extractionSnapshotEpoch.current++;
+      setExtracting(known=>new Set([...known,...submittedIds]));
+      notify(`已创建 ${submittedIds.length} 个事件提取任务，可在任务中心查看`);
+    } finally { extractionSubmitting.current=false;setBusy(false); }
   }
 
   const visible = chapters.filter((item) => !query || item.title.includes(query) || item.content.includes(query));
@@ -235,7 +263,8 @@ export function SourceLibraryPage({
         <h3>AI 事件提取</h3><p>作品级分析 · 已选 {selected.size} 章。任务失败时保留已有事件。</p>
         <label>文本模型<select value={providerId} onChange={(event) => setProviderId(event.target.value)}><option value="" disabled>请选择平台模型</option>{textProviders.map((provider) => <option key={provider.id} value={provider.id}>外部 API · {provider.name}</option>)}</select></label>
         {!textProviders.length&&<p className="error">暂无可用平台文本模型，请联系管理员。</p>}
-        <button disabled={busy || !selected.size} onClick={() => run(extract)}><Sparkles size={15}/>提取所选章节事件</button>
+        {!extractionReady&&<p>正在确认章节任务状态，暂不可重复提交。</p>}
+        <button disabled={busy || !ready || !extractionReady || !canEdit || !selected.size || selectedExtractingCount>0} onClick={() => run(extract)}><Sparkles size={15}/>{selectedExtractingCount?`正在提取（${selectedExtractingCount} 章）`:'提取所选章节事件'}</button>
       </aside>
     </div>
     {dialog && <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="source-create-title"><div className="source-create-dialog">

@@ -1317,6 +1317,11 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if old['input_hash']!=job_admission.fingerprint(pid,body,target,original):
             raise HTTPException(409,'同一提交标识不能对应不同输入、对象版本或分配')
         return s.unpack(old)
+    if body.input.get('source_event_extraction') is not None:
+        active=c.execute("""SELECT id FROM jobs WHERE production_id=%s AND node_id=%s
+            AND kind='text' AND status IN ('queued','running') LIMIT 1""",
+            (owner['production_id'],body.node_id)).fetchone()
+        if active:raise HTTPException(409,'所选章节已有事件提取任务排队或运行中，请等待完成或取消后再提交')
     if body.input.get('episode_script_generation') is not None:
         active=c.execute("SELECT id FROM jobs WHERE project_id=%s AND node_id=%s AND status IN ('queued','running') LIMIT 1",
                          (pid,body.node_id)).fetchone()
@@ -1820,6 +1825,21 @@ def source_events(production_id:str,chapter_id:str|None=None):
         item['continuity']=json.loads(item['continuity'])
         result.append(item)
     return result
+
+@app.get('/api/productions/{production_id}/source-extractions')
+def active_source_extractions(production_id:str):
+    with s.db() as c:
+        from .owned_content import production_scope
+        production_scope(c,production_id)
+        rows=c.execute("""SELECT DISTINCT sc.id FROM jobs j JOIN source_chapters sc
+            ON j.node_id='source-chapter:' || sc.id
+            JOIN source_documents d ON d.id=sc.source_id
+            WHERE j.production_id=%s AND d.production_id=%s AND j.kind='text'
+            AND j.status IN ('queued','running')
+            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='source' AND x.item_id=d.id)
+            AND NOT EXISTS(SELECT 1 FROM deleted_items x WHERE x.kind='chapter' AND x.item_id=sc.id)
+            ORDER BY sc.id""",(production_id,production_id)).fetchall()
+    return {'chapter_ids':[row['id'] for row in rows]}
 
 @app.post('/api/productions/{production_id}/source-extractions')
 def extract_source_events(production_id:str,body:SourceExtractionCreate):

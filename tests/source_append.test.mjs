@@ -24,3 +24,14 @@ test('source import captures target before file selection and checks generation 
   assert.match(action,/if\(importing.current\)return/);
   assert.doesNotMatch(action,/store.save|persistChapter/);
 });
+
+test('source extraction waits for production activity and ignores pre-submission snapshots',()=>{
+  const source=readFileSync(new URL('../src/pages/SourceLibraryPage.tsx',import.meta.url),'utf8');
+  assert.match(source,/productionId\}\/source-extractions/);
+  assert.match(source,/epoch===extractionSnapshotEpoch.current/);
+  assert.match(source,/extractionSnapshotEpoch.current\+\+/);
+  assert.match(source,/if\(polling\)return/);
+  assert.match(source,/disposed=true;window.clearInterval\(timer\)/);
+  assert.match(source,/selectedExtractingCount>0/);
+  assert.match(source,/正在提取/);
+});

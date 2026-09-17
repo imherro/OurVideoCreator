@@ -51,6 +51,50 @@ def test_append_import_preserves_existing_source_and_chapters(source_client):
         json={'title':'错作品','content':'正文'}).status_code==404
 
 
+def test_source_extraction_rejects_new_submission_while_active_across_episodes(source_client):
+    client=source_client
+    production,episode=new_production(client);base=f'/api/productions/{production["id"]}'
+    source=client.post(base+'/sources/import',json={'title':'原著','content':'第一章\n原文'}).json()
+    chapter=client.get(base+'/chapters').json()[0]
+    body={'project_id':episode['id'],'chapter_ids':[chapter['id']],'model_id':'p1-test-openai',
+          'submission_id':'source-active-first'}
+    first=client.post(base+'/source-extractions',json=body)
+    assert first.status_code==200,first.text
+    assert client.post(base+'/source-extractions',json=body).json()['jobs'][0]['id']==first.json()['jobs'][0]['id']
+    second=client.post(base+'/episodes',json={'title':'第二集'}).json()
+    response=client.post(base+'/source-extractions',json={**body,'project_id':second['id'],'submission_id':'source-active-second'})
+    assert response.status_code==409,response.text
+    assert client.get(base+'/source-extractions').json()['chapter_ids']==[chapter['id']]
+    job=first.json()['jobs'][0]
+    assert client.post('/api/jobs/'+job['id']+'/cancel').status_code==200
+    assert client.get(base+'/source-extractions').json()['chapter_ids']==[]
+    assert client.post(base+'/source-extractions',json={**body,'submission_id':'source-after-cancel'}).status_code==200
+    # Generic job entrypoint must not bypass the same production-level guard.
+    generic=client.post(f'/api/projects/{second["id"]}/jobs',json={
+        'node_id':job['node_id'],'kind':'text','submission_id':'source-generic-duplicate','input':job['input']})
+    assert generic.status_code==409,generic.text
+    fresh=client.post(base+f'/sources/{source["id"]}/chapters',json={'title':'new','content':'new'}).json()
+    mixed=client.post(base+'/source-extractions',json={**body,'chapter_ids':[fresh['id'],chapter['id']],
+        'submission_id':'source-mixed-conflict'})
+    assert mixed.status_code==409,mixed.text
+    assert client.get(base+'/source-extractions').json()['chapter_ids']==[chapter['id']]
+
+
+def test_source_extraction_concurrent_submissions_admit_only_one(source_client):
+    from concurrent.futures import ThreadPoolExecutor
+    client=source_client
+    production,episode=new_production(client);base=f'/api/productions/{production["id"]}'
+    client.post(base+'/sources/import',json={'title':'原著','content':'第一章\n原文'})
+    chapter=client.get(base+'/chapters').json()[0]
+    body={'project_id':episode['id'],'chapter_ids':[chapter['id']],'model_id':'p1-test-openai'}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        requests=[pool.submit(client.post,base+'/source-extractions',json={**body,'submission_id':'concurrent-'+str(i)}) for i in range(2)]
+        results=[r.result(20) for r in requests]
+    assert sorted(r.status_code for r in results)==[200,409]
+    with s.db() as c:
+        assert c.execute('SELECT COUNT(*) n FROM jobs WHERE production_id=%s',(production['id'],)).fetchone()['n']==1
+
+
 def test_chapter_split_accepts_markdown_and_chinese_headings():
     assert split_chapters("# 第一幕\n雨夜。\n## 第二幕\n天亮。") == [
         ("第一幕", "雨夜。"),

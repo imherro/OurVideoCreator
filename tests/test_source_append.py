@@ -48,3 +48,10 @@ def test_append_rejects_trashed_source(team):
     assert team['admin'].request('DELETE',path,json={'versions':{}}).status_code==200
     assert team['admin'].post(path+'/chapters/import',json={'title':'追加','content':'正文'}).status_code==404
     assert team['admin'].get(root+'/chapters').json()==[]
+
+
+def test_source_activity_read_is_production_scoped(team):
+    assert team['viewer'].get(base(team)+'/source-extractions').json()=={'chapter_ids':[]}
+    foreign=team['admin'].post('/api/productions',json={'name':'private'}).json()
+    denied=team['viewer'].get('/api/productions/'+foreign['id']+'/source-extractions')
+    assert denied.status_code in (403,404)
