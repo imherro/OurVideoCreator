@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   WORKFLOW_STAGES,
+  primaryWorkflowStages,
   defaultViewForStage,
   parseWorkflowStage,
   workflowStageScope,
@@ -26,6 +27,17 @@ test('workflow shell exposes the production stages in order',()=>{
   assert.deepEqual(WORKFLOW_STAGES.map(stage=>stage.label),[
     '概览','原著','改编策划','剧本','分镜规划','塑角造景','分镜图','视频','剪辑','高级画布',
   ]);
+});
+
+test('direct creation keeps adaptation optional without deleting routes or bypassing review',()=>{
+  assert.deepEqual(primaryWorkflowStages(true).map(stage=>stage.id),['overview','script','storyboard','art','images','video','editor','canvas']);
+  assert.deepEqual(primaryWorkflowStages(false),WORKFLOW_STAGES);
+  assert.equal(parseWorkflowStage('?stage=source'),'source');
+  assert.equal(parseWorkflowStage('?stage=adaptation'),'adaptation');
+  const nav=readFileSync(new URL('../src/app/WorkflowStageNav.tsx',import.meta.url),'utf8');
+  assert.match(nav,/原著改编（可选）/);
+  assert.match(nav,/<option value="source">原著资料/);
+  assert.match(nav,/<option value="adaptation">改编策划/);
 });
 
 test('workflow stage URL survives refresh and rejects unknown stages',()=>{

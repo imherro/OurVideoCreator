@@ -2715,6 +2715,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           <ChevronDown size={14} />
         </button>
         <WorkflowStageNav
+          directCreation={(doc as Any).creationMode==='direct'}
           active={workflowStage}
           onChange={activateWorkflowStage}
           states={Object.fromEntries(Object.entries(workflowGuide.stages).map(([stage, guide]: any) => [stage, guide.state]))}

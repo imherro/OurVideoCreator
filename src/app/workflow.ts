@@ -12,6 +12,9 @@ export const WORKFLOW_STAGES = [
 ] as const;
 
 export type WorkflowStage = (typeof WORKFLOW_STAGES)[number]["id"];
+export function primaryWorkflowStages(directCreation=false){
+  return WORKFLOW_STAGES.filter(stage=>!directCreation || (stage.id!=='source'&&stage.id!=='adaptation'));
+}
 export type WorkflowScope = "production" | "episode";
 
 const productionStages = new Set<WorkflowStage>(["overview", "source", "adaptation", "script"]);
