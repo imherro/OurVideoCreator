@@ -14,6 +14,7 @@ export type ProjectBibleFields = {
 };
 
 export type ProjectSetupDraft = {
+  creationMode: 'direct'|'adaptation';
   name: string;
   episodeTitle: string;
   style: string;
@@ -43,6 +44,7 @@ export function defaultGenerationPolicy(providers: Value[]): GenerationPolicy {
 
 export function defaultProjectSetupDraft(providers: Value[]): ProjectSetupDraft {
   return {
+    creationMode:'direct',
     name: "",
     episodeTitle: "第 01 集",
     style: "电影写实",
@@ -71,6 +73,7 @@ export function defaultProjectSetupDraft(providers: Value[]): ProjectSetupDraft 
 
 export function validateProjectSetupDraft(draft: ProjectSetupDraft): string[] {
   const errors: string[] = [];
+  if(!['direct','adaptation'].includes(draft.creationMode))errors.push('请选择有效创作起点');
   if (!draft.name.trim()) errors.push("请输入作品名称");
   if (draft.name.trim().length > 100) errors.push("作品名称最多 100 个字符");
   if (draft.episodeTitle.trim().length > 100) errors.push("EP01 标题最多 100 个字符");
@@ -97,6 +100,7 @@ function compactObject(value: Value): Value {
 export function projectSetupPayload(draft: ProjectSetupDraft) {
   const avoidItems = draft.bible.avoidItems.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
   return {
+    creation_mode:draft.creationMode,
     name: draft.name.trim(),
     episode_title: draft.episodeTitle.trim() || "第 01 集",
     style: draft.style.trim(),

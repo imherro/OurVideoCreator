@@ -223,6 +223,8 @@ def adopt(pid:str,jid:str,body:Adopt):
             value={**validate_script(job['result']['script']),'sourceChapterRefs':plan['sourceChapterRefs'],
                 'storyGoal':plan['coreConflict'],'paywallBeat':{'role':plan['paywallRole'],'hook':plan['hook'],'cliffhanger':plan['cliffhanger']}}
             save_script_row(c,row,value,status='draft',generation_job_id=jid,actor_id=identity.current().user_id)
+            metadata={**json.loads(row['metadata']),'origin':'adaptation','adaptationLinked':True}
+            c.execute('UPDATE episode_scripts SET metadata=%s WHERE project_id=%s',(s.dumps(metadata),row['id']))
             latest=owned.load(c,job['production_id'],'script',row['id'])
             owned.notify(c,latest,'candidate.adopt');result=owned.public(latest)
         elif kind=='adaptation':

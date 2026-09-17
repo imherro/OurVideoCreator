@@ -71,6 +71,7 @@ export function ScriptRoomPage({
   }
   const item = items.find((value) => value.episodeNo === active);
   const plan = item?.plan;
+  const displayedStatus=(value:Value)=>store.value(String(value.episodeNo))?.status||value.script?.status||value.plan?.status||'draft';
   function patch(value: Value) { if(editable){store.patch(String(active),value);redraw();} }
 
   async function save() {
@@ -93,7 +94,7 @@ export function ScriptRoomPage({
   }
   async function generate(episodeNos: number[]) {
     if(store.unsaved)throw new Error('请先保存或处理剧本草稿，再生成');
-    const normalized = normalizeEpisodeSelection(episodeNos, items.length);
+    const normalized = normalizeEpisodeSelection(episodeNos, Math.max(0,...items.map(item=>item.episodeNo)));
     if (!normalized.length) return;
     const provider = configuredDefaultProvider;
     if (!provider) throw new Error("项目默认平台文本模型 尚未配置，请到作品设置中选择");
@@ -110,37 +111,37 @@ export function ScriptRoomPage({
   }
 
   return <section className="script-room-page workflow-domain-page">
-    <header className="domain-header"><div><span className="eyebrow">SCRIPT ROOM</span><h1>剧本室</h1><p>逐集剧本是正式数据；画布草稿设为正式剧本后，会在这里统一修订并同步回画布。</p></div><div className="settings-actions">
+    <header className="domain-header"><div><span className="eyebrow">SCRIPT ROOM</span><h1>剧本室</h1><p>直接编写或粘贴本集剧本；正式正文与画布共用一份，保存后仍需审核批准。</p></div><div className="settings-actions">
       <button disabled={busy} onClick={() => run(() => loadList(active))}><RefreshCw size={15} />刷新</button>
       <button disabled={busy || !editable || entry?.state==='conflict'} onClick={() => run(save)}><Save size={15} />保存草稿</button>
-      <button disabled={busy || !editable || entry?.state!=='saved'} onClick={() => run(() => transition("review"))}>提交审核</button>
+      <button disabled={busy || !editable || entry?.state!=='saved'||!draft?.body?.trim()} onClick={() => run(() => transition("review"))}>提交审核</button>
       <button className="primary" disabled={busy || !canManage || entry?.state!=='saved' || draft?.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
     </div></header>
     <div className="script-room-layout">
       <aside className="script-episode-list"><header><b>分集</b><small>勾选后批量生成</small></header>{items.map((value) => <div className={active === value.episodeNo ? "active" : ""} key={value.episodeNo}>
-        <input type="checkbox" checked={selected.has(value.episodeNo)} onChange={(e) => setSelected((current) => { const next = new Set(current); e.target.checked ? next.add(value.episodeNo) : next.delete(value.episodeNo); return next; })} />
-        <button onClick={() => run(async () => { await onSelectEpisode(value.episodeNo); await selectEpisode(value.episodeNo); })}><b>EP{String(value.episodeNo).padStart(2, "0")}</b><span>{value.episodeTitle}</span><small className={value.script?.status || value.plan.status}>{STATUS_LABELS[value.script?.status || value.plan.status]}</small></button>
+        <input type="checkbox" disabled={value.plan?.status!=='approved'} checked={selected.has(value.episodeNo)} onChange={(e) => setSelected((current) => { const next = new Set(current); e.target.checked ? next.add(value.episodeNo) : next.delete(value.episodeNo); return next; })} />
+        <button onClick={() => run(async () => { await onSelectEpisode(value.episodeNo); await selectEpisode(value.episodeNo); })}><b>EP{String(value.episodeNo).padStart(2, "0")}</b><span>{value.episodeTitle}</span><small className={displayedStatus(value)}>{STATUS_LABELS[displayedStatus(value)]}</small></button>
       </div>)}</aside>
-      <main>{draft && plan ? <>
+      <main>{draft ? <>
         <OwnedContentPanel key={`${productionId}:${active}`} store={store} id={String(active)} actorId={actorId}
           canManage={canManage} canEdit={canEdit} request={request} onChange={redraw} onSave={save}/>
         {draft.metadata?.origin === "canvas" && <div className="notice"><b>来自画布快速创作</b><span>这里保存的是同一份正式剧本；修改后画布投影会同步更新。</span></div>}
-        <div className="script-summary-strip"><span className={`workflow-status ${draft.status}`}>{STATUS_LABELS[draft.status]}</span><span>目标 {plan.targetDuration} 秒</span><span>{plan.paywallRole}</span><span>{draft.project_id ? "已建立 Episode" : "首次保存或生成时建立 Episode"}</span></div>
+        <div className="script-summary-strip"><span className={`workflow-status ${draft.status}`}>{STATUS_LABELS[draft.status]}</span><span>目标 {draft.estimatedDuration} 秒</span><span>{plan?.paywallRole || ''}</span><span>{draft.project_id ? "已建立 Episode" : "首次保存或生成时建立 Episode"}</span></div>
+        <article className="domain-card script-body-card"><h2>剧本正文</h2><textarea aria-label="剧本正文" disabled={!editable} value={draft.body} onChange={(e) => patch({ body: e.target.value })} placeholder="直接编写或粘贴：场景标题、可见动作和对白…" /></article>
         <fieldset className="owned-content-fields" disabled={!editable}><article className="domain-card"><div className="domain-fields">
           <label>标题<input value={draft.title} onChange={(e) => patch({ title: e.target.value })} /></label>
           <label>预计时长（秒）<input type="number" value={draft.estimatedDuration} onChange={(e) => patch({ estimatedDuration: Number(e.target.value) })} /></label>
           <label>本集概要<textarea value={draft.synopsis} onChange={(e) => patch({ synopsis: e.target.value })} /></label>
           <label>剧情目标<textarea value={draft.storyGoal} onChange={(e) => patch({ storyGoal: e.target.value })} /></label>
         </div><fieldset className="chapter-reference-field"><legend>原著来源</legend>{chapters.map((chapter) => <label className="check-label" key={chapter.id}><input type="checkbox" checked={draft.sourceChapterRefs.includes(chapter.id)} onChange={(e) => patch({ sourceChapterRefs: e.target.checked ? [...draft.sourceChapterRefs, chapter.id] : draft.sourceChapterRefs.filter((id: string) => id !== chapter.id) })} />{chapter.display_no ?? chapter.chapter_no}. {chapter.title}</label>)}</fieldset>
-        <div className="plan-evidence"><div><b>开场钩子</b><p>{plan.hook || "未填写"}</p></div><div><b>结尾悬念</b><p>{plan.cliffhanger || "未填写"}</p></div><div><b>核心冲突</b><p>{plan.coreConflict || "未填写"}</p></div></div></article>
-        <article className="domain-card script-body-card"><h2>剧本正文</h2><textarea value={draft.body} onChange={(e) => patch({ body: e.target.value })} placeholder="场景标题、可见动作和对白…" /></article>
+        {plan&&<div className="plan-evidence"><div><b>开场钩子</b><p>{plan.hook || "未填写"}</p></div><div><b>结尾悬念</b><p>{plan.cliffhanger || "未填写"}</p></div><div><b>核心冲突</b><p>{plan.coreConflict || "未填写"}</p></div></div>}</article>
         <article className="domain-card"><h2>制作清单</h2><div className="domain-fields three">
           <label>角色（逗号或换行）<textarea rows={3} value={draft.characters.join("、")} onChange={(e) => patch({ characters: splitList(e.target.value) })} /></label>
           <label>场景（逗号或换行）<textarea rows={3} value={draft.scenes.join("、")} onChange={(e) => patch({ scenes: splitList(e.target.value) })} /></label>
           <label>道具（逗号或换行）<textarea rows={3} value={draft.props.join("、")} onChange={(e) => patch({ props: splitList(e.target.value) })} /></label>
-        </div></article></fieldset><div className="script-state-actions"><button disabled={busy||!canManage||entry?.state!=='saved'} onClick={() => run(() => transition("needs-changes"))}>退回修改</button><button disabled={busy||!editable||store.unsaved} onClick={() => run(() => generate([active]))}><Sparkles size={15} />{draft.body ? "重新生成本集" : "生成本集"}</button>{draft.status === "approved" && <button className="primary" disabled={busy || !draft.project_id} onClick={() => run(() => Promise.resolve(onEnterEpisode(active)))} >进入分镜规划<ArrowRight size={15}/></button>}</div>
-      </> : <div className="empty-state"><h3>先完成分集规划</h3><p>改编策划批准后，可以在这里逐集生成和修订剧本。</p></div>}</main>
+        </div></article></fieldset><div className="script-state-actions"><button disabled={busy||!canManage||entry?.state!=='saved'} onClick={() => run(() => transition("needs-changes"))}>退回修改</button><button disabled={busy||!editable||store.unsaved||plan?.status!=='approved'} onClick={() => run(() => generate([active]))}><Sparkles size={15} />根据已批准规划生成本集</button>{draft.status === "approved" && <button className="primary" disabled={busy || !draft.project_id||entry?.state!=='saved'} onClick={() => run(() => Promise.resolve(onEnterEpisode(active)))} >进入分镜规划<ArrowRight size={15}/></button>}</div>
+      </> : <div className="empty-state"><h3>选择一集开始写剧本</h3><p>可在作品列表新增一集；直接创作无需先生成改编规划。</p></div>}</main>
     </div>
-    <footer className="domain-generation-bar"><div><b>批量生成所选剧本</b><small>已选 {selected.size} 集 · 使用项目默认模型：{configuredDefaultProvider?.name || "未配置外部 Provider"} · {defaultModelId || "未配置模型 ID"}</small></div><button className="primary" disabled={busy || !selected.size} onClick={() => run(() => generate([...selected]))}><Sparkles size={15} />生成 {selected.size} 集</button></footer>
+    {!!selected.size&&<footer className="domain-generation-bar"><div><b>根据已批准规划批量生成所选剧本</b><small>已选 {selected.size} 集 · 使用项目默认模型：{configuredDefaultProvider?.name || "未配置外部 Provider"} · {defaultModelId || "未配置模型 ID"}</small></div><button className="primary" disabled={busy || !selected.size} onClick={() => run(() => generate([...selected]))}><Sparkles size={15} />生成 {selected.size} 集</button></footer>}
   </section>;
 }

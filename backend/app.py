@@ -700,6 +700,7 @@ def production_visual_usage(production_id:str):
 
 class EpisodeCreate(StrictBody):
     title:str=Field(default='',max_length=100)
+    creation_mode:str|None=None
 
 @app.post('/api/productions/{production_id}/episodes')
 def create_episode(production_id:str,body:EpisodeCreate):
@@ -712,6 +713,15 @@ def create_episode(production_id:str,body:EpisodeCreate):
             'SELECT COALESCE(MAX(episode_no),0)+1 value FROM projects WHERE production_id=%s',
             (production_id,),
         ).fetchone()['value']
+        previous=c.execute('''SELECT document FROM projects WHERE production_id=%s
+            AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=projects.id)
+            ORDER BY episode_no DESC LIMIT 1''',(production_id,)).fetchone()
+        previous_doc=json.loads(previous['document']) if previous else {}
+        for key in ('ratio','duration','videoResolution','videoRatio','videoDuration','videoFormat','videoReferenceMode','dialogueMode'):
+            if key in previous_doc:document[key]=previous_doc[key]
+        mode=body.creation_mode if body.creation_mode is not None else previous_doc.get('creationMode','adaptation')
+        if mode not in ('direct','adaptation'):raise ValueError('创作起点无效')
+        document['creationMode']=mode
         title=body.title.strip() or f'第 {episode_no:02d} 集'
         c.execute('''INSERT INTO projects(
             id,name,revision,document,created,updated,production_id,episode_no,episode_title
@@ -725,6 +735,7 @@ def create_episode(production_id:str,body:EpisodeCreate):
     return project(pid)
 
 class ProjectCreate(StrictBody):
+    creation_mode:str='adaptation'
     name:str=Field(default='未命名短片',max_length=100)
     workspace_id:str|None=None
     episode_title:str|None=Field(default=None,max_length=100)
@@ -749,6 +760,8 @@ def normalized_project_name(name:str)->str:
 def project_create_document(body:ProjectCreate):
     providers=platform_models.compiler_catalog()
     document=new_document(default_platform_policy(providers))
+    if body.creation_mode not in ('direct','adaptation'):raise ValueError('创作起点无效')
+    document['creationMode']=body.creation_mode
     if body.style is not None:
         style=body.style.strip()
         if not style:raise ValueError('视觉风格不能为空')
@@ -1974,29 +1987,32 @@ def production_scripts(production_id:str):
             )''',(production_id,)).fetchall()
     existing={row['episode_no']:row for row in rows}
     result=[]
-    for plan in plans:
-        row=existing.get(plan['episodeNo'])
-        result.append({'episodeNo':plan['episodeNo'],'plan':plan,'projectId':row['project_id'] if row else None,
-            'episodeTitle':row['episode_title'] if row else f'第 {plan["episodeNo"]:02d} 集',
+    plan_map={plan['episodeNo']:plan for plan in plans}
+    for number in sorted(set(existing)|set(plan_map)):
+        plan=plan_map.get(number);row=existing.get(number)
+        result.append({'episodeNo':number,'plan':plan,'projectId':row['project_id'] if row else None,
+            'episodeTitle':row['episode_title'] if row else f'第 {number:02d} 集',
             'script':script_to_api(row) if row and row['revision'] is not None else None})
     return result
 
-def episode_plan_context(connection,production_id,episode_no):
+def episode_plan_context(connection,production_id,episode_no,required=True):
     row=connection.execute('SELECT * FROM productions WHERE id=%s',(production_id,)).fetchone()
     if not row:raise HTTPException(404,'Production 不存在')
     context=normalize_production_context(json.loads(row['shared_context']))
     plan=next((item for item in context['episodePlans'] if item['episodeNo']==episode_no),None)
-    if not plan:raise HTTPException(404,'分集规划中没有这一集')
+    if not plan and required:raise HTTPException(404,'分集规划中没有这一集')
     return row,context,plan
 
 @app.get('/api/productions/{production_id}/episode-scripts/{episode_no}')
 def read_episode_script(production_id:str,episode_no:int):
     from .adaptation import script_default_from_plan,script_row
     with s.db() as c:
-        _,_,plan=episode_plan_context(c,production_id,episode_no)
+        _,_,plan=episode_plan_context(c,production_id,episode_no,required=False)
         project_row=c.execute('''SELECT p.* FROM projects p WHERE p.production_id=%s AND p.episode_no=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id)''',(production_id,episode_no)).fetchone()
-        if not project_row:return script_default_from_plan(None,plan)
+        if not project_row:
+            if not plan:raise HTTPException(404,'这一集尚未建立')
+            return script_default_from_plan(None,plan)
         return script_row(c,project_row['id']) or script_default_from_plan(project_row['id'],plan)
 
 @app.put('/api/productions/{production_id}/episode-scripts/{episode_no}')
@@ -2006,7 +2022,7 @@ def save_episode_script(production_id:str,episode_no:int,body:ScriptSave):
     from .adaptation import ensure_episode_for_plan,save_script_row,script_row,validate_source_references
     with s.db() as c:
         owned.production_scope(c,production_id,'editor',write=True)
-        _,_,plan=episode_plan_context(c,production_id,episode_no)
+        _,_,plan=episode_plan_context(c,production_id,episode_no,required=False)
         existed=c.execute('SELECT id FROM projects WHERE production_id=%s AND episode_no=%s',(production_id,episode_no)).fetchone()
         project_row=ensure_episode_for_plan(c,production_id,episode_no)
         row=owned.load(c,production_id,'script',project_row['id'],write=True)
@@ -2024,14 +2040,15 @@ def transition_script(production_id,episode_no,expected_revision,assignment_epoc
     from .adaptation import ensure_episode_for_plan,script_row,script_to_api
     with s.db() as c:
         owned.production_scope(c,production_id,'editor',write=True)
-        _,context,plan=episode_plan_context(c,production_id,episode_no)
+        _,context,plan=episode_plan_context(c,production_id,episode_no,required=False)
         project_row=ensure_episode_for_plan(c,production_id,episode_no)
         row=owned.load(c,production_id,'script',project_row['id'],write=True)
         owned.authorize(c,row,expected_revision,assignment_epoch,reviewer=target!='review')
         if target in ('review','approved') and not row['body'].strip():raise ValueError('剧本正文为空，不能提交审核或批准')
-        quick_canvas=json.loads(row['metadata']).get('origin')=='canvas'
+        metadata=json.loads(row['metadata'])
+        independent=metadata.get('origin')=='canvas' or metadata.get('adaptationLinked') is False
         if target=='approved':
-            if not quick_canvas and (context['adaptationPlan']['status']!='approved' or plan['status']!='approved'):raise ValueError('请先批准改编策划和本集分集规划')
+            if not independent and (context['adaptationPlan']['status']!='approved' or not plan or plan['status']!='approved'):raise ValueError('请先批准改编策划和本集分集规划')
             if row['status']!='review':raise ValueError('请先将本集剧本提交审核')
         if target=='review' and row['status']=='stale':raise ValueError('剧本已过期，请先修订后再提交审核')
         now=time.time()

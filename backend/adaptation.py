@@ -314,13 +314,19 @@ def _script_snapshot(row):
     }
 
 
-def _stale_scripts(connection, production_id):
+def _stale_scripts(connection, production_id, *, chapter_ids=None):
     from . import store as s
     now = time.time()
     rows = connection.execute('''SELECT sc.* FROM episode_scripts sc JOIN projects p ON p.id=sc.project_id
         WHERE p.production_id=%s AND sc.status IN ('review','approved')
         ORDER BY sc.project_id FOR UPDATE OF sc''',(production_id,)).fetchall()
+    changed=False
     for row in rows:
+        if chapter_ids is not None:
+            if not set(json.loads(row['source_chapter_refs'])).intersection(chapter_ids):continue
+        elif json.loads(row['metadata']).get('adaptationLinked') is False:
+            continue
+        changed=True
         connection.execute(
             'INSERT INTO episode_script_revisions VALUES(%s,%s,%s,%s,%s)',
             (s.uid('script-revision-'), row['project_id'], row['revision'], s.dumps(_script_snapshot(row)), now),
@@ -329,6 +335,7 @@ def _stale_scripts(connection, production_id):
             "UPDATE episode_scripts SET status='stale',revision=revision+1,updated=%s WHERE project_id=%s",
             (now, row['project_id']),
         )
+    return changed
 
 
 def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_ids=()):
@@ -339,17 +346,23 @@ def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_id
         return None
     context = normalize_production_context(json.loads(production['shared_context']))
     adaptation = context['adaptationPlan']
+    changed_chapters=set(chapter_ids)
+    if event_ids:
+        marks=','.join('%s' for _ in event_ids)
+        changed_chapters.update(row['chapter_id'] for row in connection.execute(
+            f'SELECT chapter_id FROM source_events WHERE production_id=%s AND id IN ({marks})',[production_id,*event_ids]))
+    scripts_changed=_stale_scripts(connection,production_id,chapter_ids=changed_chapters) if changed_chapters else False
     relevant_chapters = {ref for plan in context['episodePlans'] for ref in plan.get('sourceChapterRefs', [])}
     relevant_events = set(adaptation.get('sourceEventIds') or [])
     if (chapter_ids or event_ids) and not (
         relevant_chapters.intersection(chapter_ids) or relevant_events.intersection(event_ids)
     ):
-        return None
+        return production['revision'] if scripts_changed else None
     meaningful = bool(context['episodePlans'] or adaptation.get('sourceEventIds') or any(
         adaptation.get(key) for key in ('storyCore', 'storyArc', 'adaptationStrategy')
     ))
     if not meaningful:
-        return None
+        return production['revision'] if scripts_changed else None
     changed = False
     if adaptation['status'] in ('review', 'approved'):
         adaptation['status'] = 'stale'; changed = True
@@ -357,7 +370,7 @@ def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_id
         if plan.get('status') in ('review', 'approved'):
             plan['status'] = 'stale'; changed = True
     _stale_scripts(connection, production_id)
-    return _persist_production_context(connection, production, context) if changed else None
+    return _persist_production_context(connection, production, context) if changed else production['revision'] if scripts_changed else None
 
 
 def seed_episode_scripts(connection, project_id):
@@ -371,6 +384,7 @@ def seed_episode_scripts(connection, project_id):
         metadata = {
             'projectionNodeId': 'script-projection-' + project['id'],
         }
+        if document.get('creationMode')=='direct':metadata.update({'origin':'manual','adaptationLinked':False})
         now = project['updated'] or time.time()
         connection.execute('''INSERT INTO episode_scripts(project_id,revision,status,title,synopsis,
             source_chapter_refs,story_goal,paywall_beat,body,estimated_duration,characters,scenes,props,

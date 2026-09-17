@@ -1645,7 +1645,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
     const productionName = draft.name.trim();
     const episode = await api("/projects", send("POST", {...projectSetupPayload(draft),workspace_id:activeWorkspaceId}));
     await refreshProductionHierarchy();
-    activateWorkflowStage("overview", "replace");
+    activateWorkflowStage(draft.creationMode==='direct'?'script':'source', "replace");
     await openProject(episode.id);
     setProjectSetupOpen(false);
     setNotice(

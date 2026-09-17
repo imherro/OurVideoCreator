@@ -49,6 +49,7 @@ export function ProjectSetupDialog({
         <div className="project-setup-content">
           <section>
             <h3><Film size={17}/> ① 基本信息</h3>
+            <label>创作起点<select value={draft.creationMode} onChange={event=>patch({creationMode:event.target.value as ProjectSetupDraft['creationMode']})}><option value="direct">直接写剧本</option><option value="adaptation">从原著改编</option></select><small>直接编写无需原著或分集规划；正式剧本仍需提交审核并批准。</small></label>
             <div className="two-fields">
               <label>作品名称 *<input autoFocus maxLength={100} value={draft.name} onChange={(event)=>patch({name:event.target.value})} placeholder="例如：花信未迟"/></label>
               <label>EP01 标题<input maxLength={100} value={draft.episodeTitle} onChange={(event)=>patch({episodeTitle:event.target.value})}/></label>

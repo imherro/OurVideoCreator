@@ -154,6 +154,14 @@ export function deriveWorkflowGuide(input: {
       ? { stage: "editor", state: "ready", headline: "时间线已有内容，可以预览或导出", reasons: [] }
       : { stage: "editor", state: "unstarted", headline: "把生成的视频加入时间线", reasons: ["剪辑页始终可进入；导出前需要有效时间线。"] },
   };
+  const directScript=currentScript?.metadata?.adaptationLinked===false ||
+    (document.creationMode==='direct'&&currentScript?.metadata?.adaptationLinked!==true);
+  if(directScript){
+    if(!sourceEventCount)stages.source={stage:'source',state:'skipped',headline:'直接创作：原著资料可选',reasons:['需要改编时仍可使用原著资料库。']};
+    if(adaptationStatus!=='approved')stages.adaptation={stage:'adaptation',state:'skipped',headline:'直接创作无需改编规划',reasons:['保留原著改编入口，不把未审核规划视为已批准。']};
+    stages.script={stage:'script',state:currentScript?.status==='approved'?'complete':currentScript?.status==='review'?'review':currentScript?.status==='stale'?'stale':'ready',
+      headline:currentScript?.status==='approved'?'本集剧本已批准':'编写、保存并审核本集剧本',reasons:['正式正文与画布共用一份；批准后进入分镜规划。']};
+  }
   const order: WorkflowStage[] = ["source", "adaptation", "script", "storyboard", "art", "images", "video", "editor"];
   const recommendedStage = order.find((stage) => !["complete","skipped"].includes(stages[stage]?.state || "")) || "editor";
   return { stages, recommendedStage };
