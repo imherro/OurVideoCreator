@@ -105,6 +105,25 @@
 
 无新依赖、数据库迁移、后台页面或收费请求。保留对象事务、租约、审查、草稿和显式采纳语义；不在加载时回写。隔离PG夹具只释放本轮自建临时测试库，未删除用户数据。`READY_FOR_REVIEW`（用户已取消外部审核，不代表外部PASS）。
 
+## UPSTREAM-SYNC-06：生成素材名称与顶部制作规格
+
+来源 `83b86572b3295f19ac88b81fc9a67b17ba7ddb29` 剩余命名/规格需求；素材面板部分已在05完成。原登记函数实际返回 `Seedream 生成图.png`，真实PG专项先运行 **1 failed / 8 deselected，1.76秒**，证明协作版尚未满足按镜头/任务上下文命名的需求。
+
+实现：普通通用结果名按冻结的任务label显示“镜头 06 · 分镜图 · V1.png”；显式output_name/asset_name优先，保留有效后缀及固定角色音色等结果限定词，替换名称中的路径分隔及控制字符。具体自定义名称与无上下文旧名称保持。参考图提交带视觉卡名、主/状态参考图及视觉版本号；结果仍只登记候选，明确采纳前不写回视觉卡。只改新结果显示名，不回填历史素材，不改assetId、UUID物理路径、内容、类别或生成指纹。
+
+协作适配：PG按项目/节点/媒体类型计数，同名节点跨EP互不累计；用一个该组的事务advisory lock保护现有单Worker内并发登记，锁在任务行锁之前，等待时取消可先提交，随后不发布结果。不是新版本表/任务平台，不扩展多Worker。显示V编号不替代协作对象revision或视觉版本，原删除/保留策略不变。
+
+比例、风格、目标秒数从视图工具栏移到共享流程顶部，只读显示并保留完整title；小屏按上游收缩/隐藏，原设置、保存与对象协作入口不变。没有引入单机默认模型或免审核行为。
+
+实际验证：
+
+- 命名、取消与Provider联合专项 `tests/test_asset_naming.py tests/test_asset_registration.py tests/test_volcengine_speech.py tests/test_volcengine_ark.py tests/test_hc_atom.py` → **56 passed，52.87秒，exit0**。包含4个并发登记得到V1–V4、跨EP/节点分别V1、数据库锁等待时取消及媒体清理、注册返回与PG名称一致、文件字节和UUID路径保持。Provider只使用Mock/本地测试，不代表真实账号通过。
+- `npm test` → **222 passed / 0 failed / 0 skipped，1268.29ms，exit0**。顶部规格是结构回归检查，不宣称浏览器像素布局验收。
+- `npm run build` → **tsc与Vite exit0，1840 modules，Vite 7.49秒**；既有大chunk警告保留。
+- 协作联合专项 `tests/test_asset_naming.py tests/test_asset_registration.py tests/test_p5_object_candidates.py tests/test_p4_submission_execution.py` → **31 passed，79.98秒，exit0**。实际普通编辑者参考图提交保留命名输入，登记后卡片不变，明确采纳后按assetId关联；原非负责人、迟到结果及平台提交保护通过。此31项与前面56项包含重复专项，不累计为87个独立测试。`git diff --check`通过；没有运行全量后端、浏览器或真实付费API。
+
+无新依赖、迁移、配置项、后台页面；保留主工作区与运行服务。本轮PG夹具仅自动释放新建测试库，未动用户库、历史媒体或草稿。`READY_FOR_REVIEW`，用户已取消外部ChatGPT审核。
+
 ## 后续队列
 
-前五组已完成自测，其余仍未全部移植。下一组处理生成素材命名/规格需求，再处理媒体参数、多模态/音色、直接剧本。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+前六组已完成自测，其余仍未全部移植。下一组处理媒体参数与制作规格，再处理多模态/音色、直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

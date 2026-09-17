@@ -193,6 +193,7 @@ def test_visual_submission_never_mutates_card_and_explicit_adoption_records_refe
     card=response.json()
     body={'node_id':'visual-version:hero-v1','kind':'image','submission_id':uuid.uuid4().hex,
         'input':{'model_id':model,'prompt':'hero portrait','asset_category':'character',
+            'output_name':'主角 · 主参考图 · V1.png',
             'visual_reference':{'versionId':'hero-v1','targetSource':'override'}}}
     response=team['a'].post('/api/projects/'+team['pid']+'/jobs',json=body)
     assert response.status_code==200,response.text
@@ -201,6 +202,10 @@ def test_visual_submission_never_mutates_card_and_explicit_adoption_records_refe
     assert team['a'].get(url(team,card)).json()==card
     path=tmp_path/'portrait.png';Image.new('RGB',(8,8),'red').save(path)
     s.job_update(job['id'],status='running');asset=register(job,path)
+    assert asset['name']=='主角 · 主参考图 · V1.png'
+    with s.db() as c:
+        stored=c.execute('SELECT name,path FROM assets WHERE id=%s',(asset['id'],)).fetchone()
+    assert stored['name']==asset['name'] and stored['path']==asset['id']+'.png'
     s.job_update(job['id'],status='succeeded',result={'assets':[asset]})
     assert team['a'].get(url(team,card)).json()==card
     response=team['a'].post(candidate(team,job)+'/adopt',json=version(card))

@@ -1,5 +1,6 @@
 """Provider-neutral access to assets, HTTP errors and result registration."""
 import mimetypes
+import re
 import shutil
 import time
 from pathlib import Path
@@ -11,6 +12,33 @@ from .. import store as s
 from .. import provider_egress
 from ..provider_redaction import scrub
 from ..media import probe
+
+
+_GENERIC_RESULT_NAMES = {'生成结果', 'Seedream 生成图', '幻场 AI 生成图'}
+
+
+def _clean_asset_label(value):
+    label = re.sub(r'\bshot[-_ ]?(\d+)\b', lambda match: f'镜头 {int(match.group(1)):02d}',
+                   str(value or '').strip(), flags=re.IGNORECASE)
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', label).strip(' .-')
+
+
+def _registered_asset_name(job, requested_name, ext, existing_versions=0):
+    """Display names only: stored media paths always retain their asset ID."""
+    requested = Path(requested_name or '').name
+    stem = Path(requested).stem
+    suffix = Path(requested).suffix or ext
+    inp = job.get('input') or {}
+    explicit = _clean_asset_label(inp.get('output_name') or inp.get('asset_name'))
+    if explicit:
+        explicit_path = Path(explicit)
+        base = explicit_path.stem if explicit_path.suffix else explicit
+        return base.rstrip(' .-') + suffix
+    label = _clean_asset_label(inp.get('asset_label') or inp.get('label'))
+    if not label or not (stem in _GENERIC_RESULT_NAMES or stem.startswith('生成结果 ·')):
+        return requested or ('生成素材' + suffix)
+    qualifier = stem.removeprefix('生成结果').strip(' ·') if stem.startswith('生成结果 ·') else ''
+    return ' · '.join(part for part in (label, qualifier, f'V{existing_versions + 1}') if part) + suffix
 
 
 class RecoverableProviderError(Exception):
@@ -112,11 +140,19 @@ def register(job,path,name=None,category=None,asset_source='generated'):
         result={'id':aid,'url':f'/api/assets/{aid}/file','name':name or source.name,'kind':kind,'category':semantic,'source':asset_source}
         if fingerprint:result['generationFingerprint']=fingerprint
         with s.db() as c:
+            # Separate jobs for the same node may register concurrently inside
+            # the single Worker. Serialize only this display-version group.
+            # Take this before the job row so cancellation can win while waiting.
+            group=s.dumps(['asset-name',job['project_id'],job['node_id'],kind])
+            c.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',(group,))
             state=c.execute('SELECT status FROM jobs WHERE id=%s FOR UPDATE',(job['id'],)).fetchone()
             if not state or state['status']=='cancelled':raise InterruptedError('结果登记前任务已取消')
             origin=c.execute('SELECT production_id FROM projects WHERE id=%s',(job['project_id'],)).fetchone()
             if not origin:raise ValueError('生成任务所属项目不存在')
-            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(aid,job['project_id'],name or source.name,kind,target.name,mime,s.dumps(metadata),time.time(),semantic,asset_source,origin['production_id']))
+            count=c.execute("SELECT count(*) n FROM assets WHERE project_id=%s AND kind=%s AND metadata->>'node_id'=%s",
+                            (job['project_id'],kind,job['node_id'])).fetchone()['n']
+            result['name']=_registered_asset_name(job,name or source.name,ext,count)
+            c.execute('INSERT INTO assets(id,project_id,name,kind,path,mime,metadata,created,category,source,production_id) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(aid,job['project_id'],result['name'],kind,target.name,mime,s.dumps(metadata),time.time(),semantic,asset_source,origin['production_id']))
     except BaseException:
         target.unlink(missing_ok=True)
         raise

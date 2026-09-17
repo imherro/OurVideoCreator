@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {
   WORKFLOW_STAGES,
   defaultViewForStage,
@@ -8,6 +9,18 @@ import {
   workflowStageUrl,
 } from '../src/app/workflow.ts';
 import {planGlobalPanelAction} from '../src/app/globalNavigation.ts';
+
+test('workflow specifications are read-only in the shared header without duplicating the view toolbar', () => {
+  const source = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
+  const header = source.slice(source.indexOf('<WorkflowStageNav'), source.indexOf('<GlobalNav'));
+  assert.match(header, /className="workflow-header-meta"/);
+  assert.match(header, /<span>\{doc.ratio\}<\/span>/);
+  assert.match(header, /<span>\{doc.style\}<\/span>/);
+  assert.match(header, /<span>\{doc.duration\} 秒<\/span>/);
+  assert.doesNotMatch(source, /className="view-meta"/);
+  assert.match(header, /对象协作/);
+  assert.match(header, /saveCurrentView\(\)/);
+});
 
 test('workflow shell exposes the production stages in order',()=>{
   assert.deepEqual(WORKFLOW_STAGES.map(stage=>stage.label),[

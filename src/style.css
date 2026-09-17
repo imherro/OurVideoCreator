@@ -184,6 +184,12 @@
 /* Compact workflow guidance shares the second row with workspace controls. */
 .viewbar>.workflow-guide-banner{min-width:260px;max-width:520px;flex:1;align-items:center;margin:0;padding:6px 9px;border-color:transparent;background:transparent}
 .viewbar>.workflow-guide-banner>svg{margin:0}.viewbar>.workflow-guide-banner>div{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.viewbar>.workflow-guide-banner>div>span{margin-right:7px}.viewbar>.workflow-guide-banner b{font-size:12px}.viewbar>.workflow-guide-banner small{display:none}.viewbar>.workflow-guide-banner button{padding:5px 8px;font-size:11px}.viewbar>.workflow-guide-banner+.view-meta{flex:0 0 auto}
+.workflow-header-meta{flex:0 0 auto;display:flex;align-items:center;gap:6px;max-width:235px;padding:6px 9px;border-left:1px solid #30373a;color:#8c9699;font-size:11px;white-space:nowrap}
+.workflow-header-meta span:nth-of-type(2){max-width:105px;overflow:hidden;text-overflow:ellipsis}
+.workflow-header-meta i{color:#555f63;font-style:normal}
+@media(max-width:1450px){.workflow-header-meta span:nth-of-type(2),.workflow-header-meta i:nth-of-type(1){display:none}.workflow-header-meta{max-width:none}}
+@media(max-width:1050px){.workflow-header-meta{display:none}}
+
 /* Film Bible references stay visual wherever a shot is reviewed. */
 .storyboard-reference-chip{display:flex!important;align-items:center;gap:5px;padding:3px 6px!important;border:1px solid #3c4649;border-radius:8px;color:#9ea9aa}.storyboard-reference-chip>img,.storyboard-binding-card>img,.reference-placeholder{width:34px;height:34px;flex:0 0 34px;border-radius:5px;object-fit:cover;background:#111719}.reference-placeholder{display:flex;align-items:center;justify-content:center}.storyboard-reference-chip>span:last-child{display:flex;flex-direction:column}.storyboard-reference-chip b{font-size:10px}.storyboard-reference-chip small{font-size:8px}.storyboard-binding-card{grid-template-columns:38px 1fr auto!important;min-width:205px!important}.storyboard-binding-card>span:nth-child(2){display:flex;min-width:0;flex-direction:column}.storyboard-binding-card>.icon-button{grid-column:3!important}.storyboard-binding-card>button:not(.icon-button){grid-column:2/4!important}
 /* Compact operational layout for the art department. */
