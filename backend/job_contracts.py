@@ -25,7 +25,7 @@ def freeze_prompt_contract(kind: str, value: dict, *, origin: str = 'submission'
         system_prompt, response_schema, schema_version = ADAPTATION_SYSTEM_PROMPT, ADAPTATION_SCHEMA, 'adaptation-plan/v1'
     elif stage == 'script_generation':
         from .adaptation import SCRIPT_SCHEMA, SCRIPT_SYSTEM_PROMPT
-        system_prompt, response_schema, schema_version = SCRIPT_SYSTEM_PROMPT, SCRIPT_SCHEMA, 'episode-script/v1'
+        system_prompt, response_schema, schema_version = SCRIPT_SYSTEM_PROMPT, SCRIPT_SCHEMA, 'episode-script/v2'
     elif kind == 'storyboard' and result.get('film_bible'):
         from .film_bible.models import (
             BOUND_STORYBOARD_SCHEMA, STORYBOARD_DIRECTOR_PROMPT,

@@ -183,7 +183,7 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
     assert {job["kind"] for job in first.json()["jobs"]} == {"text"}
     assert {job["scope"] for job in first.json()["jobs"]} == {"episode"}
     assert {job["input"]["episode_script_generation"]["episodeNo"] for job in first.json()["jobs"]} == {5, 8, 12}
-    assert {job["input"]["schema_version"] for job in first.json()["jobs"]} == {"episode-script/v1"}
+    assert {job["input"]["schema_version"] for job in first.json()["jobs"]} == {"episode-script/v2"}
     assert all(job["input"]["system_prompt"] and job["input"]["response_schema"] for job in first.json()["jobs"])
 
     worker = Worker()
@@ -192,6 +192,7 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
         "estimatedDuration": 60, "characters": ["阿青"], "scenes": ["旧屋"], "props": ["密信"],
     }
     monkeypatch.setattr(worker,"_chat_text",lambda *_args,**_kwargs:json.dumps(generated,ensure_ascii=False))
+    completed = []
     for job in first.json()["jobs"]:
         s.job_update(job["id"],status="running")
         result = worker.text({**job,"status":"running"},{"url":"http://unused","local":True})
@@ -201,6 +202,11 @@ def test_script_generation_requires_explicit_approval_and_selected_set_isolated(
         before = client.get(script_path).json()
         assert before['body'] == ''  # Completing AI work must not publish it.
         s.job_update(job["id"],status="succeeded",result=result)
+        completed.append((no, job, script_path, before))
+    # Every candidate was composed against the same empty-prior-script snapshot.
+    # Adopt later episodes first; adopting an earlier episode intentionally makes
+    # any still-pending later candidate stale under the continuity contract.
+    for no, job, script_path, before in sorted(completed, reverse=True):
         adopted = client.post(f'/api/projects/{job["project_id"]}/candidates/{job["id"]}/adopt', json={
             'expected_revision': before['revision'], 'assignment_epoch': before['assignment_epoch']})
         assert adopted.status_code == 200, adopted.text

@@ -2174,7 +2174,8 @@ def revise_episode_script(production_id:str,episode_no:int,body:OwnedRevisionAct
 
 @app.post('/api/productions/{production_id}/script-generations')
 def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
-    from .adaptation import adaptation_fingerprint,ensure_episode_for_plan,script_to_api,validate_source_references
+    from .adaptation import ensure_episode_for_plan
+    from .script_generations import frozen_input
     if len(set(body.episode_nos))!=len(body.episode_nos):raise ValueError('不能重复选择同一集')
     with s.db() as c:
         job_admission.lock(c)
@@ -2184,34 +2185,21 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
         production_row,context,_=episode_plan_context(c,production_id,body.episode_nos[0])
         if context['adaptationPlan']['status']!='approved':raise ValueError('请先批准改编策划，再生成逐集剧本')
         plan_map={item['episodeNo']:item for item in context['episodePlans']}
-        fingerprint=adaptation_fingerprint(context);created=[]
+        created=[]
         batch_project=ensure_episode_for_plan(c,production_id,body.episode_nos[0])
         job_admission.batch_members(c,batch_project['id'],'script-generation',body.submission_id,body.episode_nos)
         for episode_no in body.episode_nos:
             plan=plan_map.get(episode_no)
             if not plan:raise ValueError(f'第 {episode_no:02d} 集不在分集规划中')
             if plan['status']!='approved':raise ValueError(f'第 {episode_no:02d} 集规划尚未批准')
-            validate_source_references(c,production_id,plan['sourceChapterRefs'])
             project_row=ensure_episode_for_plan(c,production_id,episode_no)
             script=owned.load(c,production_id,'script',project_row['id'],write=True)
             collaboration.editable(c,script)
-            placeholders=','.join('%s' for _ in plan['sourceChapterRefs'])
-            chapters=[]
-            if plan['sourceChapterRefs']:
-                chapters=[dict(row) for row in c.execute(f'''SELECT id,title,content,revision,assignment_epoch FROM source_chapters
-                    WHERE id IN ({placeholders}) ORDER BY id''',plan['sourceChapterRefs']).fetchall()]
-            prompt='''请生成且只生成目标单集剧本。\n已批准分集规划：'''+s.dumps(plan)+\
-                '\n原著章节：'+s.dumps(chapters)+'\n本集现有剧本（为空则首次生成）：'+s.dumps(script_to_api(script))
+            frozen=frozen_input(c,project_row['id'],production_row,script)
             job_body=JobCreate(node_id='episode-script:'+project_row['id'],kind='text',
                 submission_id=body.submission_id+f':{episode_no:03d}',input={
                     'model_id':body.model_id,'allow_cloud':body.allow_cloud,
-                    'stage':'script_generation','prompt':prompt,
-                    'episode_script_generation':{
-                        'productionId':production_id,'episodeNo':episode_no,
-                        'scriptRevision':script['revision'],'assignmentEpoch':script['assignment_epoch'],
-                        'adaptationFingerprint':fingerprint,
-                        'chapterVersions':[{'id':item['id'],'revision':item['revision'],'assignment_epoch':item['assignment_epoch']} for item in chapters],
-                    },
+                    **frozen,
             })
             created.append(create_job_record(c,project_row['id'],job_body,entrypoint='script-generation'))
         for item in created:

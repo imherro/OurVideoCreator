@@ -409,3 +409,13 @@ Worker复用原文本候选通道，按单集Schema严格验证并保存episodeP
 首轮真实PG专项4 passed（30.48秒），覆盖明确采纳/未自动写入、角色权限、同请求回放、重复任务、原著/前集/视频变化拒绝。前端最终 **272 passed /0 failed /0 skipped，1540.38ms**；tsc/Vite build exit0，Vite **7.79秒**，既有chunk警告保留。浏览器完整E2E、真实供应商、全量后端未运行，Worker仅模拟文本返回；没有新增依赖/迁移/后台页面。原验收副本尚无实际Worker，不能把本轮模拟验证称作真实生成部署完成。
 
 最终联合 `test_episode_plan_jobs.py test_episode_plan_contract.py test_p5_relation_candidates.py` **29 passed，95.69秒**。额外覆盖通用入口重复拒绝、原任务完成后通用入口提示词/Schema重建、前集行锁冲突409，以及旧整体/关系候选回归。仅推送集成分支并更新7878验收副本；整份冻结清单仍未核对完成，后续继续分集连续性其余入口、源章节/页面同步及视觉历史等未完项。
+
+## UPSTREAM-SYNC-26：正式剧本生成的前集连续性
+
+接续87c470a的业务意图，将已经用于单集规划的前集/Bible连续性真正接入“已批准规划 → 正式剧本候选”路径。每个任务冻结前集正式正文证据、Film Bible故事/连续性和当前锁定视觉版本，并把紧邻前集全文放进服务端提示词；`episode-script/v2`明确要求承接前集结尾，不重复已完成剧情或无依据重置人物状态。通用任务入口会重建提示词、Schema、连续性上下文和允许的章节版本，客户端伪造字段无效。
+
+提交与明确采纳都在production和目标剧本锁下，以NOWAIT短锁读取前集、原著章节、项目与协作视觉对象；前集、原著、规划或Film Bible变化后，旧候选即使请求`accept_stale`也不能写入。目标集已有采纳视频时禁止生成和采纳新正式剧本。仍保留原负责人、assignment_epoch、revision、人工审核与显式候选采纳；Worker只生成候选，不自动写正文。批量候选来自同一旧快照时，从后往前采纳仍可全部使用；先采纳较早集会使尚未采纳的后集候选按设计过期，避免后集遗漏新前集内容。
+
+实际验证：新专项 `tests/test_script_generation_continuity.py` **4 passed，18.88秒**；修正批量回归采纳顺序后，新专项加原失败用例 **5 passed，22.01秒**。最终真实隔离PostgreSQL联合 `test_script_generation_continuity.py test_p5_relation_candidates.py test_adaptation.py test_p6_admission.py test_direct_script_assist.py` **42 passed，174.74秒**，覆盖前集/Bible变化、通用入口伪造、依赖行锁、成片保护、任务准入、直接剧本与原候选回归。前端 `npm test` **272 passed / 0 failed / 0 skipped，1600.28ms**；`npm run build` exit0，Vite **7.03秒**，保留既有大chunk警告。
+
+本批无新增依赖、数据库迁移、后台页面或配置；未运行真实付费Provider、完整业务浏览器E2E或全量后端。测试使用模拟文本返回。整体同步仍未完成，后续继续核对原著/改编/剧本页面同步、视觉历史复用与恢复及其余冻结清单。

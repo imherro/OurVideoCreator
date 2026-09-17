@@ -66,18 +66,8 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
         raise HTTPException(422,'正式剧本目标与节点不匹配')
     row=owned.load(c,production_id,'script',pid,write=True)
     owned.authorize(c,row,marker.get('scriptRevision'),marker.get('assignmentEpoch'))
-    episode=c.execute('SELECT episode_no FROM projects WHERE id=%s',(pid,)).fetchone()
-    if marker.get('episodeNo')!=episode['episode_no']:raise HTTPException(422,'目标分集编号不匹配')
-    plan=next((p for p in context['episodePlans'] if p['episodeNo']==episode['episode_no']),None)
-    if context['adaptationPlan']['status']!='approved' or not plan or plan['status']!='approved':
-        raise HTTPException(409,'请先批准当前改编策划及分集规划')
-    refs=[]
-    for chapter_id in sorted(set(plan['sourceChapterRefs'])):
-        chapter=owned.load(c,production_id,'chapter',chapter_id)
-        refs.append({'id':chapter_id,'revision':chapter['revision'],'assignment_epoch':chapter['assignment_epoch']})
-    if refs!=marker.get('chapterVersions'):raise HTTPException(409,'原著章节已变化，请重新提交')
-    return {'target':{'kind':kind,'id':pid,'revision':row['revision'],'assignment_epoch':row['assignment_epoch']},
-            'references':refs}
+    from .script_generations import freeze_target
+    return freeze_target(c,pid,body,production,row)
 
 
 def adaptation_value(job,generated):
@@ -225,16 +215,11 @@ def adopt(pid:str,jid:str,body:Adopt):
             from .direct_scripts import adopt_candidate
             result=adopt_candidate(c,job,row)
         elif kind=='script':
-            context=normalize_production_context(json.loads(production['shared_context']))
             marker=job['input']['episode_script_generation']
-            if adaptation_fingerprint(context)!=marker['adaptationFingerprint']:
-                raise HTTPException(409,'分集规划已变化，请按新规划重新生成')
-            for ref in job['collaboration'].get('references',[]):
-                chapter=owned.load(c,job['production_id'],'chapter',ref['id'])
-                collab.expected(chapter,ref['revision'],ref['assignment_epoch'])
+            from .script_generations import check_adoption_dependencies
+            check_adoption_dependencies(c,job,production,row)
+            context=normalize_production_context(json.loads(production['shared_context']))
             plan=next((p for p in context['episodePlans'] if p['episodeNo']==marker['episodeNo']),None)
-            if context['adaptationPlan']['status']!='approved' or not plan or plan['status']!='approved':
-                raise HTTPException(409,'改编规划已不再处于批准状态')
             validate_source_references(c,job['production_id'],plan['sourceChapterRefs'])
             value={**validate_script(job['result']['script']),'sourceChapterRefs':plan['sourceChapterRefs'],
                 'storyGoal':plan['coreConflict'],'paywallBeat':{'role':plan['paywallRole'],'hook':plan['hook'],'cliffhanger':plan['cliffhanger']}}
