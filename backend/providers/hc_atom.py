@@ -5,6 +5,7 @@ import base64
 import hashlib
 import threading
 import time
+import uuid
 from urllib.parse import quote
 
 import httpx
@@ -291,10 +292,14 @@ def _asset_group(client, provider):
             ).fetchone()
         if row:
             return row['remote_group_id']
+        # Independent databases may share one HC account, whose group names
+        # are account-wide. Name only new groups uniquely; keep cached and
+        # explicitly configured IDs, existing remote groups and review policy.
+        group_name = '安影 Seedance 虚拟人物素材-' + uuid.uuid4().hex[:12]
         value = _unwrap(_checked(client.post(
             _root(provider) + '/v3/asset-groups',
             json={
-                'name': '安影 Seedance 虚拟人物素材',
+                'name': group_name,
                 'description': '安影自动登记的虚拟人物首帧素材',
             },
         )))

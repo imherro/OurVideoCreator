@@ -3,6 +3,7 @@ import time
 import uuid
 
 import httpx
+import pytest
 
 from tests.platform_model_helpers import bind_adapter_job
 from tests.egress_helpers import mock_egress
@@ -160,7 +161,8 @@ def test_seedance_uses_v3_signed_first_frame_and_minimum_duration(monkeypatch):
         calls.append((request.method, request.url.path))
         if request.url.path == '/v3/asset-groups':
             body = json.loads(request.read())
-            assert body['name'] == '安影 Seedance 虚拟人物素材'
+            assert body['name'].startswith('安影 Seedance 虚拟人物素材-')
+            assert len(body['name']) <= 32
             return httpx.Response(200, json={'code': 200, 'data': {'groupId': 'group-1'}})
         if request.url.path == '/v3/assets':
             body = json.loads(request.read())
@@ -307,3 +309,95 @@ def test_reference_image_uses_async_task_protocol(monkeypatch):
     worker = Worker()
     worker.halt = NoWait()
     assert hc_atom.generate_image(worker, item, provider())['assets'][0]['id'] == 'image-asset'
+
+
+def test_asset_groups_are_unique_across_pg_databases_and_reused(monkeypatch):
+    """Same provider/account, independent migrated PG caches, one fake cloud."""
+    import os
+    import re
+    from pathlib import Path
+    from tests.postgres_test_db import create_isolated_database, drop_isolated_database
+
+    primary_url = os.environ['OVC_DATABASE_URL']
+    secondary_name, secondary_url = create_isolated_database(Path(__file__).resolve().parents[1])
+    os.environ['OVC_DATABASE_URL'] = primary_url
+    configured = provider()
+    configured['id'] = 'hc-independent-' + uuid.uuid4().hex
+    remote_groups = {'安影 Seedance 虚拟人物素材': 'legacy-group'}
+    calls = []
+
+    def handle(request):
+        assert request.method == 'POST' and request.url.path == '/v3/asset-groups'
+        name = json.loads(request.read())['name']
+        calls.append(name)
+        if name in remote_groups:
+            return httpx.Response(200, json={'code': 500, 'msg': '同名分组已存在'})
+        remote_groups[name] = f'group-{len(remote_groups)}'
+        return httpx.Response(200, json={'code': 200, 'data': {'groupId': remote_groups[name]}})
+
+    try:
+        with httpx.Client(transport=httpx.MockTransport(handle)) as client:
+            monkeypatch.setenv('OVC_DATABASE_URL', primary_url)
+            first = hc_atom._asset_group(client, configured)
+            assert hc_atom._asset_group(client, configured) == first
+            monkeypatch.setenv('OVC_DATABASE_URL', secondary_url)
+            second = hc_atom._asset_group(client, configured)
+            assert hc_atom._asset_group(client, configured) == second
+            monkeypatch.setenv('OVC_DATABASE_URL', primary_url)
+            assert hc_atom._asset_group(client, configured) == first
+        assert first != second
+        assert len(calls) == len(set(calls)) == 2
+        assert remote_groups['安影 Seedance 虚拟人物素材'] == 'legacy-group'
+        for name in calls:
+            assert re.fullmatch(r'安影 Seedance 虚拟人物素材-[0-9a-f]{12}', name)
+            assert len(name) <= 32
+            assert configured['api_key'] not in name
+    finally:
+        # Only the database allocated above is disposable; restore the primary
+        # test target even on failure so the session fixture cleans up its own DB.
+        try:
+            os.environ['OVC_DATABASE_URL'] = secondary_url
+            drop_isolated_database(secondary_name, secondary_url)
+        finally:
+            os.environ['OVC_DATABASE_URL'] = primary_url
+
+
+def test_asset_group_keeps_existing_cache_and_explicit_group_id():
+    configured = provider()
+    configured['id'] = 'hc-existing-' + uuid.uuid4().hex
+    with s.db() as db:
+        db.execute('''INSERT INTO provider_asset_groups
+            (provider_id,account_hash,remote_group_id,created,updated)
+            VALUES(%s,%s,%s,%s,%s)''',
+            (configured['id'], hc_atom._asset_account_hash(configured),
+             'existing-group', time.time(), time.time()))
+
+    def no_network(request):
+        raise AssertionError('cached or explicitly configured group must not call the provider')
+
+    with httpx.Client(transport=httpx.MockTransport(no_network)) as client:
+        assert hc_atom._asset_group(client, configured) == 'existing-group'
+        configured['parameters']['video']['asset_group_id'] = 'explicit-group'
+        assert hc_atom._asset_group(client, configured) == 'explicit-group'
+        # Explicit configuration also takes precedence without any cached row.
+        configured['id'] = 'hc-uncached-' + uuid.uuid4().hex
+        assert hc_atom._asset_group(client, configured) == 'explicit-group'
+
+
+@pytest.mark.parametrize('status,payload,error_type', [
+    (200, {'code': 500, 'msg': 'group rejected'}, ValueError),
+    (200, {'code': 200, 'data': {}}, ValueError),
+    (503, {'detail': 'unavailable'}, ValueError),
+])
+def test_failed_asset_group_creation_does_not_cache_success(status, payload, error_type):
+    configured = provider()
+    configured['id'] = 'hc-rejected-' + uuid.uuid4().hex
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(status, json=payload)
+    )) as client:
+        with pytest.raises(error_type):
+            hc_atom._asset_group(client, configured)
+    with s.db() as db:
+        assert db.execute('''SELECT remote_group_id FROM provider_asset_groups
+            WHERE provider_id=%s AND account_hash=%s''',
+            (configured['id'], hc_atom._asset_account_hash(configured))).fetchone() is None
