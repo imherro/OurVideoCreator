@@ -445,3 +445,13 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 真实隔离 PostgreSQL 分镜专项最终 **11 passed，59.91秒**，包括EP02复用EP01由另一负责人维护的Production视觉卡、调用方伪造目录被替换、旧卡内容/revision逐项不变、新状态父级、镜头及对白ID映射、目录编辑/新增后无半写、镜头负责人/版本及真实图锁竞争。Film Bible、对象候选和主源联合 **49 passed，127.21秒**；任务准入、批量画布和平台模型冻结联合 **30 passed，145.83秒**。这些命令有重叠项时不相加冒充独立总数。
 
 前端 `npm test` **276 passed / 0 failed / 0 skipped，1457.08ms**；`npm run build` tsc/Vite exit0，Vite **8.61秒**，产物主包仍为 `assets/index-BjNoHSE2.js`，保留既有大chunk警告。`compileall`与`git diff --check`通过。本批无新增依赖、数据库迁移、平台配置或后台页面；没有真实付费Provider调用，未运行登录业务浏览器E2E或全量后端。整体同步尚未完成，下一独立批次处理从协作历史恢复废弃视觉版本；不能用本批复用能力代替显式历史恢复。
+
+## UPSTREAM-SYNC-29：从协作审计历史恢复废弃视觉版本
+
+按冻结上游 `045853a` 的业务目标适配，没有复制单机版 Production 整份快照写回。新增对象范围恢复入口，要求当前负责人、精确 object revision 和 assignment epoch；manager 仍须先显式接管。在视觉绑定事务锁下按新到旧读取该对象不可变历史，只从最近非废弃快照恢复 `draft` / `pending_reference` / `locked` 状态。除状态外内容不一致、所属卡片未恢复、对象代际变化或非负责人操作均拒绝。
+
+写入只改目标版本 `status`，不使用历史卡片、参考素材、声音、其他版本或分镜覆盖当前协作主源。成功追加 object revision、`visual.restore` 历史、审计及各分集SSE事件。网页只在废弃版本显示恢复按钮；目标对象有本地草稿时先拒绝，恢复回执仅合并该对象，不覆盖其他未保存内容。详见[跨集分镜复用作品视觉资产](../storyboard-asset-reuse.md#废弃版本恢复)。
+
+实际验证：纯规则及真实隔离 PostgreSQL 恢复专项 **7 passed，14.58秒**；扩展到 Film Bible、视觉主源、普通对象历史/事务、分镜候选与采纳的真实PG联合回归 **64 passed，213.49秒**。覆盖locked/draft恢复、只改状态、跨集可见、负责人/manager/viewer、旧revision、缺失版本、两请求竞争只一次提交、历史/审计/事件，以及原整对象恢复与候选采纳回归。
+
+前端协作客户端专项 **22 passed，173.42ms**；全量 `npm test` **278 passed / 0 failed / 0 skipped，1395.82ms**；`npm run build` tsc/Vite exit0，Vite **7.43秒**，保留既有大chunk警告。无新增依赖、数据库迁移、平台配置或后台页面；未调用真实付费Provider，未运行登录业务浏览器E2E或全量后端。整体上游同步仍未全部完成，下批继续分集切换反馈与剩余冻结清单审计。

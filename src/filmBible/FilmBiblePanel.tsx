@@ -50,6 +50,7 @@ export function FilmBiblePanel({
   onDeleteCard,
   onSaveVersion,
   onStatus,
+  onRestoreVersion,
   onSetImageOverride,
   onUploadReference,
   onGenerateReference,
@@ -83,6 +84,7 @@ export function FilmBiblePanel({
   onDeleteCard: (cardId: string) => void;
   onSaveVersion: (versionId: string, draft: VersionDraft) => void;
   onStatus: (versionId: string, status: VisualVersionStatus) => void;
+  onRestoreVersion: (versionId: string) => Promise<void>;
   onSetImageOverride: (
     cardId: string,
     override: VisualGenerationOverride,
@@ -146,6 +148,8 @@ export function FilmBiblePanel({
     invariants: selected?.invariants || [],
   });
   const [referenceBusy, setReferenceBusy] = useState(false);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
   const [referenceError, setReferenceError] = useState("");
   const speechProviders = providers.filter((item) => item.type === "volcengine_speech" && item.kind === "audio");
   const defaultSpeech = speechProviders.find(item=>item.is_default);
@@ -188,6 +192,7 @@ export function FilmBiblePanel({
   }, [shotUid, shots]);
   useEffect(() => {
     setReferenceError("");
+    setRestoreError("");
   }, [selected?.id]);
   useEffect(() => {
     if (!card) return;
@@ -382,6 +387,16 @@ export function FilmBiblePanel({
         )}
         {!editable && (
           <>
+            {selected.status === "deprecated" && <>
+              <button className="secondary full" disabled={restoreBusy} onClick={async () => {
+                setRestoreBusy(true);
+                setRestoreError("");
+                try { await onRestoreVersion(selected.id); }
+                catch (reason: any) { setRestoreError(reason?.message || String(reason)); }
+                finally { setRestoreBusy(false); }
+              }}>{restoreBusy ? "正在恢复…" : "恢复弃用前状态"}</button>
+              {restoreError && <p className="warning-text">{restoreError}</p>}
+            </>}
             <p className="muted">
               {selected.status === "locked"
                 ? "已锁定版本只读；修改会派生新版本，旧版本和旧分镜绑定继续保留。"

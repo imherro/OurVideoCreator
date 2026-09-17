@@ -90,6 +90,20 @@ export class CollaborationClient {
     return result as ObjectRow;
   }
 
+  async restoreVisualVersion(versionId:string){
+    const row=[...this.rows.values()].find(item=>item.kind==='visual_card'&&item.content?.versions?.[versionId]);
+    const pid=this.project?.id,generation=this.drafts.generation;
+    if(!row||!pid)throw new Error('视觉版本尚未载入');
+    if(this.drafts.entries.get(row.id)?.state!=='saved')
+      throw new Error('请先保存该视觉资产或处理它的本地草稿，再恢复历史状态');
+    const result=await this.request(
+      `/projects/${pid}/objects/${encodeURIComponent(row.id)}/visual-versions/${encodeURIComponent(versionId)}/restore`,
+      send('POST',{expected_revision:row.revision,assignment_epoch:row.assignment_epoch}),
+    );
+    this.assertScope(pid,generation);
+    return result as ObjectRow;
+  }
+
   async comment(id:string,body:string){
     const pid=this.project?.id,generation=this.drafts.generation;
     if(!pid)throw new Error('协作项目尚未载入');

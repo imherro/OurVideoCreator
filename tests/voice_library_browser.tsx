@@ -27,7 +27,7 @@ function App(){const [doc,setDoc]=useState(uploadMode?{...initial,filmBible:{...
  onAdmitVoice:async(value:File|string)=>{if(value!=='upload-one')throw new Error('隔离模拟：文件不能完整解码');setAdmissions(n=>n+1);return uploadedAssets[0]},
  onLockVoice:(id:string,locked:boolean)=>update((current:any)=>setVoiceLocked(current,id,locked)),
  onGenerateVoice:async()=>{throw new Error('隔离页不生成')},onGenerateCharacterDialogue:async()=>{throw new Error('隔离页不生成')},onRegenerateDialogue:async()=>{throw new Error('隔离页不生成')},
- onRenameCard:noop,onDeleteCard:noop,onSaveVersion:noop,onStatus:noop,onSetImageOverride:noop,onUploadReference:noop,onGenerateReference:noop,onLock:noop,onFork:noop,onUpgrade:noop,onBind:noop,onUnbind:noop,onLocate:noop,onPreviewAsset:(asset:any)=>setPreview(asset.id)};
+ onRenameCard:noop,onDeleteCard:noop,onSaveVersion:noop,onStatus:noop,onRestoreVersion:async()=>{},onSetImageOverride:noop,onUploadReference:noop,onGenerateReference:noop,onLock:noop,onFork:noop,onUpgrade:noop,onBind:noop,onUnbind:noop,onLocate:noop,onPreviewAsset:(asset:any)=>setPreview(asset.id)};
  return <main style={{padding:20,maxWidth:1050,margin:'auto'}}><h1>音色库隔离测试 · 无API／业务库</h1>
  <p>修改次数：{changes} · 基础默认：V{resolvedVoice(doc,{}, {characterCardId:'hero'}).profile.version} · 黑袍生效：V{resolvedVoice(doc,{}, {characterCardId:'state'}).profile.version}</p>
  {uploadMode&&<p>无语音模型 · 校验次数：{admissions} · 试听目标：{preview||'未选择'}</p>}

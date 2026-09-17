@@ -160,6 +160,12 @@ def restore_object(pid: str, oid: str, body: Restore):
         return collab.restore(c, pid, oid, **body.model_dump())
 
 
+@router.post('/{oid}/visual-versions/{version_id}/restore')
+def restore_visual_version(pid: str, oid: str, version_id: str, body: Version):
+    with s.db() as c:
+        return collab.restore_visual_version(c, pid, oid, version_id, **body.model_dump())
+
+
 @router.get('/{oid}/comments')
 def object_comments(pid: str, oid: str):
     with s.db() as c:

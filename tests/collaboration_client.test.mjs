@@ -291,3 +291,47 @@ test('switch during lease acquisition prevents subsequent writes of the old save
   assert.equal(calls.length,1);assert.ok(calls[0].endsWith('/lease'));
   assert.equal(client.leases.size,0);
 });
+
+test('deprecated visual restore uses object CAS and merges only the returned row',async()=>{
+  const {project}=setup();
+  const visual={id:'visual-hero',kind:'visual_card',object_key:'hero',revision:4,assignment_epoch:2,
+    assignee_id:'editor-a',content:{
+      card:{id:'hero',kind:'character',name:'Hero',parentCardId:null,currentVersionId:'hero-v1',status:'active'},
+      versions:{'hero-v1':{id:'hero-v1',cardId:'hero',version:1,parentVersionId:null,status:'deprecated',
+        spec:{description:'coat',attributes:[]},invariants:[],references:[],createdAt:1,provenance:{}}},
+      voice_profile:null}};
+  project.objects.push(copy(visual));
+  project.document.filmBible.visual.cards.hero=copy(visual.content.card);
+  project.document.filmBible.visual.versions['hero-v1']=copy(visual.content.versions['hero-v1']);
+  const calls=[];
+  const client=new CollaborationClient(async(path,init)=>{
+    const body=JSON.parse(init.body);calls.push({path,body});
+    const restored=copy(visual);restored.revision=5;restored.content.versions['hero-v1'].status='locked';
+    return restored;
+  },'editor-a');
+  client.open(project,[]);
+  const restored=await client.restoreVisualVersion('hero-v1');
+  assert.equal(restored.content.versions['hero-v1'].status,'locked');
+  assert.equal(calls[0].path,'/projects/episode/objects/visual-hero/visual-versions/hero-v1/restore');
+  assert.deepEqual(calls[0].body,{expected_revision:4,assignment_epoch:2});
+  const merged=client.mergeRemote(restored,project.document,[]);
+  assert.equal(merged.filmBible.visual.versions['hero-v1'].status,'locked');
+  assert.equal(client.drafts.entries.get('visual-hero').state,'saved');
+});
+
+test('visual restore refuses a local draft instead of replacing it with history',async()=>{
+  const {client,project,calls}=setup();
+  const visual={id:'visual-hero',kind:'visual_card',object_key:'hero',revision:1,assignment_epoch:1,
+    assignee_id:'editor-a',content:{card:{id:'hero',kind:'character',name:'Hero',parentCardId:null,
+      currentVersionId:'hero-v1',status:'active'},versions:{'hero-v1':{id:'hero-v1',cardId:'hero',version:1,
+      parentVersionId:null,status:'deprecated',spec:{description:'old',attributes:[]},invariants:[],references:[],
+      createdAt:1,provenance:{}}},voice_profile:null}};
+  project.objects.push(copy(visual));
+  project.document.filmBible.visual.cards.hero=copy(visual.content.card);
+  project.document.filmBible.visual.versions['hero-v1']=copy(visual.content.versions['hero-v1']);
+  client.open(project,[]);
+  const edited=copy(project.document);edited.filmBible.visual.cards.hero.name='Local draft';client.mark(edited,[]);
+  await assert.rejects(client.restoreVisualVersion('hero-v1'),/本地草稿/);
+  assert.equal(calls.length,0);
+  assert.equal(client.drafts.entries.get('visual-hero').content.card.name,'Local draft');
+});

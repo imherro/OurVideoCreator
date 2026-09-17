@@ -160,6 +160,23 @@ def validate_asset_references(connection, production_id, content):
             raise HTTPException(422, '素材不存在或不属于当前作品')
 
 
+def _visual_document(rows):
+    """Project all canonical visual cards and shot bindings for validation."""
+    result = {'filmBible': {'visual': {'cards': {}, 'versions': {}}}, 'shots': []}
+    for row in rows:
+        value = validation.object_content(row)
+        if row['kind'] == 'shot':
+            result['shots'].append(value['shot'])
+        elif row['kind'] == 'visual_card':
+            visual = result['filmBible']['visual']
+            visual['cards'][value['card']['id']] = value['card']
+            for version_id, version in value['versions'].items():
+                if version_id in visual['versions']:
+                    raise HTTPException(422, '视觉版本编号不能属于多张卡片')
+                visual['versions'][version_id] = version
+    return result
+
+
 def create(connection, project_id, kind, content, *, validated=False):
     validate_content(kind, content)
     if kind=='visual_card' and any((content.get('voice_profile') or {}).get(key) for key in ('referenceAssetId','lockedVersions','defaultVersion')):
@@ -315,6 +332,58 @@ def restore(connection, project_id, object_id, *, expected_revision, assignment_
     return commands(connection, project_id, creates=[], deletes=[], updates=[{
         'id': object_id, 'expected_revision': expected_revision, 'assignment_epoch': assignment_epoch,
         'content': content, 'lease_token': lease_token, 'lease_epoch': lease_epoch}], _action='restore')['updated'][0]
+
+
+def restore_visual_version(connection, project_id, object_id, version_id, *, expected_revision, assignment_epoch):
+    """Restore one deprecated version status from this object's audit trail.
+
+    The object row is the write boundary.  Historical snapshots only prove the
+    previous status; they never replace the current card, references, voice
+    profile, sibling versions, or any shot owned by another collaborator.
+    """
+    row = load(connection, project_id, object_id, write=True)
+    editable(connection, row)
+    expected(row, expected_revision, assignment_epoch)
+    if row['kind'] != 'visual_card':
+        raise HTTPException(422, '只有视觉资产版本可使用此恢复入口')
+    current_content = validation.object_content(row)
+    if version_id not in current_content['versions']:
+        raise HTTPException(404, '视觉版本不存在')
+
+    # Serialize with ordinary visual-card and shot-binding commands.  The
+    # target object is already locked, matching commands' object-before-visual
+    # lock order and keeping the CAS check authoritative.
+    connection.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
+                       ('visual-bindings:' + row['production_id'],))
+    before_rows = list(connection.execute(
+        'SELECT * FROM collaboration_objects WHERE production_id=%s AND NOT deleted',
+        (row['production_id'],)))
+    before = _visual_document(before_rows)
+
+    def historical_documents():
+        for historical in connection.execute('''SELECT snapshot FROM collaboration_history
+                WHERE object_id=%s ORDER BY revision DESC''', (object_id,)):
+            snapshot = json.loads(historical['snapshot'])
+            content = snapshot.get('content') if isinstance(snapshot, dict) else None
+            if not isinstance(content, dict) or not isinstance(content.get('card'), dict) or not isinstance(content.get('versions'), dict):
+                continue
+            card = content['card']
+            yield {'filmBible': {'visual': {
+                'cards': {card.get('id'): card},
+                'versions': content['versions'],
+            }}, 'shots': []}
+
+    from .film_bible.versioning import restore_visual_version as proven_restore
+    restored, status = proven_restore(before, version_id, historical_documents())
+    content = validation.object_content(row)
+    content['versions'][version_id]['status'] = status
+    validate_content('visual_card', content)
+    validate_asset_references(connection, row['production_id'], content)
+    # The pure restore already validated the complete production projection;
+    # assert the row we will persist contains exactly that proven status.
+    if restored['filmBible']['visual']['versions'][version_id]['status'] != status:
+        raise HTTPException(409, '视觉版本恢复状态已变化，请刷新后重试')
+    return replace_content(connection, row, content, project_id, 'visual.restore')
 
 
 def comment(connection, project_id, object_id, body):
@@ -539,22 +608,8 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     for item in updates:
         validation.graph_transition(connection, locked[item['id']], item['content'], scoped)
     if visual_changed:
-        def visual_document(rows):
-            result={'filmBible':{'visual':{'cards':{},'versions':{}}},'shots':[]}
-            for row in rows:
-                value=validation.object_content(row)
-                if row['kind']=='shot':
-                    result['shots'].append(value['shot'])
-                elif row['kind']=='visual_card':
-                    visual=result['filmBible']['visual']
-                    visual['cards'][value['card']['id']]=value['card']
-                    for vid, version in value['versions'].items():
-                        if vid in visual['versions']:
-                            raise HTTPException(422,'视觉版本编号不能属于多张卡片')
-                        visual['versions'][vid]=version
-            return result
         from .film_bible.versioning import validate_film_bible_transition
-        validate_film_bible_transition(visual_document(all_before),visual_document(proposed.values()))
+        validate_film_bible_transition(_visual_document(all_before),_visual_document(proposed.values()))
         for item in updates:
             if locked[item['id']]['kind']=='visual_card':
                 previous=validation.object_content(locked[item['id']]).get('voice_profile')

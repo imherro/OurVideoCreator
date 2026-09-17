@@ -2616,6 +2616,16 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       try { update(() => setVisualVersionStatus(doc, versionId, status)); }
       catch (reason) { report(reason); }
     },
+    onRestoreVersion: async (versionId) => {
+      const client = collaboration.current;
+      const pid = current.current.project?.id;
+      if (!client || !pid || !current.current.doc) return;
+      const restored = await client.restoreVisualVersion(versionId);
+      if (current.current.project?.id !== pid || !current.current.doc) return;
+      const next = client.mergeRemote(restored, current.current.doc, collaborationAssets.current) as Doc;
+      acceptObjectDocument(next);
+      setNotice("已恢复弃用前状态；当前卡片、参考素材和分镜绑定均未改变");
+    },
     onSetImageOverride: (cardId, override) => {
       try {
         update((document) => setVisualCardImageOverride(document, cardId, override));

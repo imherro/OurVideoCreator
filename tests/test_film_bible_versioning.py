@@ -36,3 +36,41 @@ def test_server_rejects_locked_mutation_and_referenced_hard_delete_but_allows_de
     deprecated = copy.deepcopy(old); deprecated['filmBible']['visual']['versions']['hero-v1']['status'] = 'deprecated'
     assert validate_film_bible_transition(old, deprecated) is deprecated
     assert deprecated['shots'][0]['assetBindings']['characters'][0]['versionId'] == 'hero-v1'
+
+
+def test_restore_deprecated_version_uses_nearest_history_without_changing_references():
+    import pytest
+    from backend.film_bible.versioning import restore_visual_version
+
+    original = fixture()
+    deprecated = copy.deepcopy(original)
+    deprecated['filmBible']['visual']['versions']['hero-v1']['status'] = 'deprecated'
+    restored, status = restore_visual_version(deprecated, 'hero-v1', [deprecated, original])
+    assert status == 'locked'
+    assert restored == original
+    with pytest.raises(ValueError, match='不可原地修改'):
+        validate_film_bible_transition(deprecated, restored)
+    with pytest.raises(ValueError, match='未找到'):
+        restore_visual_version(deprecated, 'hero-v1', [])
+
+    mismatched = copy.deepcopy(original)
+    mismatched['filmBible']['visual']['versions']['hero-v1']['invariants'] = []
+    with pytest.raises(ValueError, match='内容不一致'):
+        restore_visual_version(deprecated, 'hero-v1', [mismatched, original])
+
+    deleted_card = copy.deepcopy(deprecated)
+    deleted_card['filmBible']['visual']['cards']['hero'].update(status='deprecated', deletedAt=3)
+    with pytest.raises(ValueError, match='先恢复所属资产卡'):
+        restore_visual_version(deleted_card, 'hero-v1', [original])
+
+
+def test_restore_draft_does_not_lock_or_switch_current_version():
+    from backend.film_bible.versioning import restore_visual_version
+
+    original = fixture()
+    original['filmBible']['visual']['versions']['hero-v1']['status'] = 'draft'
+    deprecated = copy.deepcopy(original)
+    deprecated['filmBible']['visual']['versions']['hero-v1']['status'] = 'deprecated'
+    restored, status = restore_visual_version(deprecated, 'hero-v1', [original])
+    assert status == 'draft'
+    assert restored == original

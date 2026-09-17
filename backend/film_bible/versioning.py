@@ -30,7 +30,7 @@ def _without_status(version):
     return value
 
 
-def validate_film_bible_transition(previous, updated):
+def validate_film_bible_transition(previous, updated, *, restored_statuses=None):
     """Reject destructive saves while allowing explicit, auditable upgrades.
 
     The project document remains the persistence boundary. This validator does
@@ -56,7 +56,13 @@ def validate_film_bible_transition(previous, updated):
                 and new.get('status') == 'deprecated'
                 and _without_status(old) == _without_status(new)
             )
-            if new != old and not allowed_deprecation:
+            allowed_restore = (
+                old.get('status') == 'deprecated'
+                and new.get('status') in ('draft', 'pending_reference', 'locked')
+                and (restored_statuses or {}).get(version_id) == new.get('status')
+                and _without_status(old) == _without_status(new)
+            )
+            if new != old and not allowed_deprecation and not allowed_restore:
                 raise ValueError('已锁定或已弃用的视觉版本不可原地修改')
 
     cards = after.get('cards') or {}
@@ -91,3 +97,31 @@ def validate_film_bible_transition(previous, updated):
             raise ValueError('分镜引用的视觉版本不存在')
 
     return updated
+
+
+def restore_visual_version(context, version_id, history):
+    """Restore only a status proven by newest-first immutable snapshots.
+
+    ``history`` may be a lazy iterator.  The first snapshot containing a
+    non-deprecated copy is authoritative: a content mismatch is an error, not
+    permission to search farther back for a coincidentally matching version.
+    """
+    visual = _visual(context)
+    version = (visual.get('versions') or {}).get(version_id)
+    if not version or version.get('status') != 'deprecated':
+        raise ValueError('该版本不存在或已不是弃用状态，请刷新后重试')
+    card = (visual.get('cards') or {}).get(version.get('cardId')) or {}
+    if card.get('deletedAt') or card.get('status') == 'deprecated':
+        raise ValueError('请先恢复所属资产卡片')
+    for snapshot in history:
+        previous = (_visual(snapshot).get('versions') or {}).get(version_id)
+        if not previous or previous.get('status') == 'deprecated':
+            continue
+        status = previous.get('status')
+        if status not in ('draft', 'pending_reference', 'locked') or _without_status(previous) != _without_status(version):
+            raise ValueError('历史版本内容不一致，无法安全恢复')
+        updated = copy.deepcopy(context)
+        updated['filmBible']['visual']['versions'][version_id]['status'] = status
+        validate_film_bible_transition(context, updated, restored_statuses={version_id: status})
+        return updated, status
+    raise ValueError('未找到弃用前的历史状态，无法自动恢复')
