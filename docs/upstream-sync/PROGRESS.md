@@ -471,3 +471,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 本批没有修改任务加载、作品授权、跨集/整部作品作用域、状态枚举、候选采纳、取消/恢复或刷新逻辑。现有筛选函数及六种持久任务状态回归继续通过；紧凑布局只改变标记结构和 CSS，不产生任务、自动重试或费用。
 
 定向 `task_center + job_detail + episode_transition`：**10 passed / 0 failed**；新增契约断言验证作品名省略、说明 title、三列比例及 select 宽度边界。全量 `npm test`：**282 passed / 0 failed / 0 skipped，1619.59ms**。`npm run build` tsc/Vite exit0，Vite **7.29秒**，产物 `assets/index-CyImXyGr.js` / `assets/index-EH1HLD0z.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
+
+## UPSTREAM-SYNC-32：简化当前作品标题
+
+按冻结上游 `0e8ce1c` 的界面目标适配。顶栏作品按钮移除文件夹图标、“项目 ·”前缀和下拉箭头，只显示当前 Production 名称，为制作流程和分集选择释放横向空间。按钮仍打开 Production 设置页签，完整作品名保留在动态 `aria-label`，title 明确为查看和修改当前项目。
+
+协作版团队切换、制作流程、当前分集选择、作品/分集设置、保存状态和对象协作入口全部保留；没有把作品名和 Episode 标题混为一个可写字段，也没有改变权限、草稿或保存逻辑。`FolderOpen` 仍用于引用类型、回收站原著/剧本等其他位置，只删除已无使用的主文件 `ChevronDown` 导入。
+
+定向 `workflow_shell + production_navigation + episode_transition`：**12 passed / 0 failed**，新增契约断言验证按钮行为/无障碍名称及协作控件仍存在。全量 `npm test`：**283 passed / 0 failed / 0 skipped，1639.84ms**。`npm run build` tsc/Vite exit0，Vite **7.41秒**，主产物 `assets/index-iU3-9m7N.js`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。

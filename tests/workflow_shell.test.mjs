@@ -23,6 +23,22 @@ test('workflow specifications are read-only in the shared header without duplica
   assert.match(header, /saveCurrentView\(\)/);
 });
 
+test('current production header is compact without hiding collaboration controls', () => {
+  const source = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
+  const start = source.indexOf('className={panel === "projectInfo" ? "project-menu active" : "project-menu"}');
+  const end = source.indexOf('<WorkflowStageNav', start);
+  const projectMenu = source.slice(start, end);
+  const topbar = source.slice(source.indexOf('<header className="topbar">'), source.indexOf('<GlobalNav'));
+
+  assert.match(projectMenu, /aria-label=\{`查看和修改项目：\$\{currentProduction\?\.name \|\| project\.name\}`\}/);
+  assert.match(projectMenu, />\s*\{currentProduction\?\.name \|\| project\.name\}\s*<\/button>/);
+  assert.match(projectMenu, /setProjectSettingsTab\("production"\)/);
+  assert.doesNotMatch(projectMenu, /FolderOpen|ChevronDown|项目 ·/);
+  assert.match(topbar, /className="team-switcher"/);
+  assert.match(topbar, /className="project-settings-button"/);
+  assert.match(topbar, /className=\{"save-status "/);
+});
+
 test('workflow shell exposes the production stages in order',()=>{
   assert.deepEqual(WORKFLOW_STAGES.map(stage=>stage.label),[
     '概览','原著','改编策划','剧本','分镜规划','塑角造景','分镜图','视频','剪辑','高级画布',
