@@ -389,3 +389,11 @@ _stale_scripts增加episode_nos筛选，仅锁定并更新受影响的已审核�
 初步scope真实PG **3 passed，13.87秒**。前端 **270 passed /0 failed /0 skipped，1568.63ms**；tsc/Vite build exit0，Vite **10.30秒**，保留既有chunk警告。前端新增静态入口/保存版本/忙碌保护断言，未运行浏览器完整E2E；未运行真实Provider或全量后端，无依赖/迁移/后台页面新增。独立单集AI规划生成及候选采纳仍未完成，下一步继续此闭环。
 
 最终 `tests/test_adaptation_scope.py tests/test_adaptation.py` **12 passed，35.52秒**，包括新增manager/其他角色验证，以及已成片EP01保持、EP02独立review/approve、禁止直接批准/旧版批准、错误集404。只推送集成分支并更新7878验收副本。
+
+## UPSTREAM-SYNC-25 准备：单集规划契约与连续性上下文
+
+对照冻结最终13939a8中4dfb676/87c470a的合成要求，新增内部episode_plans模块：严格单集JSON Schema/结果校验、目标集号与固定时长、仅引用快照内章节，结果为draft、不写业务。continuity_context读取正式剧本与协作视觉投影：紧邻前集全文、更早集末1500字及截断标识；区分已成片/已批准/保存/仅规划证据，未成片过期正文不作为可靠来源；包含assignment_epoch，锁定视觉来自currentVersion spec，忽略废弃卡。兼容没有改编plan的已存在直接创作前集，不遗漏实际正文。
+
+实际测试 `tests/test_episode_plan_contract.py`：首轮14 passed /1 failed（5.66秒，测试误用projectId而实际API为project_id）；修正后15 passed（4.78秒）；增加真实PG规范视觉对象对照旧document残留后最终 **16 passed，8.70秒**。覆盖不修改候选/数据库正文、集号bool/float、NaN/Inf/错时长、越界章节、未知status字段、空要点、前集全文/截断/过期证据、锁定正式视觉及废弃排除。
+
+**本次仅内部准备，不是单集AI功能完成**。模块尚未接HTTP/准入、Worker、候选采纳或网页按钮；调用者未来必须在授权和依赖锁下读取、冻结指纹，不能仅凭当前只读helper声称已具备并发安全。没有新增依赖/迁移，没有付费调用，未运行前端构建/浏览器/全量后端。7878继续运行SYNC-24，待单集生成闭环完成再更新；整体同步目标保持进行中。
