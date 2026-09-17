@@ -87,10 +87,10 @@ def test_project_create_name_only_remains_backward_compatible(client):
     assert project["name"] == project["episode_title"] == "Legacy"
     assert project["document"]["style"] == "电影写实"
     assert project["document"]["ratio"] == "16:9"
-    assert project["document"]["duration"] == 15
+    assert project["document"]["duration"] == 120
     adaptation = client.get(f'/api/productions/{project["production_id"]}/adaptation').json()
     assert adaptation["adaptationPlan"]["format"] == {
-        "episodeCount": 1, "targetDuration": 15.0, "ratio": "16:9", "platform": "通用短视频",
+        "episodeCount": 1, "targetDuration": 120.0, "ratio": "16:9", "platform": "通用短视频",
     }
     assert len(adaptation["episodePlans"]) == 1
 

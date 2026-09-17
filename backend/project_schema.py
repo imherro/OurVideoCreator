@@ -26,7 +26,7 @@ def new_document(generation_policy=None):
         'filmBible': empty_film_bible(),
         'generationPolicy': copy.deepcopy(generation_policy or empty_generation_policy()),
         'nodes': [], 'edges': [], 'shots': [], 'timeline': [], 'characters': [],
-        'brief': '', 'style': '电影写实', 'ratio': '16:9', 'duration': 15,
+        'brief': '', 'style': '电影写实', 'ratio': '16:9', 'duration': 120,
         'videoResolution': '720p',
         'videoRatio': '16:9', 'videoDuration': -1, 'videoFormat': 'mp4',
     }

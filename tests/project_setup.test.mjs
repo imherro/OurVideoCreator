@@ -13,6 +13,7 @@ import {
 
 test('project setup validates required fields and creates the reviewed API payload',()=>{
   const draft=defaultProjectSetupDraft(['text','image','video'].map(kind=>({id:kind,kind,is_default:true})));
+  assert.equal(draft.duration,120);
   assert.deepEqual(validateProjectSetupDraft(draft),['请输入作品名称']);
   draft.name=' 花信未迟 ';draft.ratio='9:16';draft.duration=60;draft.episodeCount=12;draft.platform='抖音';draft.bible.worldEra='江南';draft.bible.avoidItems='高饱和\n\n磨皮';
   draft.videoResolution='1080p';draft.videoRatio='21:9';draft.videoDuration=8;draft.videoFormat='mov';
