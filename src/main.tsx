@@ -296,7 +296,7 @@ const assetCategories: Any = {
   music: "音乐",
   sfx: "音效",
   voice: "人声",
-  reference: "参考",
+  reference: "参考", motion_reference:"动作参考",
   other: "其他",
 };
 const assetKinds: Any = { image: "图片", video: "视频", audio: "音频", subtitle: "字幕" };
@@ -3579,7 +3579,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             )}
             {data.kind==='video'&&doc.shots.filter(shot=>(shot.videoNode||shot.pipeline?.videoNodeId)===node.id).map(shot=><MotionReferenceEditor
               key={shot.uid||shot.id} document={doc} shot={shot} node={node} assets={assets} models={config.models}
-              projectId={project.id} request={api} onUploaded={asset=>setAssets(items=>[asset as Asset,...items])}
+              projectId={project.id} busy={busy} request={api} onUploaded={asset=>setAssets(items=>[asset as Asset,...items])}
               onPatch={patch=>update(document=>updateStoryboardShot(document,shotIdentity(shot),patch))}/>)}
             {data.kind === 'image' ? <ImageGenerationSettings key={node.id} node={node} document={doc}
               projectId={project.id} models={config.models} request={api} onChange={changeModel}/> : <ModelSelector

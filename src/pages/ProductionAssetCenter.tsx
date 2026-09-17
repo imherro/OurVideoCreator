@@ -6,7 +6,7 @@ import { visualBibleOf, visualKindLabels, type FilmBibleDocument } from "../film
 type Any = Record<string, any>;
 type Usage = { version_id: string; episodes: Any[]; shots: Any[] };
 
-const categoryLabels: Record<string, string> = { character: "角色", scene: "场景", prop: "道具", shot: "镜头", music: "音乐", sfx: "音效", voice: "配音", reference: "参考", other: "其他" };
+const categoryLabels: Record<string, string> = { character: "角色", scene: "场景", prop: "道具", shot: "镜头", music: "音乐", sfx: "音效", voice: "配音", reference: "参考", motion_reference:"动作参考", other: "其他" };
 const kindLabels: Record<string, string> = { image: "图片", video: "视频", audio: "声音", subtitle: "字幕" };
 const sourceLabels: Record<string, string> = { generated: "模型生成", uploaded: "上传", imported: "导入" };
 

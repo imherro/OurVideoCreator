@@ -87,13 +87,13 @@ export function VideoProductionWorkspace(props: Props) {
           <details className="video-dialogue-projection"><summary>镜头与对白摘要（最终参数请展开下方提交预览）</summary><pre>{compileVideoPrompt(row.shot.video_prompt,row.shot,row.submissionDuration)}</pre>{row.submissionDuration !== row.plannedDuration && <small>分镜计划 {row.plannedDuration} 秒；预计提交 {row.submissionDuration} 秒，以服务端预览校验为准。</small>}</details>
             <div className="domain-fields three"><label>时长（秒）<input type="number" min="0.1" step="0.1" value={row.shot.duration ?? 3} onChange={(event) => props.onPatchShot(row.uid,{duration:Number(event.target.value)})}/></label><ModelSelector data={{...data,kind:"video"}} providers={providers} request={props.request}
               onChange={patch=>props.onPatchVideoNode(row.videoNode!.id,patch)}/></div>
-            {row.videoNode&&<MotionReferenceEditor document={props.document} shot={row.shot} node={row.videoNode}
-             assets={props.assets} models={props.providers} projectId={props.projectId} request={props.request}
-             onUploaded={props.onUploaded} onPatch={patch=>props.onPatchShot(row.uid,patch)}/>}
             <div className="video-shot-context"><span>{row.shot.action || "未填写镜头动作"}</span><small>{row.shot.camera || "未设置机位"} · 分镜 {row.plannedDuration || 0} 秒 · 提交 {row.submissionDuration || 0} 秒</small></div>
           </div>
           <div className="video-result-column"><small>GENERATED VIDEO</small><button className="video-result-preview" disabled={!row.videoAsset} onClick={() => row.videoAsset && props.onPreview(row.videoAsset as Asset)}>{row.videoAsset ? <video src={row.videoAsset.url} muted preload="metadata"/> : <span><Film/>等待视频</span>}</button>{row.job && <div className="video-job-state"><span>{jobLabels[row.job.status] || row.job.status}</span>{row.job.progress != null && <b>{Math.round(row.job.progress)}%</b>}<small>{row.job.phase}</small></div>}</div>
         </div>
+        {row.videoNode&&<div className="video-shot-reference-settings"><MotionReferenceEditor document={props.document} shot={row.shot} node={row.videoNode}
+         assets={props.assets} models={props.providers} projectId={props.projectId} busy={props.busy||row.status==='generating'} request={props.request}
+         onUploaded={props.onUploaded} onPatch={patch=>props.onPatchShot(row.uid,patch)}/></div>}
         <footer>{row.status === "stale" && <span className="danger">依赖已变化，旧视频仍保留</span>}<div/><button disabled={props.busy || !canGenerate} onClick={() => void submit([row.uid])}>{row.videoAsset ? <><RefreshCw size={14}/>重新生成</> : <><Play size={14}/>开始生成</>}</button>{row.videoAsset && <button onClick={() => props.onPreview(row.videoAsset as Asset)}>预览</button>}{row.videoNode && <button className="quiet" onClick={() => props.onOpenCanvas(row.videoNode!.id)}>高级画布<ArrowUpRight size={13}/></button>}</footer>
       </article>;
     })}</div>}

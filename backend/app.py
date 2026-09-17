@@ -885,7 +885,7 @@ def asset_public(row):
         if isinstance(visual,dict):public['visual_version_id']=visual.get('versionId')
     return public
 
-ASSET_CATEGORIES={'character','scene','prop','shot','music','sfx','voice','reference','other'}
+ASSET_CATEGORIES={'character','scene','prop','shot','music','sfx','voice','reference','motion_reference','other'}
 ASSET_KINDS={'image','video','audio','subtitle'}
 
 def asset_category(value):
