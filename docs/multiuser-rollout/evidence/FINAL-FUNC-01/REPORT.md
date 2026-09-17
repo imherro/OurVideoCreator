@@ -2,6 +2,8 @@
 
 状态：**READY_FOR_REVIEW**，请求外部最终功能验收；不预写外部通过。
 
+后续外部结论（2026-09-17）：**通过，FUNC-01…06全通过，FINAL-01关闭，无需返修**。业务018a604 / evidence59e3c0d绑定保持；见 [正式结论简明归档](../../reviews/FINAL-FUNC-01/ACCEPTANCE.md)。下文为原实施送审记录，不改写历史运行版本或证据。
+
 ## 版本与实际范围
 
 - 唯一协作仓库：imherro/OurVideoCreator，master；不向 MyVideoCreator 推送。

@@ -1,6 +1,10 @@
 # 多用户改造外部验收记录
 
-## 当前覆盖：FINAL-FUNC-01 READY_FOR_REVIEW
+## 当前覆盖：FINAL-FUNC-01 外部功能验收通过，收尾结束
+
+2026-09-17 主 ChatGPT 会话正式判定 **通过**，完整回复与 REVIEW.md 九节附件已读取；[简明归档](reviews/FINAL-FUNC-01/ACCEPTANCE.md)。通过业务 `018a6049bde4e47226ff41ff3b289d3496f75446`，通过 evidence `59e3c0d0cb93079f5440420cf8fdf4df64bf9fde`。FUNC-01…06全通过，FINAL-01关闭，无剩余阻塞、无需返修，下一开发任务无。P0–P5及P6-SINGLE-01历史通过保持；运维/部署暂缓、容量/真实供应商未验、旧P6平台延期，不作生产可用或原九阶段全部条目通过声明。后续仅文档归档不替换本次通过绑定，保持停止。
+
+### 本次提交记录（外部结论前）
 
 用户明确要求功能收尾、暂缓运维；ChatGPT 正式下发 `prompts/FINAL_FUNC_01_CODEX_PROMPT.md`。起点 `1ca827212bdc411c7cccf093687482f47cdc9251`，P0–P5 及 P6-SINGLE-01 历史通过保持（P6 业务 c1b1695 / evidence 026cddf）。P7-RECOVERY-01 暂缓且尚未开始。双人浏览器链路完成，候选 `018a6049bde4e47226ff41ff3b289d3496f75446` 修复引用素材删除保护、定向 99 passed，报告 `evidence/FINAL-FUNC-01/REPORT.md`，状态仅 READY_FOR_REVIEW。旧 P6 平台继续延期；不启动原 P8 全矩阵、备份恢复、部署、容量或真实付费验证，不预写通过。
 
