@@ -91,6 +91,7 @@ import {
 } from "./graph";
 import { PromptLibrary } from "./PromptLibrary";
 import { ModelSelector } from "./ModelSelector";
+import { ImageGenerationSettings } from "./ImageGenerationSettings";
 import { PlatformModels } from "./PlatformModels";
 import { GenerationPolicyPanel } from "./GenerationPolicyPanel";
 import { VisualStylePicker } from "./VisualStylePicker";
@@ -2926,6 +2927,9 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
             assets={assets}
             jobs={jobs}
             busy={busy}
+            renderImageSettings={(imageNode) => <ImageGenerationSettings node={imageNode} document={doc}
+              projectId={project.id} models={config.models} request={api}
+              onChange={(patch) => update((d) => patchNode(d,imageNode.id,patch))}/>}
             onPatch={(uid, patch) =>
               update((document) => updateStoryboardShot(document, uid, patch))
             }
@@ -3549,13 +3553,14 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 <small>生成后校验总时长，不合格时自动修正一次。</small>
               </label>
             )}
-            <ModelSelector
+            {data.kind === 'image' ? <ImageGenerationSettings key={node.id} node={node} document={doc}
+              projectId={project.id} models={config.models} request={api} onChange={changeModel}/> : <ModelSelector
               data={data}
               providers={config.models}
               localModels={system.models}
               request={api}
               onChange={changeModel}
-            />
+            />}
             {data.kind === "video" &&
               ["minimax", "volcengine_ark"].includes(
                 config.models.find((p: Any) => p.id === data.model_id)

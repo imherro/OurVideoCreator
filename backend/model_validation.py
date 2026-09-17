@@ -214,7 +214,7 @@ def model_definition(body, config, kind):
     return value
 
 
-def image_parameters(definition, result, document, node_id):
+def image_parameters(definition, result, document, node_id, size_override=None):
     """Derive only published controls, including images outside shot objects."""
     ratio = document.get('ratio')
     node = next((n for n in document.get('nodes', []) if n.get('id') == node_id), {})
@@ -226,6 +226,7 @@ def image_parameters(definition, result, document, node_id):
                    '1:1':'2048x2048', '3:4':'1536x2048', '9:16':'1152x2048', '2:1':'1024x512'}.get(ratio)
     if not recommended:
         return result
+    recommended = size_override or recommended
     rules = definition['rules']
     for name in ('ratio', 'aspect_ratio'):
         if name in rules:
@@ -256,13 +257,13 @@ def image_parameters(definition, result, document, node_id):
     return result
 
 
-def shot_parameters(definition, submitted, kind, document, node_id, *, complete=True):
+def shot_parameters(definition, submitted, kind, document, node_id, *, complete=True, image_size=None):
     """Recompute linked-shot controls from canonical state and frozen model rules."""
     # Canonical shot controls may fill missing fields. Require completeness only
     # after that derivation, before freezing or making any external request.
     result = parameters(definition, submitted, complete=False)
     if kind == 'image':
-        result = image_parameters(definition, result, document, node_id)
+        result = image_parameters(definition, result, document, node_id, image_size)
     shot = next((item for item in document.get('shots', [])
                  if item.get(kind + 'Node') == node_id
                  or (item.get('pipeline') or {}).get(kind + 'NodeId') == node_id), None)

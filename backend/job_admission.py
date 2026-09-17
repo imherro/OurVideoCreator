@@ -102,8 +102,9 @@ def replay_binding(connection, old, body, document):
     """
     if body.kind=='export':return None
     from .platform_models import Binding
-    row=connection.execute('''SELECT p.*,v.model_id,v.definition FROM job_private p
-        JOIN model_versions v ON v.id=p.model_version_id WHERE p.job_id=%s''',(old['id'],)).fetchone()
+    row=connection.execute('''SELECT p.*,v.model_id,v.definition,cv.config FROM job_private p
+        JOIN model_versions v ON v.id=p.model_version_id
+        JOIN provider_config_versions cv ON cv.id=p.config_version_id WHERE p.job_id=%s''',(old['id'],)).fetchone()
     if not row:raise HTTPException(409,'原任务缺少固定模型版本，请人工核对')
     if body.input.get('model_id')!=row['model_id']:raise HTTPException(409,'同一提交标识不能更换平台模型')
     submitted=body.input.get('parameters',{})
@@ -113,6 +114,12 @@ def replay_binding(connection, old, body, document):
         if name in body.input:
             if name in submitted and submitted[name]!=body.input[name]:raise ValueError('生成参数存在重复冲突')
             submitted[name]=body.input[name]
-    parameters=model_validation.shot_parameters(json.loads(row['definition']),submitted,
-        'text' if body.kind=='storyboard' else body.kind,document,body.node_id)
+    if body.kind=='image' and json.loads(old['input']).get('image_spec',{}).get('version')=='platform-image-settings/v1':
+        from .image_settings import resolve
+        parameters,_=resolve(json.loads(row['definition']),submitted,document,body.node_id,
+            json.loads(row['config']),body.input.get('imageSettings'),freeze=True,
+            frozen_seed=json.loads(row['parameters']).get('seed'))
+    else:
+        parameters=model_validation.shot_parameters(json.loads(row['definition']),submitted,
+            'text' if body.kind=='storyboard' else body.kind,document,body.node_id)
     return Binding(row['model_id'],row['model_version_id'],row['config_version_id'],row['credential_version_id'],parameters)

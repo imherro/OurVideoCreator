@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
 type Value=Record<string,any>;
-export function ModelSelector({data,providers,request,onChange}:{data:Value;providers:Value[];localModels?:Value[];request:(path:string)=>Promise<any>;onChange:(patch:Value)=>void}){
+export function ModelSelector({data,providers,request,onChange,hideControl,preserveParameters=false}:{data:Value;providers:Value[];localModels?:Value[];request:(path:string)=>Promise<any>;onChange:(patch:Value)=>void;hideControl?:(name:string,rule:Value,model:Value)=>boolean;preserveParameters?:boolean}){
  const [models,setModels]=useState<Value[]>(providers),[loading,setLoading]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
  const kind=data.kind==='storyboard'?'text':data.kind;
  useEffect(()=>{
@@ -12,7 +12,7 @@ export function ModelSelector({data,providers,request,onChange}:{data:Value;prov
  const available=models.filter(item=>item.kind===kind),selected=available.find(item=>item.id===data.model_id),caps=selected?.capabilities;
  function choose(id:string){
   const model=available.find(item=>item.id===id);
-  onChange({model_id:id,parameters:{...model?.defaults},provider:undefined,model:undefined,
+  onChange({model_id:id,parameters:{...model?.defaults,...(preserveParameters?data.parameters:{})},provider:undefined,model:undefined,
             resolution:undefined,frames:undefined,seed:undefined,
             model_capabilities:{...model?.capabilities},model_rules:{...model?.rules}});
  }
@@ -26,7 +26,7 @@ export function ModelSelector({data,providers,request,onChange}:{data:Value;prov
  {!loading&&!available.length&&<p className="error">暂无已发布且可用的平台模型，请联系管理员。系统不会自动回退其他服务。</p>}
  {error&&<p className="error">{error}</p>}
  {caps&&<p className="muted">{caps.image_reference?'支持参考图':'不支持参考图'}{caps.max_references?` · 最多 ${caps.max_references} 张`:''}{caps.end_frame?' · 支持尾帧':''}{caps.audio_reference?' · 支持参考音频':''}</p>}
- {selected&&Object.entries(selected.rules||{}).filter(([,rule])=>(rule as Value).type!=='strings').map(([name,value])=>{
+ {selected&&Object.entries(selected.rules||{}).filter(([name,rule])=>(rule as Value).type!=='strings'&&!hideControl?.(name,rule as Value,selected)).map(([name,value])=>{
    const rule=value as Value,current=data.parameters?.[name]??selected.defaults?.[name]??'';
    const change=(v:any)=>onChange({parameters:{...data.parameters,[name]:v}});
    return <label key={name}>{name}

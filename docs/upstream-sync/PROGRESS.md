@@ -140,6 +140,26 @@
 
 无新依赖、数据库迁移、配置项或后台页面；保持对象权限、候选采纳、平台模型版本与幂等流程。未部署、合并master或修改用户服务。`READY_FOR_REVIEW`，按用户授权独立自测，不提交ChatGPT审核。
 
+## UPSTREAM-SYNC-08：统一图片设置、只读预览与实际参数展示
+
+来源 `9b55ccf`，与07的画幅基础合并满足这组需求。按协作版平台模型、对象保存和冻结绑定适配，不复制单机SQLite设置或恢复本地推理部署。需求/行为说明见 `docs/image-generation-settings.md`。
+
+- 分镜列表、宫格、高级画布共用折叠图片设置，编辑同一节点的model_id/parameters/imageSettings。切换模型保留当前参数，不兼容明确报错；恢复项目默认是显式操作。仍经原patchNode、对象revision/草稿及提交前保存，不绕过负责人权限，不自动采纳图片。
+- 新增本地只读 `POST /projects/{pid}/image-spec`，viewer只能在有权作品内预览，保留登录/CSRF边界；不创建任务、不改项目、不查询外部模型目录或发起生成。不以预览代替提交时的对象/素材检查。支持未保存画幅、视频分辨率及旧节点顶层参数，旧顶层参数重复冲突在预览与实际提交均拒绝。
+- 私有工作流支持且平台发布相应规则时，Maestro/Comfy外部API才开放自定义/视频像素及固定种子。尺寸/随机整数仍受管理员规则约束；云端固定种子未实现时拒绝，不把输入后被忽略当作支持。随机种子预览不抽取，创建时冻结，旧幂等回执沿用原模型/配置/种子。没有种子合法候选时预览与提交均拒绝。
+- 新图片任务的image_spec是只读安全投影，与job_private参数一致；客户端伪造值不影响冻结和重试。任务详情区分原请求与冻结值。不回填历史任务、不改恢复查询、无迁移或依赖升级。
+- 额外实际复现批量入口重复注入图片ratio与节点parameters冲突，红测 **1 failed / 13 deselected，3.24秒**；仅取消图片批量入口的第二处注入，沿用服务端统一推导。单次与绑定镜头的精确批量均保持显式尺寸和稳定重试。
+
+验证记录：
+
+- 首轮图片设置/画幅专项24 passed，36.45秒；扩大联合首次62 passed / 1 setup error，161.36秒：测试新导入team夹具但遗漏clients夹具，修正测试导入，未改变权限实现以绕过测试。
+- 随后联合82 passed，189.64秒；加入规则更新后种子回执及随机域校验，`tests/test_image_settings.py tests/test_upstream_image_aspect.py tests/test_p4_submission_execution.py tests/test_p4_r1_regressions.py tests/test_p5_run_permissions.py tests/test_runninghub.py tests/test_hc_atom.py` → **83 passed，199.11秒，exit0**。之后补齐旧顶层参数预览，最终设置专项 **16 passed，45.65秒**。有重复覆盖，不相加声称独立测试数。
+- 真实PG与普通编辑者提交/批量/重试均执行；Maestro/Comfy Worker通过真实冻结绑定向MockTransport发出自定义宽高及确定种子，取回2×2合成PNG并登记素材。此项验证请求与登记，不声称真实供应商输出1280×720或付费账号通过。viewer跨作品拒绝，预览的外部调用入口被测试桩禁止，业务文档/任务列表不变。
+- 前端首次228 passed / 1 failed：新增“保留已有节点”夹具没有既有图像→视频边，ensureShotNodes正常补边时测试的禁止ID生成器抛错；补齐夹具既有边后通过。最终 `npm test` → **229 passed / 0 failed / 0 skipped，1537.27ms**；`npm run build` → **tsc与Vite exit0，Vite 8.29秒**，既有chunk警告保留。
+- computer-use隔离真实组件页：展开预览修改次数0；设置1280×720与种子7后三次修改，旧assetId保留且generation_revision递增/stale=true；切换入口不增加修改且设置保持；换模型保留参数并出现不兼容错误；主动恢复默认才重置。截图检查收紧后的布局。页面使用模拟预览函数，不是登录业务系统完整E2E；服务端一致性由PG专项覆盖。已关闭本轮自建页与Vite，保留用户服务和日志。
+
+最终候选回归 `tests/test_image_settings.py tests/test_p5_object_candidates.py tests/test_upstream_compiled_candidates.py` → **26 passed，93.47秒，exit0**，包括本轮最终16项设置测试及既有显式采纳/迟到结果边界。`git diff --check`通过。未运行全量后端、真实付费API或部署。无新依赖、数据库迁移或后台配置页面；原master工作区仍干净且HEAD为eeb7a4f。本批仅进入集成分支，不合并master，不发送ChatGPT审核。`READY_FOR_REVIEW`仅为开发交付标识，不代表新的外部验收PASS。
+
 ## 后续队列
 
-前七组已完成自测，其余仍未全部移植。下一组继续处理9b55ccf的图片设置、只读规格预览与冻结实际参数展示，再处理多模态/音色、直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+前八组已完成自测，其余仍未全部移植。下一组处理多模态/参考输入与音色，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

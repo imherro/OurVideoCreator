@@ -1152,10 +1152,39 @@ def save_platform_prompt_template(tid:str,body:PromptTemplateSave):
     from .prompt_library import save
     return save(tid,body)
 
+class ImageSpecPreview(StrictBody):
+    node_id: str
+    model_id: str
+    node_data: dict = Field(default_factory=dict)
+    parameters: dict = Field(default_factory=dict)
+    imageSettings: dict = Field(default_factory=dict)
+    ratio: str | None = None
+    videoResolution: str | None = None
+
+
+@app.post('/api/projects/{pid}/image-spec')
+def image_spec_preview(pid:str,body:ImageSpecPreview):
+    with s.db() as c:
+        collaboration.project_scope(c,pid,'viewer')
+        state=read_project_state(c,pid)
+        document=dict(state['document'])
+        if body.ratio is not None: document['ratio']=body.ratio
+        if body.videoResolution is not None:
+            if body.videoResolution not in ('480p','720p','1080p'): raise ValueError('视频分辨率无效')
+            document['videoResolution']=body.videoResolution
+        # References/prompts are validated on submission, not by this local
+        # parameter-only preview. It never queues or contacts a provider.
+        binding=platform_models.resolve(c,body.model_id,'image',
+            {**body.node_data,'parameters':body.parameters,'imageSettings':body.imageSettings},
+            document=document,node_id=body.node_id,preview=True)
+        return binding.image_spec
+
+
 def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     from .job_contracts import freeze_prompt_contract
     from .job_candidates import freeze_relation
     model_validation.reject_private_overrides(body.input)
+    body.input.pop('image_spec',None)  # Read-only projection, never trust caller metadata.
     submitted_input=body.input
     body.input=freeze_prompt_contract(body.kind,body.input)
     if body.kind not in ('text','storyboard','image','video','audio','export'): raise ValueError('不支持的任务类型')
@@ -1282,6 +1311,8 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     scope='production' if body.input.get('stage') in ('source_analysis','adaptation_generation') else 'episode'
     jid=s.uid('job-'); now=time.time()
     input_hash=job_admission.fingerprint(pid,body,target,binding)
+    if binding and binding.image_spec:
+        body.input={**body.input,'image_spec':binding.image_spec}
     c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id,submission_namespace,input_hash)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id,entrypoint,input_hash))
     if binding:
@@ -2127,8 +2158,10 @@ def prepare_run_workflow(pid,body):
             if not parents: raise ValueError(f'节点 {data.get("label",node["id"])} 缺少输入')
             data['prompt']={'text':'根据上游信息编写剧本','storyboard':'将上游剧本拆解为结构化分镜','image':'生成上游描述的电影画面','video':'根据上游画面与描述生成动态镜头'}[kind]
         data['project_style']=p['document'].get('style','')
-        if kind in ('image','video') and provider and 'ratio' in provider.get('rules',{}):
-            data['ratio']=(p['document'].get('videoRatio') or p['document'].get('ratio','16:9')) if kind=='video' else p['document'].get('ratio','16:9')
+        if kind=='video' and provider and 'ratio' in provider.get('rules',{}):
+            data['ratio']=p['document'].get('videoRatio') or p['document'].get('ratio','16:9')
+        # Image aspect is resolved once from canonical state at admission;
+        # injecting a second spelling here conflicts with saved parameters.
         if kind in ('text','storyboard'):
             data['target_duration']=data.get('target_duration') or p['document'].get('duration',15)
         if kind=='storyboard':

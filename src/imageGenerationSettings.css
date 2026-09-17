@@ -1,0 +1,9 @@
+.image-generation-settings { min-width: 0; margin: 8px 0; border: 1px solid var(--border, #35404b); border-radius: 8px; padding: 10px; }
+.image-generation-settings summary { cursor: pointer; font-size: 13px; }
+.image-generation-settings-body { display: grid; gap: 8px; margin-top: 10px; min-width: 0; }
+.image-generation-settings-body label { display: grid; gap: 4px; margin: 0; }
+.image-generation-settings-body pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
+.image-generation-settings-body select, .image-generation-settings-body input { width: 100%; min-width: 0; }
+.image-generation-settings-body p, .image-generation-settings-body small { overflow-wrap: anywhere; }
+.image-generation-settings-body p { margin: 0; }
+.image-generation-settings-body > button { justify-self: start; }

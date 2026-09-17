@@ -120,6 +120,11 @@ export function TaskDetailPage({ jobId, request }: { jobId: string; request: (pa
           <h3>User Prompt</h3><pre className="debug-block">{job.input?.prompt || "未记录"}</pre>
           <h3>Output Schema · {job.input?.schema_version || "无版本"}</h3><pre className="debug-block">{job.input?.response_schema ? JSON.stringify(job.input.response_schema, null, 2) : "此任务没有结构化输出 Schema"}</pre>
         </>}
+        {job.kind==='image'&&job.input?.image_spec&&<section><h3>图片提交规格（任务创建时冻结）</h3>
+          <p>{job.input.image_spec.ratio} · {job.input.image_spec.size||'平台未发布像素尺寸'} · {job.input.image_spec.seedSupported
+            ? `实际种子：${job.input.image_spec.seed??'未记录'}`:'供应商控制随机性'}</p>
+          <p className="muted">{job.input.image_spec.sizeNote} 下方原始请求可能包含旧默认值；执行以此处冻结参数为准。</p>
+          <pre className="debug-block">{JSON.stringify(job.input.image_spec.parameters,null,2)}</pre></section>}
         <h3>请求参数</h3><pre className="debug-block">{JSON.stringify(parameters, null, 2)}</pre>
       </section>
       <section className="task-detail-card">

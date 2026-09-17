@@ -254,9 +254,10 @@ class Binding:
     config_version_id: str
     credential_version_id: str
     parameters: dict
+    image_spec: dict | None = None
 
 
-def resolve(connection, model_id, kind, inp, *, document=None, node_id=None):
+def resolve(connection, model_id, kind, inp, *, document=None, node_id=None, preview=False):
     validation.reject_private_overrides(inp)
     kind = 'text' if kind == 'storyboard' else kind
     row = connection.execute('''SELECT m.* FROM model_catalog m WHERE id=%s FOR SHARE''', (model_id,)).fetchone()
@@ -276,7 +277,8 @@ def resolve(connection, model_id, kind, inp, *, document=None, node_id=None):
         raise provider_secrets.SecretUnavailable('当前模型凭证不可用')
     provider_secrets.decrypt(connection, credential)
     definition = json.loads(version['definition'])
-    validate_capabilities(definition['capabilities'], inp)
+    if not preview:
+        validate_capabilities(definition['capabilities'], inp)
     submitted = inp.get('parameters', {})
     if not isinstance(submitted,dict):
         raise ValueError('生成参数必须为对象')
@@ -286,8 +288,14 @@ def resolve(connection, model_id, kind, inp, *, document=None, node_id=None):
             if name in submitted and submitted[name] != inp[name]:
                 raise ValueError('生成参数存在重复冲突')
             submitted[name] = inp[name]
-    normalized = validation.shot_parameters(definition, submitted, kind, document or {}, node_id)
-    return Binding(row['id'], row['version_id'], provider['config_version_id'], credential['id'], normalized)
+    spec = None
+    if kind == 'image':
+        from .image_settings import resolve as image_settings
+        normalized, spec = image_settings(definition, submitted, document or {}, node_id, config,
+            inp.get('imageSettings'), freeze=not preview)
+    else:
+        normalized = validation.shot_parameters(definition, submitted, kind, document or {}, node_id)
+    return Binding(row['id'], row['version_id'], provider['config_version_id'], credential['id'], normalized, spec)
 
 
 def validate_capabilities(caps, inp):
