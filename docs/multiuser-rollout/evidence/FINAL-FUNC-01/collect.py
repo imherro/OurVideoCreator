@@ -62,5 +62,5 @@ for command in commands:
 (out/'media-check.json').write_text(redact(json.dumps(media, ensure_ascii=False, indent=2))+'\n', encoding='utf-8')
 for name in ('targeted.txt', 'targeted-018a604.txt'):
     text = (local/name).read_text(encoding='utf-8-sig')
-    (out/name).write_text(redact(text).replace('\r\n', '\n'), encoding='utf-8')
+    (out/name).write_text(redact(text).replace('\r\n', '\n').rstrip()+'\n', encoding='utf-8')
 print(json.dumps({'browser_calls': len(calls), 'media_exit_codes': [item['exit_code'] for item in media]}))
