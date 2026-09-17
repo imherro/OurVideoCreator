@@ -1,5 +1,5 @@
 param(
-    [int]$Port=7868,
+    [int]$Port=7878,
     [string]$BindAddress='0.0.0.0',
     [int]$WorkerConcurrency=4,
     [switch]$NoBrowser,

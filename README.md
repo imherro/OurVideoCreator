@@ -23,7 +23,9 @@ $env:OVC_DATABASE_URL='postgresql+psycopg://用户名:密码@127.0.0.1:5432/our_
 .\Stop-Studio.ps1
 ```
 
-开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁。P6-SINGLE-01 继续保留单 Worker；多 Worker 与完整配额已明确延期。
+协作版 Web 默认使用 **7878**，访问 `http://127.0.0.1:7878`，与单机版 MyVideoCreator 的 7868 分开。端口配置在下次启动时生效，不会自动重启现有服务；显式传入 `-Port` 时仍以指定值为准。
+
+开发时可直接运行 `python -m uvicorn backend.app:app --host 127.0.0.1 --port 7878` 和 `python -m backend.worker_cli`。关闭浏览器或重启 Web 不会停止 Worker，也不会重置已持久化任务。`-WebOnly` 停止和重启 Web 时不会触碰 Worker。第二个 Worker 会因同一 PostgreSQL 队列上的 session advisory lock 明确拒绝启动；改变 `MVC_DATA_DIR` 不能绕过该锁。P6-SINGLE-01 继续保留单 Worker；多 Worker 与完整配额已明确延期。
 
 首次部署必须由运维使用 `python -m backend.admin_cli bootstrap-admin --phone <管理员手机号> --nickname <昵称>` 初始化平台管理员，并通过进程环境 `OVC_BOOTSTRAP_PASSWORD` 提供密码；没有默认密码，浏览器公共初始化入口已退役。后续用户通过管理员邀请注册，入组及作品授权后才能访问对应内容。当前仍只能在受控开发网络使用，不得公网部署。
 
@@ -121,7 +123,7 @@ FFmpeg 优先使用配置路径或系统 PATH，也可使用已安装的 `imagei
 ## 开发与验证
 
 ```powershell
-python -m uvicorn backend.app:app --host 127.0.0.1 --port 7868
+python -m uvicorn backend.app:app --host 127.0.0.1 --port 7878
 python -m backend.worker_cli
 npm run dev
 npm run build
@@ -130,6 +132,6 @@ $env:OVC_TEST_ADMIN_URL='postgresql+psycopg://测试管理员@127.0.0.1:5432/pos
 python -m pytest -q
 ```
 
-开发浏览器使用 Vite 的 5178 端口，其 `/api` 代理到 7868；生产使用后端直接服务 `dist`。每次 pytest 会创建名称受限的独立 `ovc_test_*` PostgreSQL 数据库，预先执行 Alembic 迁移，并只允许删除当前活动的该测试目标；测试网络仅允许回环地址。
+开发浏览器使用 Vite 的 5178 端口，其 `/api` 代理到协作版 7878；生产使用后端直接服务 `dist`。5178 仅供开发调试，不能与单机版 Vite 同时占用，必要时通过 `npm run dev -- --port 5179` 指定独立开发端口。每次 pytest 会创建名称受限的独立 `ovc_test_*` PostgreSQL 数据库，预先执行 Alembic 迁移，并只允许删除当前活动的该测试目标；测试网络仅允许回环地址。
 
 完整设计与研究边界见 [DESIGN_RESEARCH.md](DESIGN_RESEARCH.md)。开发中状态与未验收项见 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)。
