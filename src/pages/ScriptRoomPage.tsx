@@ -29,6 +29,10 @@ export function ScriptRoomPage({
   const editable=canEdit&&store.editable(String(active),actorId);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [assistInstructions,setAssistInstructions]=useState<Record<string,string>>({});
+  const assistKey=`${productionId}:${active}`;
+  const assistInstruction=assistInstructions[assistKey]||'';
+  const assistSubmission=useRef<{key:string;id:string}|null>(null);
   const textProviders = useMemo(
     () => providers.filter((p) => !p.kind || p.kind === "text"),
     [providers],
@@ -110,6 +114,23 @@ export function ScriptRoomPage({
     notify(`已创建 ${result.count} 个剧本任务，可在任务中心查看`);
   }
 
+  async function assist() {
+    if(!draft||!editable||entry?.state!=='saved')throw new Error('请先保存当前正文并解决冲突，再使用 AI 辅助');
+    if(!defaultModelId)throw new Error('请先在作品设置中选择平台文本模型');
+    const instruction=assistInstruction.trim();
+    if(!instruction)throw new Error('请填写本集创作要求');
+    const payload={instruction,model_id:defaultModelId,revision:draft.revision,assignment_epoch:draft.assignment_epoch};
+    const key=JSON.stringify([assistKey,payload]);
+    if(assistSubmission.current?.key!==key)assistSubmission.current={key,id:crypto.randomUUID()};
+    await request(`/productions/${productionId}/episode-scripts/${active}/assist`,{
+      method:'POST',body:JSON.stringify({...payload,submission_id:assistSubmission.current.id}),
+    });
+    // Only uncertain retries reuse the id; a later deliberate generation is new.
+    assistSubmission.current=null;
+    notify('本集 AI 辅助任务已提交。结果在任务中心比较并明确采纳，当前正文保持不变。');
+    await onChanged();
+  }
+
   return <section className="script-room-page workflow-domain-page">
     <header className="domain-header"><div><span className="eyebrow">SCRIPT ROOM</span><h1>剧本室</h1><p>直接编写或粘贴本集剧本；正式正文与画布共用一份，保存后仍需审核批准。</p></div><div className="settings-actions">
       <button disabled={busy} onClick={() => run(() => loadList(active))}><RefreshCw size={15} />刷新</button>
@@ -128,6 +149,16 @@ export function ScriptRoomPage({
         {draft.metadata?.origin === "canvas" && <div className="notice"><b>来自画布快速创作</b><span>这里保存的是同一份正式剧本；修改后画布投影会同步更新。</span></div>}
         <div className="script-summary-strip"><span className={`workflow-status ${draft.status}`}>{STATUS_LABELS[draft.status]}</span><span>目标 {draft.estimatedDuration} 秒</span><span>{plan?.paywallRole || ''}</span><span>{draft.project_id ? "已建立 Episode" : "首次保存或生成时建立 Episode"}</span></div>
         <article className="domain-card script-body-card"><h2>剧本正文</h2><textarea aria-label="剧本正文" disabled={!editable} value={draft.body} onChange={(e) => patch({ body: e.target.value })} placeholder="直接编写或粘贴：场景标题、可见动作和对白…" /></article>
+        <details className="domain-card"><summary>AI 辅助本集剧本（无需改编规划）</summary>
+          <p>参考已保存正文、最近三集及 Bible，只生成本集候选，不自动覆盖。采纳后仍需审核；已有采纳视频的集不支持此操作。</p>
+          <label>本集创作要求<textarea aria-label="本集 AI 创作要求" rows={3} maxLength={24000} disabled={!editable||busy}
+            value={assistInstruction} onChange={event=>setAssistInstructions(current=>({...current,[assistKey]:event.target.value}))}
+            placeholder="例如：在现有情节基础上补充车站重逢的动作与对白，保持人物关系…"/></label>
+          <p>平台文本模型：{configuredDefaultProvider?.name||'未配置'}。创建任务可能产生供应商费用。</p>
+          {entry?.state!=='saved'&&<p>请先保存当前正文或解决冲突。</p>}
+          <button disabled={busy||!editable||entry?.state!=='saved'||!defaultModelId||!assistInstruction.trim()}
+            onClick={()=>run(assist)}><Sparkles size={15}/>创建本集 AI 辅助任务</button>
+        </details>
         <fieldset className="owned-content-fields" disabled={!editable}><article className="domain-card"><div className="domain-fields">
           <label>标题<input value={draft.title} onChange={(e) => patch({ title: e.target.value })} /></label>
           <label>预计时长（秒）<input type="number" value={draft.estimatedDuration} onChange={(e) => patch({ estimatedDuration: Number(e.target.value) })} /></label>

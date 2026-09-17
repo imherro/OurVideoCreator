@@ -43,6 +43,9 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
     # Lock production BEFORE script: source writes use chapter -> production ->
     # script when marking dependent scripts stale. Keep this same lock order.
     production=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
+    if kind=='script' and markers==['episode_script_generation'] and marker.get('mode')=='direct':
+        from .direct_scripts import freeze_target
+        return freeze_target(c,pid,body,marker)
     context=normalize_production_context(json.loads(production['shared_context']))
     if marker.get('adaptationFingerprint')!=adaptation_fingerprint(context):
         raise HTTPException(409,'改编规划已变化，请刷新后重新提交')
@@ -208,6 +211,9 @@ def adopt(pid:str,jid:str,body:Adopt):
                       (identity.current().user_id,time.time(),row['id']))
             latest=owned.load(c,job['production_id'],'chapter',row['id'])
             owned.notify(c,latest,'candidate.adopt');result=owned.public(latest)
+        elif kind=='script' and job['input']['episode_script_generation'].get('mode')=='direct':
+            from .direct_scripts import adopt_candidate
+            result=adopt_candidate(c,job,row)
         elif kind=='script':
             context=normalize_production_context(json.loads(production['shared_context']))
             marker=job['input']['episode_script_generation']

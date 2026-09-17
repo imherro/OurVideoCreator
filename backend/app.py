@@ -1317,6 +1317,10 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         if old['input_hash']!=job_admission.fingerprint(pid,body,target,original):
             raise HTTPException(409,'同一提交标识不能对应不同输入、对象版本或分配')
         return s.unpack(old)
+    if body.input.get('episode_script_generation') is not None:
+        active=c.execute("SELECT id FROM jobs WHERE project_id=%s AND node_id=%s AND status IN ('queued','running') LIMIT 1",
+                         (pid,body.node_id)).fetchone()
+        if active:raise HTTPException(409,'本集已有剧本任务排队或运行中，请等待完成后再生成')
     if body.input.get('visual_reference') is not None:
         active=c.execute("""SELECT * FROM jobs
             WHERE project_id=%s AND node_id=%s AND kind=%s AND status IN ('queued','running')
@@ -1868,6 +1872,12 @@ class ScriptGenerationCreate(StrictBody):
     allow_cloud:bool=False
     submission_id:str=Field(min_length=8,max_length=100)
 
+class ScriptAssistCreate(OwnedRevisionAction):
+    instruction:str=Field(min_length=1,max_length=24000)
+    model_id:str=Field(min_length=1,max_length=200)
+    allow_cloud:bool=False
+    submission_id:str=Field(min_length=8,max_length=100)
+
 def production_event_targets(connection,production_id):
     return [row['id'] for row in connection.execute('''SELECT p.id FROM projects p
         WHERE p.production_id=%s AND NOT EXISTS(
@@ -2119,6 +2129,33 @@ def generate_episode_scripts(production_id:str,body:ScriptGenerationCreate):
         for item in created:
             s.event(item['project_id'],{'type':'job','id':item['id']},connection=c)
     return {'jobs':created,'count':len(created)}
+
+
+@app.post('/api/productions/{production_id}/episode-scripts/{episode_no}/assist')
+def assist_episode_script(production_id:str,episode_no:int,body:ScriptAssistCreate):
+    from . import owned_content as owned
+    from .direct_scripts import checked_context,context_fingerprint,assist_prompt
+    with s.db() as c:
+        job_admission.lock(c)
+        owned.production_scope(c,production_id,'editor',write=True)
+        c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
+        project_row=c.execute('SELECT id FROM projects WHERE production_id=%s AND episode_no=%s',
+                              (production_id,episode_no)).fetchone()
+        if not project_row:raise HTTPException(404,'目标分集不存在')
+        pid=project_row['id']
+        collaboration.project_scope(c,pid,'editor')
+        context=checked_context(c,pid)
+        row=owned.load(c,production_id,'script',pid,write=True)
+        owned.authorize(c,row,body.revision,body.assignment_epoch)
+        job_body=JobCreate(node_id='episode-script:'+pid,kind='text',submission_id=body.submission_id,input={
+            'model_id':body.model_id,'allow_cloud':body.allow_cloud,'stage':'script_generation',
+            'prompt':assist_prompt(context,body.instruction),
+            'episode_script_generation':{'mode':'direct','productionId':production_id,'episodeNo':episode_no,
+                'scriptRevision':body.revision,'assignmentEpoch':body.assignment_epoch,
+                'instruction':body.instruction.strip(),'contextFingerprint':context_fingerprint(context)}})
+        job=create_job_record(c,pid,job_body,entrypoint='script-generation')
+        s.event(pid,{'type':'job','id':job['id']},connection=c)
+        return job
 
 @app.post('/api/projects/{pid}/run')
 async def run_workflow(pid:str,request:Request):
