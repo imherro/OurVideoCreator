@@ -118,8 +118,8 @@ def main():
                               'capabilities':{},'defaults':{},'rules':{}}}))
             if final_mode:
                 image_provider=checked(owner.post('/api/admin/model-providers',json={
-                    'revision':0,'name':'FINAL loopback image only','enabled':True,'api_key':'',
-                    'config':{'type':'replicate','url':f'http://127.0.0.1:{fake.server_port}/v1','auth_mode':'none'}}))
+                    'revision':0,'name':'FINAL loopback image only','enabled':True,'api_key':os.urandom(24).hex(),
+                    'config':{'type':'replicate','url':f'http://127.0.0.1:{fake.server_port}/v1','auth_mode':'api_key'}}))
                 image_model=checked(owner.post('/api/admin/models',json={
                     'revision':0,'provider_id':image_provider['id'],'kind':'image','published':True,'enabled':True,
                     'definition':{'name':'FINAL 图片 fake','upstream_model':'final/image',
