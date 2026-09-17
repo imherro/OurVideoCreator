@@ -3,8 +3,9 @@
 ## 当前执行覆盖（2026-09-17）
 
 旧 P6 范围已被 [P6-SINGLE-01](prompts/P6_SINGLE_01_CODEX_PROMPT.md) 替代。
-当前只交付单 Worker 主链恢复、六类提交幂等及独立资源隔离，**READY_FOR_REVIEW**，未外部验收。
+单 Worker 主链恢复、六类提交幂等及独立资源隔离已获 **ChatGPT 外部验收通过，无需返修**。结论仅覆盖 P6-SINGLE-01，不代表旧 P6 平台整体通过。
 固定业务 `c1b1695b6a2ef907647284bf1474a8d08537432f`：完整后端 490 passed，固定专项 17 passed（重叠不累计）。见 [简明报告](evidence/P6-SINGLE-01/REPORT.md)。
+通过 evidence HEAD：`026cddf92776595164e752fea704444daea1f871`。见 [外部结论归档](reviews/P6-SINGLE-01/ACCEPTANCE.md)。下一开发任务尚未授权，停止等待明确范围。
 旧多 Worker、完整配额、checkpoint 自动恢复等登记为延期，非通过。
 下方旧 P6/P5 状态文字为历史记录，不构成当前执行授权。
 

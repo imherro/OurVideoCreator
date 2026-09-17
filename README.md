@@ -1,6 +1,6 @@
 # 安影 · OurVideoCreator
 
-安影协作版 AI 视频创作工作室。P0–P5 已通过外部验收，当前按 P6-SINGLE-01 验证单 Worker 主链与提交幂等，P6 尚未通过：浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；不得公网部署或发起未经独立授权的真实付费调用。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
+安影协作版 AI 视频创作工作室。P0–P5 及缩减范围的 P6-SINGLE-01 已通过外部验收；旧 P6 多 Worker、完整配额及自动恢复平台仍延期，下一开发任务尚未授权。浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；不得公网部署或发起未经独立授权的真实付费调用。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
 
 ## 运行
 
