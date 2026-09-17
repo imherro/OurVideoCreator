@@ -495,3 +495,11 @@ Worker 两阶段输出保留已有全部版本、参考图和外观约束；第�
 折叠使用原生 `details`，关闭时子控件仍挂载，不建立第二份草稿，也不触发保存、生成或 API。所有编辑继续调用原 `onPatch` / 绑定命令和共享 `ImageGenerationSettings`；两处图片设置入口数量保持，负责人、对象 revision、冲突和草稿保护仍由宿主原链路实施。分镜图卡继续在折叠外显示过期、待核对提示词、无视觉绑定或缺主参考图警告，生成/预览/尾帧/高级画布按钮不移入折叠区。
 
 定向 `storyboard_workspace + image_settings + shot_sync + batch_generation`：**16 passed / 0 failed**；新增契约断言验证规划展开、图片 disclosure 默认关闭、两处图片设置仍挂载及摘要换行样式。全量 `npm test`：**285 passed / 0 failed / 0 skipped，1689.99ms**。`npm run build` tsc/Vite exit0，Vite **7.78秒**，产物 `assets/index-DWRuFsqu.js` / `assets/index-He3xw10A.css`，保留既有大 chunk 警告。本批纯前端，没有新增 API、依赖、迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。
+
+## UPSTREAM-SYNC-35：分镜图批量操作浮动
+
+按冻结上游 `b5ece03` 的界面目标适配。分镜图表格与宫格共用的批量栏固定在视口右下角，窄屏为其预留底部空间，宽屏为其预留右侧空间，滚动长分镜列表时无需回到顶部即可查看选择数量和提交批量生成。批量栏补充 `role=group` 与“批量生成分镜图”无障碍名称。
+
+本批只改变批量栏布局与语义标记。全选仍写入当前镜头的稳定 UID，提交仍只调用 `generate(selected)`；未选择或工作区忙碌时继续禁用。没有扩大跨集选择、对象权限、任务准入或 Provider 调用范围，也没有自动提交任务。
+
+定向 `storyboard_workspace`：**6 passed / 0 failed**；新增契约断言验证浮动布局、宽窄屏内容避让、显式 UID 选择提交及禁用条件。全量 `npm test`：**286 passed / 0 failed / 0 skipped，1610.39ms**。`npm run build` tsc/Vite exit0，Vite **7.68秒**，产物 `assets/index-CqhTs9qD.js` / `assets/index-CNbrRJBI.css`，保留既有大 chunk 警告。`git diff --check` 通过。本批纯前端，没有新增 API、依赖、数据库迁移、配置或后台页面；未调用真实付费 Provider，也未运行登录业务浏览器 E2E。

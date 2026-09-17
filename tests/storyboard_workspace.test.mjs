@@ -91,3 +91,12 @@ test('image review cards collapse mounted editing controls while planning stays 
   assert.match(storyboardStyles,/\.storyboard-image-details>summary\{[^}]*cursor:pointer/);
   assert.match(storyboardStyles,/\.storyboard-action-summary\{[^}]*-webkit-line-clamp:2[^}]*overflow-wrap:anywhere/);
 });
+
+test('image batch actions float without changing explicit selection submission semantics',()=>{
+  assert.match(storyboardWorkspace,/className="storyboard-selection-bar" role="group" aria-label="批量生成分镜图"/);
+  assert.match(storyboardWorkspace,/setSelected\(event\.target\.checked \? identities : \[\]\)/);
+  assert.match(storyboardWorkspace,/disabled=\{props\.busy \|\| !selected\.length\} onClick=\{\(\) => void generate\(selected\)\}/);
+  assert.match(storyboardStyles,/\.storyboard-workspace \.storyboard-selection-bar\{position:fixed;top:auto;right:18px;bottom:28px;z-index:12;/);
+  assert.match(storyboardStyles,/@media\(min-width:1200px\)\{\.storyboard-workspace:has\(\.storyboard-selection-bar\)\{padding-right:202px\}\}/);
+  assert.match(storyboardStyles,/@media\(max-width:1199px\)\{\.storyboard-workspace:has\(\.storyboard-selection-bar\)\{padding-bottom:170px\}/);
+});

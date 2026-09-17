@@ -157,6 +157,14 @@
 .video-shot-context small{flex:0 1 auto;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 @media(max-width:1150px){.video-production-header{align-items:flex-start;flex-direction:column}.video-status-filters{justify-content:flex-start}.video-production-main,.video-production-main:has(.video-frame-column+.video-frame-column){grid-template-columns:140px minmax(0,1fr) 170px}.video-production-main:has(.video-frame-column+.video-frame-column) .video-production-fields{grid-column:2/4}.video-production-main:has(.video-frame-column+.video-frame-column) .video-result-column{grid-column:3;grid-row:1}}
 
+/* Keep image batch actions reachable in both table and grid views. */
+.storyboard-workspace .storyboard-selection-bar{position:fixed;top:auto;right:18px;bottom:28px;z-index:12;display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:9px;width:164px;margin:0;padding:12px;box-sizing:border-box;background:#1d2529;backdrop-filter:none;box-shadow:0 8px 28px #0006}
+.storyboard-selection-bar .check-label{font-size:12px}
+.storyboard-selection-bar>span{order:0;flex:none;font-size:12px}
+.storyboard-selection-bar>button{justify-content:center;width:100%;padding:8px 6px;font-size:12px}
+@media(min-width:1200px){.storyboard-workspace:has(.storyboard-selection-bar){padding-right:202px}}
+@media(max-width:1199px){.storyboard-workspace:has(.storyboard-selection-bar){padding-bottom:170px}.storyboard-workspace .storyboard-selection-bar{right:12px;bottom:16px}}
+
 .video-production-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
 .side-panel:has(.task-center){z-index:50}
 .task-center{display:flex;min-height:100%;flex-direction:column;gap:14px}

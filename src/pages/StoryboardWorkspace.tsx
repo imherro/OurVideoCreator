@@ -125,7 +125,7 @@ export function StoryboardWorkspace(props: Props) {
         {props.purpose === "images" && !!shots.length && <button onClick={props.onOpenVideo}>设置首尾帧<ArrowUpRight size={14}/></button>}
       </div>
     </div>
-    {props.purpose === "images" && !!shots.length && <div className="storyboard-selection-bar">
+    {props.purpose === "images" && !!shots.length && <div className="storyboard-selection-bar" role="group" aria-label="批量生成分镜图">
       <label className="check-label"><input type="checkbox" checked={selected.length === shots.length} onChange={(event) => setSelected(event.target.checked ? identities : [])}/>全选 {shots.length} 镜</label>
       <span>已选 {selected.length} 镜</span>
       <button className="primary compact" disabled={props.busy || !selected.length} onClick={() => void generate(selected)}><ImageIcon size={15}/>生成所选分镜图</button>
