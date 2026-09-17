@@ -598,6 +598,29 @@ def validate_source_references(connection, production_id, chapter_ids):
         raise ValueError('分集规划引用了不存在或属于其他 Production 的原著章节')
 
 
+def protected_episode_nos(connection, production_id, *, lock=False):
+    """Read accepted video bindings from canonical collaboration projections."""
+    from .production_context import read_project_state
+    from psycopg.errors import LockNotAvailable
+    from fastapi import HTTPException
+    try:
+        rows=connection.execute('''SELECT p.id,p.episode_no FROM projects p WHERE production_id=%s
+            AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='project' AND d.item_id=p.id)
+            ORDER BY p.id'''+(' FOR SHARE NOWAIT' if lock else ''),(production_id,)).fetchall()
+        if lock:
+            connection.execute('''SELECT id FROM collaboration_objects WHERE production_id=%s
+                ORDER BY id FOR SHARE NOWAIT''',(production_id,)).fetchall()
+    except LockNotAvailable:
+        raise HTTPException(409,'分集内容正在保存，请稍后重试改编操作') from None
+    protected=[]
+    for row in rows:
+        document=read_project_state(connection,row['id'])['document']
+        if any(node.get('data',{}).get('kind')=='video' and node.get('data',{}).get('assetId')
+               for node in document.get('nodes',[])):
+            protected.append(row['episode_no'])
+    return sorted(set(protected))
+
+
 def adaptation_change_scope(current_context, submitted):
     """Separate shared story changes from appended or edited episode plans."""
     old = adaptation_bundle(current_context)

@@ -143,7 +143,8 @@ def test_script_generation_freezes_owner_and_sources_then_adopts_without_auto_wr
     assert latest['revision']==script['revision']+1 and latest['assignee_id']==team['aid']
 
 
-def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(team,monkeypatch):
+@pytest.mark.parametrize('accepted_video',[False,True])
+def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(team,monkeypatch,accepted_video):
     chapter=create_chapter(team)
     model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
     extracted=extraction(team,[chapter],model).json()['jobs'][0]
@@ -164,6 +165,17 @@ def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(t
     assert team['admin'].get(base(team)+'/adaptation').json()==before
     path=candidate_path(team,job)
     assert team['a'].post(path+'/adopt',json=expected(before)).status_code==403
+    if accepted_video:
+        from tests.test_p5_object_transactions import create
+        node=create(team,kind='node',node={'id':'finished-video','type':'video','data':{'kind':'video'}})
+        with s.db() as c:
+            content=node['content'];content['node']['data']['assetId']='isolated-accepted-video'
+            c.execute('UPDATE collaboration_objects SET content=%s WHERE id=%s',(s.dumps(content),node['id']))
+        response=team['admin'].post(path+'/adopt',json=expected(before,accept_stale=True))
+        assert response.status_code==409,response.text
+        assert team['admin'].get(base(team)+'/adaptation').json()==before
+        assert team['admin'].post(base(team)+'/adaptation/generate',json={**body,'submission_id':'new-'+uuid.uuid4().hex}).status_code==409
+        return
     adopted=team['admin'].post(path+'/adopt',json=expected(before))
     assert adopted.status_code==200,adopted.text
     assert adopted.json()['target']['adaptationPlan']['storyCore']['premise']=='candidate new premise'

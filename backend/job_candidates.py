@@ -51,6 +51,9 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
         raise HTTPException(409,'改编规划已变化，请刷新后重新提交')
     if kind=='adaptation':
         identity.require_production(c,collab.live_principal(c),production_id,'manager')
+        from .adaptation import protected_episode_nos
+        if protected_episode_nos(c,production_id,lock=True):
+            raise HTTPException(409,'已有分集采纳视频，不能整体重新生成改编策划')
         if markers!=['adaptation_generation'] or body.node_id!='adaptation:'+production_id:
             raise HTTPException(422,'改编目标与节点不匹配')
         if marker.get('sourceFingerprint')!=source_fingerprint(source_snapshot(c,production_id)):
@@ -234,6 +237,9 @@ def adopt(pid:str,jid:str,body:Adopt):
             latest=owned.load(c,job['production_id'],'script',row['id'])
             owned.notify(c,latest,'candidate.adopt');result=owned.public(latest)
         elif kind=='adaptation':
+            from .adaptation import protected_episode_nos
+            if protected_episode_nos(c,job['production_id'],lock=True):
+                raise HTTPException(409,'已有分集采纳视频，不能采纳整体改编候选')
             marker=job['input']['adaptation_generation']
             if source_fingerprint(source_snapshot(c,job['production_id']))!=marker['sourceFingerprint']:
                 raise HTTPException(409,'原著事件已变化，请按新原著重新生成')

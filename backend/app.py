@@ -1941,7 +1941,7 @@ def save_adaptation(production_id:str,body:AdaptationSave):
     from .owned_content import production_scope
     from .adaptation import (
         _persist_production_context,_stale_scripts,prepare_manual_adaptation,
-        validate_source_references,
+        validate_source_references,protected_episode_nos,
     )
     with s.db() as c:
         production_scope(c,production_id,'manager',write=True)
@@ -1954,6 +1954,9 @@ def save_adaptation(production_id:str,body:AdaptationSave):
             'adaptationPlan':body.adaptationPlan,'episodePlans':body.episodePlans,
             'monetizationPlan':body.monetizationPlan,
         })
+        protected=set(protected_episode_nos(c,production_id,lock=True))
+        if protected.intersection(changed_episodes) or (shared_changed and protected):
+            raise HTTPException(409,'已有采纳视频的分集受保护；只能修改其他分集，不能修改全局改编内容')
         validate_source_references(c,production_id,[chapter for plan in bundle['episodePlans'] for chapter in plan['sourceChapterRefs']])
         context.update(bundle)
         if changed:_stale_scripts(c,production_id,episode_nos=None if shared_changed else changed_episodes)
@@ -1964,13 +1967,15 @@ def save_adaptation(production_id:str,body:AdaptationSave):
 
 def transition_adaptation(production_id,expected_revision,target):
     from .owned_content import production_scope
-    from .adaptation import _persist_production_context,adaptation_bundle,validate_adaptation_bundle,validate_approval_ready
+    from .adaptation import _persist_production_context,adaptation_bundle,validate_adaptation_bundle,validate_approval_ready,protected_episode_nos
     with s.db() as c:
         production_scope(c,production_id,'manager',write=True)
         row=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
         production_scope(c,production_id,'manager')
         if row['revision']!=expected_revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
+        if protected_episode_nos(c,production_id,lock=True):
+            raise HTTPException(409,'已有分集采纳视频，不能整体变更审核状态；请只审核新增分集')
         context=normalize_production_context(json.loads(row['shared_context']))
         bundle=adaptation_bundle(context)
         if target=='review':

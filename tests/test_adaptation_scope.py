@@ -75,3 +75,33 @@ def test_scope_ignores_status_forgery_but_tracks_shared_changes(adaptation_clien
     expanded['episodePlans'].append(extra)
     _,changed,shared,episodes=prepare_manual_adaptation(expanded,current)
     assert changed and shared and episodes=={3}
+
+
+def test_manual_plans_preserve_episode_with_accepted_canonical_video(adaptation_client):
+    from tests.test_p5_object_transactions import create
+    from backend import store as s
+    client=adaptation_client
+    production,episode,_,bundle=setup_production(client,count=2)
+    current=save_and_approve(client,production,bundle)
+    node=create({'pid':episode['id'],'a':client},kind='node',node={'id':'finished-video','type':'video','data':{'kind':'video'}})
+    with s.db() as c:
+        content=node['content'];content['node']['data']['assetId']='isolated-accepted-video'
+        c.execute('UPDATE collaboration_objects SET content=%s WHERE id=%s',(s.dumps(content),node['id']))
+    root='/api/productions/'+production['id']
+    current=client.get(root+'/adaptation').json()
+    for global_edit in (False,True):
+        patch=copy.deepcopy(current)
+        if global_edit:patch['adaptationPlan']['storyCore']['premise']='changed'
+        else:patch['episodePlans'][0]['logline']='changed'
+        response=save_bundle(client,root,patch)
+        assert response.status_code==409,response.text
+        assert client.get(root+'/adaptation').json()==current
+    patch=copy.deepcopy(current);patch['episodePlans'][1]['logline']='safe sibling'
+    assert save_bundle(client,root,patch).status_code==200
+    current=client.get(root+'/adaptation').json()
+    assert client.post(root+'/adaptation/review',json={'revision':current['revision']}).status_code==409
+    with s.db() as c:
+        c.execute('SELECT id FROM projects WHERE id=%s FOR UPDATE',(episode['id'],))
+        result=save_bundle(client,root,current)
+        assert result.status_code==409,result.text
+    assert client.get(root+'/adaptation').json()==current
