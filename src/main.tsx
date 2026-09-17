@@ -1,4 +1,5 @@
 import { planShotTimeline } from "./shotTimeline";
+import { readApiErrorMessage } from "./apiResponse";
 import {OwnedContentDrafts} from './ownedContentDrafts';
 import { ensureShotNodes } from "./shotNodes";
 import { autoLayoutCanvas } from "./canvasLayout";
@@ -320,14 +321,9 @@ const api = async (path: string, options: RequestInit = {}) => {
                 : {}) },
     });
     if (!r.ok) {
-      let error;
-      try {
-        error = (await r.json()).detail;
-      } catch {
-        error = await r.text();
-      }
+      const error = await readApiErrorMessage(r);
       throw Object.assign(
-        new Error(typeof error === "string" ? error : JSON.stringify(error)),
+        new Error(error),
         { kind: "api", status: r.status, url: requestUrl },
       );
     }
