@@ -353,3 +353,13 @@ UPSTREAM-SYNC-18（统一新增集入口）：对照冻结上游 EpisodeSetupDia
 验证过程：初步原著库7 passed（22.40秒）；扩展联合首轮15 passed /1 failed（69.31秒），失败是旧并发采纳夹具同时排两个提取任务，被新规则正确拒绝。改为顺序完成生成但不采纳，再以两个同版本候选竞争采纳，保留200/409及单收据断言。读取权限专项1 passed（4.56秒）。npm test **269 passed /0 failed /0 skipped，1496.63ms**；tsc/Vite build exit0，Vite **6.93秒**，原大chunk警告保留。本批未运行浏览器E2E、全量后端或真实Provider；前端新增静态作用域/迟到查询保护断言，不冒充浏览器交互测试。无新依赖、迁移或后台页面。
 
 最终联合 `tests/test_source_library.py tests/test_p5_relation_candidates.py` **16 passed，73.97秒**。覆盖跨EP/通用入口防重复、幂等回放、取消后重提、混合批次全回滚、两请求竞争仅一个入队及原候选版本/负责人/明确采纳回归。仅提交推送集成分支并更新7878，不合并master。长篇扩展/连续性及其余冻结清单仍待完成。
+
+## UPSTREAM-SYNC-22：手工分集规划的失效范围
+
+需求来自4dfb676的change-scope部分，对照冻结最终版本确认。真实PG红测证明追加EP03会将已批准的全局策划降为draft（1 failed，5.66秒）。新增adaptation_change_scope区分共享内容与具体集：纯增集/单集修改保留全局批准和未变集状态，新/变集强制draft；故事骨架、商业策划、全局画幅/时长/平台及减集仍使全局draft。状态字段不能由手工保存晋升或伪造降级。保留manager权限与production revision检查。
+
+_stale_scripts增加episode_nos筛选，仅锁定并更新受影响的已审核关联剧本；chapter_ids来源失效、直接剧本adaptationLinked=false排除规则保持。没有新增主源、自动采纳或批量跨负责人正文写入。全局AI候选仍沿用保守整体失效，不在本批悄悄改变。
+
+实际验证：`tests/test_adaptation_scope.py tests/test_adaptation.py tests/test_direct_script_manual.py` **13 passed，41.14秒**（当时scope专项1项）；随后扩展scope专项最终 **2 passed，8.18秒**。中间两次专项各1 failed/1 passed，分别因测试将API revision混入严格bundle、删除计划但未同步总集数，被既有校验拒绝；修正测试输入，不放宽业务校验。验证追加两集旧正文/状态/revision完全不变、只改EP02只使EP02过期、全局前提使EP01过期、状态伪造忽略、全局规格/减集识别。上述次数有重叠，不加总冒充独立覆盖。
+
+本批纯后端，未额外运行前端构建/浏览器E2E、全量后端或真实供应商。无新增依赖、迁移、配置或后台页面。只提交推送集成分支，按要求更新独立7878 Web。**这只是长篇扩展的一部分**：已有成片的服务端保护、单集规划生成及候选采纳、单集审核入口、连续性上下文和相关UI尚需继续完成；不将4dfb676/87c470a整项标完成。

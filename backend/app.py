@@ -1950,13 +1950,13 @@ def save_adaptation(production_id:str,body:AdaptationSave):
         production_scope(c,production_id,'manager')
         if row['revision']!=body.revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
         context=normalize_production_context(json.loads(row['shared_context']))
-        bundle,changed=prepare_manual_adaptation(context,{
+        bundle,changed,shared_changed,changed_episodes=prepare_manual_adaptation(context,{
             'adaptationPlan':body.adaptationPlan,'episodePlans':body.episodePlans,
             'monetizationPlan':body.monetizationPlan,
         })
         validate_source_references(c,production_id,[chapter for plan in bundle['episodePlans'] for chapter in plan['sourceChapterRefs']])
         context.update(bundle)
-        if changed:_stale_scripts(c,production_id)
+        if changed:_stale_scripts(c,production_id,episode_nos=None if shared_changed else changed_episodes)
         revision=_persist_production_context(c,row,context)
         targets=production_event_targets(c,production_id)
         for pid in targets:s.event(pid,{'type':'production','revision':revision},connection=c)

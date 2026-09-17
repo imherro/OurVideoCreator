@@ -314,12 +314,19 @@ def _script_snapshot(row):
     }
 
 
-def _stale_scripts(connection, production_id, *, chapter_ids=None):
+def _stale_scripts(connection, production_id, *, chapter_ids=None, episode_nos=None):
     from . import store as s
     now = time.time()
+    params=[production_id]
+    episode_filter=''
+    if episode_nos is not None:
+        numbers=sorted(set(episode_nos))
+        if not numbers:return False
+        episode_filter=' AND p.episode_no=ANY(%s)'
+        params.append(numbers)
     rows = connection.execute('''SELECT sc.* FROM episode_scripts sc JOIN projects p ON p.id=sc.project_id
-        WHERE p.production_id=%s AND sc.status IN ('review','approved')
-        ORDER BY sc.project_id FOR UPDATE OF sc''',(production_id,)).fetchall()
+        WHERE p.production_id=%s AND sc.status IN ('review','approved')'''+episode_filter+
+        ' ORDER BY sc.project_id FOR UPDATE OF sc',params).fetchall()
     changed=False
     for row in rows:
         if chapter_ids is not None:
@@ -591,28 +598,39 @@ def validate_source_references(connection, production_id, chapter_ids):
         raise ValueError('分集规划引用了不存在或属于其他 Production 的原著章节')
 
 
-def prepare_manual_adaptation(current_context, submitted):
-    """Manual edits invalidate approval; status-only promotion is ignored."""
+def adaptation_change_scope(current_context, submitted):
+    """Separate shared story changes from appended or edited episode plans."""
     old = adaptation_bundle(current_context)
     new = validate_adaptation_bundle(submitted)
-    old_adaptation_content = {key:value for key,value in old['adaptationPlan'].items() if key!='status'}
-    new_adaptation_content = {key:value for key,value in new['adaptationPlan'].items() if key!='status'}
+    old_format=old['adaptationPlan']['format'];new_format=new['adaptationPlan']['format']
+    shared_changed=(
+        {key:value for key,value in old['adaptationPlan'].items() if key not in ('status','format')}
+        !={key:value for key,value in new['adaptationPlan'].items() if key not in ('status','format')}
+        or {key:value for key,value in old_format.items() if key!='episodeCount'}
+        !={key:value for key,value in new_format.items() if key!='episodeCount'}
+        or old['monetizationPlan']!=new['monetizationPlan']
+        or new_format['episodeCount']<old_format['episodeCount'])
     old_plans = {plan['episodeNo']:plan for plan in old['episodePlans']}
-    changed = (
-        old_adaptation_content != new_adaptation_content
-        or old['monetizationPlan'] != new['monetizationPlan']
-        or len(old['episodePlans']) != len(new['episodePlans'])
-    )
+    changed_episodes={plan['episodeNo'] for plan in new['episodePlans']
+        if {key:value for key,value in plan.items() if key!='status'}
+        !={key:value for key,value in old_plans.get(plan['episodeNo'],{}).items() if key!='status'}}
+    changed_episodes.update(set(old_plans)-{plan['episodeNo'] for plan in new['episodePlans']})
+    return new,shared_changed,changed_episodes
+
+
+def prepare_manual_adaptation(current_context, submitted):
+    """Manual edits invalidate only their scope; never accept status promotion."""
+    old=adaptation_bundle(current_context)
+    new,shared_changed,changed_episodes=adaptation_change_scope(current_context,submitted)
+    old_plans={plan['episodeNo']:plan for plan in old['episodePlans']}
     for plan in new['episodePlans']:
         previous = old_plans.get(plan['episodeNo'])
-        previous_content = {key:value for key,value in previous.items() if key!='status'} if previous else None
-        current_content = {key:value for key,value in plan.items() if key!='status'}
-        if previous_content != current_content:
-            plan['status'] = 'draft'; changed = True
+        if plan['episodeNo'] in changed_episodes:
+            plan['status'] = 'draft'
         else:
             plan['status'] = previous['status']
-    new['adaptationPlan']['status'] = 'draft' if changed else old['adaptationPlan']['status']
-    return new, changed
+    new['adaptationPlan']['status'] = 'draft' if shared_changed else old['adaptationPlan']['status']
+    return new,shared_changed or bool(changed_episodes),shared_changed,changed_episodes
 
 
 def validate_approval_ready(connection, production_id, bundle):
