@@ -139,6 +139,11 @@ def bind_fixed_dialogue_audio(document, node_id, kind, input_value, assets, prod
     if require_canonical:
         result.pop('audio_asset_ids', None)
         result.pop('audio_reference_ids', None)
+    from .voice_samples import dialogue_mode
+    if dialogue_mode(document,shot)=='voice_sample':
+        for key in ('dialogue_audio','dialogue_audio_asset_ids','dialogue_audio_mode','duration_adjustment'):
+            result.pop(key,None)
+        return result  # Actual samples are compiled from canonical profiles by motion_references.
     dialogues = [
         item for item in (shot.get('dialogues') or [])
         if isinstance(item, dict) and str(item.get('text') or '').strip()

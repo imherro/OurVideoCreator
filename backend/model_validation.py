@@ -161,10 +161,11 @@ def model_definition(body, config, kind):
     caps = value.setdefault('capabilities', {})
     _object(caps, {'image_reference', 'end_frame', 'audio_reference', 'max_references',
                   'multimodal_reference', 'video_reference', 'max_reference_duration', 'max_video_duration', 'audio_only_reference',
+                  'voice_sample_reference','max_audio_references',
                   'requires_reference', 'max_prompt_length',
                   'fps', 'min_frames', 'frame_step', 'max_frames'}, '模型能力')
     for name in ('image_reference', 'end_frame', 'audio_reference', 'requires_reference',
-                 'multimodal_reference', 'video_reference', 'audio_only_reference'):
+                 'multimodal_reference', 'video_reference', 'audio_only_reference','voice_sample_reference'):
         if name in caps and type(caps[name]) is not bool:
             raise ValueError('模型能力必须为布尔值')
     for name, ceiling in (('max_references', 30), ('max_prompt_length', 240000)):
@@ -185,8 +186,16 @@ def model_definition(body, config, kind):
             raise ValueError('视频输出时长超过已接通协议上限')
         if caps.get('audio_only_reference') and not reference_limits['audio_only']:
             raise ValueError('当前模型未接通仅音频参考')
+        if caps.get('voice_sample_reference'):
+            if not caps.get('audio_reference'):raise ValueError('音色样本须同时发布参考音频能力')
+            count=caps.setdefault('max_audio_references',reference_limits['max_audio'])
+            if type(count) is not int or not 1<=count<=reference_limits['max_audio']:raise ValueError('音色样本数量上限无效')
     elif caps.get('video_reference') or caps.get('audio_only_reference') or 'max_reference_duration' in caps or 'max_video_duration' in caps:
         raise ValueError('参考视频及参考时长须同时发布多模态能力')
+    if (caps.get('voice_sample_reference') or 'max_audio_references' in caps) and not caps.get('multimodal_reference'):
+        raise ValueError('音色样本须明确发布多模态能力')
+    if 'max_audio_references' in caps and not caps.get('voice_sample_reference'):
+        raise ValueError('声音样本数量须同时发布音色样本参考能力')
     if timing.intersection(caps):
         if kind != 'video' or not timing.issubset(caps):
             raise ValueError('视频帧数能力必须完整声明')

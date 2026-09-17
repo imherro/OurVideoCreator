@@ -736,6 +736,7 @@ class ProjectCreate(StrictBody):
     video_duration:int=Field(default=-1)
     video_format:str=Field(default='mp4')
     video_reference_mode:str=Field(default='legacy')
+    dialogue_mode:str=Field(default='full_dialogue')
     episode_count:int=Field(default=1,ge=1,le=500)
     platform:str=Field(default='通用短视频',min_length=1,max_length=100)
     brief:str|None=Field(default=None,max_length=24000)
@@ -772,6 +773,8 @@ def project_create_document(body:ProjectCreate):
     if body.video_reference_mode not in ('legacy','multimodal','first_frame','first_last_frame'):
         raise ValueError('视频参考模式无效')
     if body.video_reference_mode!='legacy': document['videoReferenceMode']=body.video_reference_mode
+    if body.dialogue_mode not in ('voice_sample','full_dialogue'):raise ValueError('对白生成方式无效')
+    if body.dialogue_mode!='full_dialogue':document['dialogueMode']=body.dialogue_mode
     if body.brief is not None:document['brief']=body.brief
     if body.generation_policy is not None:
         document['generationPolicy']=validate_generation_policy(
@@ -1190,6 +1193,7 @@ class VideoSpecPreview(StrictBody):
     node_data: dict = Field(default_factory=dict)
     shot: dict = Field(default_factory=dict)
     videoReferenceMode: str | None = None
+    dialogueMode: str | None = None
 
 
 @app.post('/api/projects/{pid}/video-spec')
@@ -1198,7 +1202,7 @@ def video_spec_preview(pid:str,body:VideoSpecPreview):
     from .motion_references import compile_motion_input, _shot_for_video_node
     from .video_dialogue import compile_shot_video_input, bind_fixed_dialogue_audio
     model_validation.reject_private_overrides(body.model_dump())
-    if set(body.shot)-{'motionReference','videoReferenceMode','video_prompt','duration','camera'}:
+    if set(body.shot)-{'motionReference','videoReferenceMode','video_prompt','duration','camera','dialogueMode'}:
         raise ValueError('视频预览只接受本镜头参考设置，不接受其他业务对象')
     with s.db() as c:
         collaboration.project_scope(c,pid,'viewer')
@@ -1212,6 +1216,7 @@ def video_spec_preview(pid:str,body:VideoSpecPreview):
     node['data'].update(body.node_data)
     if 'video_prompt' in body.shot: node['data']['prompt']=shot['video_prompt']
     if body.videoReferenceMode is not None: document['videoReferenceMode']=body.videoReferenceMode
+    if body.dialogueMode is not None:document['dialogueMode']=body.dialogueMode
     provider=next((item for item in platform_models.compiler_catalog() if item['id']==body.model_id),None)
     if provider is None: raise ValueError('请选择已发布的平台视频模型')
     data={**node['data'],'model_id':body.model_id}
@@ -1230,13 +1235,13 @@ def video_spec_preview(pid:str,body:VideoSpecPreview):
     with s.db() as c:
         binding=platform_models.resolve(c,body.model_id,'video',data,document=document,node_id=body.node_id)
         selected=platform_models.config_for_binding(c,binding)
-    if data.get('motion_reference') and provider['type'] in ('volcengine_ark','hc_atom'):
+    if (data.get('motion_reference') or (data.get('voice_samples') and provider['type']=='hc_atom')) and provider['type'] in ('volcengine_ark','hc_atom'):
         from .provider_assets import public_asset_base
         public_asset_base(selected)
     data['parameters']=binding.parameters
     # Deliberate whitelist: no private model identity, provider URL, credentials, or arbitrary node fields.
     return {key:data[key] for key in ('prompt','generation_mode','motion_reference','reference_manifest',
-        'motion_warnings','planned_shot_duration','shot_duration','parameters','dialogue_audio_mode') if key in data}
+        'motion_warnings','planned_shot_duration','shot_duration','parameters','dialogue_audio_mode','dialogue_mode','voice_samples') if key in data}
 
 
 def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
@@ -1303,7 +1308,7 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
         payload({**body.input,**binding.parameters,'parameters':binding.parameters},selected)
     references=list(body.input.get('asset_ids',[]))
     multimodal=(body.input.get('generation_mode') or {}).get('requested')=='multimodal'
-    if body.input.get('motion_reference') and selected and selected['type'] in ('volcengine_ark','hc_atom'):
+    if selected and (body.input.get('motion_reference') or (body.input.get('voice_samples') and selected['type']=='hc_atom')) and selected['type'] in ('volcengine_ark','hc_atom'):
         from .provider_assets import public_asset_url
         public_asset_url(selected, 'motion-preflight')
     if body.input.get('end_asset_id'):references.append(body.input['end_asset_id'])
@@ -1386,7 +1391,7 @@ def create_job_record(c,pid,body,*,object_state=None,entrypoint='job'):
     if binding and body.kind=='video' and body.input.get('generation_mode'):
         body.input={**body.input,'video_spec':{
             **{key:body.input[key] for key in ('generation_mode','reference_manifest','motion_reference',
-                'motion_warnings','planned_shot_duration','shot_duration') if key in body.input},
+                'motion_warnings','planned_shot_duration','shot_duration','dialogue_mode','voice_samples') if key in body.input},
             'parameters':binding.parameters}}
     c.execute('''INSERT INTO jobs(id,submission_id,project_id,node_id,kind,status,input,created,updated,scope,production_id,workspace_id,actor_user_id,submission_namespace,input_hash)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(jid,body.submission_id,pid,body.node_id,body.kind,'queued',s.dumps(body.input),now,now,scope,owner['production_id'],owner['workspace_id'],actor.user_id,entrypoint,input_hash))

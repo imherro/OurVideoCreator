@@ -210,6 +210,27 @@
 
 `git diff --check`通过。仅交付集成分支，原master仍为eeb7a4f且工作区干净；不发送ChatGPT审核。`READY_FOR_REVIEW`为开发交付标识，不代表外部验收PASS。
 
+## UPSTREAM-SYNC-12：已确认角色音色样本用于视频生成
+
+按冻结上游 `10acb73`、`4e86bac`、`77b99d7`、`dcee553` 的相关需求适配，不整体复制这些提交。早期上游说明仍将幻场标为不支持，但冻结代码已实现；本批以实际冻结协议为依据。命名音色库、状态继承和外部音频上传确认仍未完成，不能以本批代替这些后续需求。使用说明见 [音色样本](../voice-samples.md)。
+
+- 形成“生成试听 → 任务中心明确采纳 → 锁定声音参考 → 视频生成”闭环；历史已锁定试听可一次性明确确认，不能借此改写其他锁定字段。派生音色版本清空引用，不删除原媒体。仍使用原对象负责人、revision、历史任务快照及采纳权限。
+- 新网页作品显式选择音色样本；旧API省略字段与旧文档保持完整对白。支持本集默认和镜头覆盖。样本模式必须显式多模态且平台已发布能力，否则拒绝，不自动切模型或减少参考。
+- 服务端预览、单次、精确批量共用规范编译：只取本镜说话角色、按首次出现编号、同素材去重但保留角色映射。只参考音色，不混音、不播放样本文字、不套用样本情绪、不延长镜头。真实8秒样本测试保持4秒提交。
+- MP3/WAV、大小、时长、完整解码、作品归属及摘要检查；超限拒绝不截断。方舟数据URI、幻场短期签名URL、RunningHub上传，冻结引用与参数，远端handle恢复只查询。未调用付费服务，未改现用平台模型配置。
+- 共享音色变化在同作品各EP分别计算依赖，只更新相关视频/下游生成版本；他人正文、分配和租约保留，旧保存409，跨EP请求仍404。额外真实PG复现：回收站中的EP引用导致确认声音404“项目不存在”。修复仅内部派生失效的锁定路径，保持回收站内容及恢复后的失效状态，不把该内部路径开放给用户写入。
+- 已有前端编辑器显示对白模式、当前声音参考版本和缺失警示；任务详情显示冻结角色到音频映射。无新增依赖、迁移或后台页面，仅扩展既有JSON数据及平台公开能力定义。
+
+实际测试过程：旧音色/动作回归38 passed；初次新增专项6 passed/4 failed，分别是单次测试漏传与已保存预览相同的prompt、样本排除断言误包含在测试台词中、错误码断言及误用公共素材返回的path，修正测试后10 passed/1 failed（无生成结果的节点应检查generation_revision而非stale=true）。扩展2.0及模式覆盖后15 passed。回收站分集专项先实际失败1项（404），修复后与生命周期联合23 passed。上述中间结果不相加为独立用例数。
+
+联合回归：`tests/test_voice_samples.py tests/test_voice_identity.py tests/test_motion_references.py tests/test_p5_object_transactions.py tests/test_p5_object_candidates.py tests/test_p5_canonical_integration.py tests/test_p4_model_foundation.py tests/test_p4_submission_execution.py tests/test_project_setup.py tests/test_upstream_hc_dialogue.py tests/test_hc_atom.py tests/test_volcengine_ark.py tests/test_runninghub.py tests/test_video_dialogue.py` → **203 passed，533.41秒，exit0**。此收集使用音色专项最初11项及修复回收站前代码；回收站修复与追加2.0/默认模式边界由最终 `tests/test_voice_samples.py tests/test_p5_lifecycle.py` **23 passed，114.88秒，exit0** 覆盖（收集音色16项、生命周期7项）。真实PG夹具和本地FFmpeg，商业请求均Mock。
+
+追加的最终边界/供应商复测 `tests/test_voice_samples.py -k 'protection_total or worker'` **6 passed / 11 deselected，44.07秒，exit0**；覆盖真实参考素材删除保护（409，未删除）、跨作品素材拒绝、两份各8秒样本超15秒总量拒绝、伪造时长元数据下真实损坏WAV仍拒绝解码，以及五组供应商提交/恢复（含2.0先拒绝仅音频、再加视频参考提交）。这些测试与前述联合有重叠，不累计为独立测试数。
+
+前端 `npm test` **244 passed / 0 failed / 0 skipped，1443.37ms**。最终 `npm run build` **tsc/Vite exit0，Vite8.01秒**，既有大chunk警告保留。computer-use技能用于隔离实际组件检查：版本不匹配显示缺失，切完整对白/样本不丢台词和动作绑定，忙碌时可只读预览且不增加修改次数；截图确认控件可读、提示折行。此页无API代理/业务数据库，不冒充完整业务E2E。已关闭本轮测试页及其Vite进程，没有停止用户或历史实例。
+
+未跑全量后端或真实付费供应商；不声明音色相似度/口型质量通过。原master仍为eeb7a4f且工作区干净；本批不合并master、不部署、不发送ChatGPT审核。`READY_FOR_REVIEW`为开发交付标识，不代表外部PASS。
+
 ## 后续队列
 
-前十一组已完成各自验证并交付；其余仍未全部移植。后续处理音色样本/状态继承与剩余参考展示需求，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。
+前十二组已完成各自验证；其余仍未全部移植。后续处理音色库、状态继承、外部样本确认与剩余参考展示需求，再处理直接剧本及剩余交互。必须继续保留timeline单主源、租约与草稿。单机免审核/覆盖冲突草稿不照搬；运维、付费和延期平台不恢复。整体同步目标仍在进行，尚未合并master或更新用户运行实例。

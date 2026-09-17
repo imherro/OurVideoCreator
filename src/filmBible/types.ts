@@ -75,6 +75,8 @@ export type VoiceProfile = {
   status: "draft" | "locked";
   previewText: string;
   previewAssetId?: string;
+  referenceAssetId?: string;
+  referenceVersion?: number;
   generationJobId?: string;
   parameters: { speechRate: number; emotion: string };
 };

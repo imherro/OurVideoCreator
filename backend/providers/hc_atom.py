@@ -468,6 +468,11 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
                     'video_url': {'url': public_asset_url(provider, silent_motion_asset(job)['id'])}})
             if audio_url:
                 content.append({'type': 'audio_url', 'audio_url': {'url': audio_url}, 'role': 'reference_audio'})
+            if job['input'].get('voice_samples'):
+                from ..voice_samples import submission_assets
+                from ..provider_assets import public_asset_url
+                for sample in submission_assets(job):
+                    content.append({'type':'audio_url','audio_url':{'url':public_asset_url(provider,sample['id'])},'role':'reference_audio'})
             resolution = str(params.get('resolution') or '720p').lower()
             if resolution not in ('480p', '720p'):
                 raise ValueError('幻场 Seedance 2.5 目前只支持 480p 或 720p，请修改项目视频分辨率')
@@ -477,7 +482,7 @@ def _generate_seedance_v3(worker, job, provider, model, refs, params):
                 'resolution': resolution,
                 'ratio': 'adaptive' if refs and not (multimodal or dialogue_reference) else str(job['input'].get('ratio') or params.get('ratio') or '16:9'),
                 'duration': submitted,
-                'generate_audio': bool(params.get('generate_audio', True)),
+                'generate_audio': True if job['input'].get('voice_samples') else bool(params.get('generate_audio', True)),
             }
             if (multimodal or dialogue_reference) and 'seedance-2.5' in model.lower():
                 body['omni_reference_task_type'] = 'reference'

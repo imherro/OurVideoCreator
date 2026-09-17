@@ -35,10 +35,25 @@ def validate_adoption(connection,target,profile):
         raise HTTPException(409,'试听文本、语速或情绪已变化，旧试听不能确认为当前音色，请重新生成')
 
 
+def is_reference_confirmation(before,after):
+    before=before or {};after=after or {}
+    return (before.get('status')=='locked' and not before.get('referenceAssetId')
+            and after.get('referenceAssetId')==before.get('previewAssetId') and bool(before.get('previewAssetId'))
+            and after.get('referenceVersion')==before.get('version')
+            and {k:v for k,v in after.items() if k not in ('referenceAssetId','referenceVersion')}==
+                {k:v for k,v in before.items() if k not in ('referenceAssetId','referenceVersion')})
+
+
 def validate_lock(connection,row,content):
     before=object_content(row).get('voice_profile') or {}
     profile=content.get('voice_profile') or {}
-    if profile.get('status')!='locked' or before.get('status')=='locked':return
+    changed_reference=any(before.get(k)!=profile.get(k) for k in ('referenceAssetId','referenceVersion'))
+    if profile.get('referenceVersion') is not None and not profile.get('referenceAssetId'):
+        raise HTTPException(422,'声音参考版本必须关联明确采纳的试听素材')
+    if profile.get('referenceAssetId') and (profile.get('status')!='locked' or profile.get('referenceVersion')!=profile.get('version')
+                                          or profile['referenceAssetId']!=profile.get('previewAssetId')):
+        raise HTTPException(422,'声音参考必须是当前已锁定版本的明确采纳试听')
+    if profile.get('status')!='locked' or (before.get('status')=='locked' and not changed_reference):return
     # A generated audition can only be confirmed after the existing explicit
     # adoption path. No new snapshot field or rewrite of old jobs is required.
     if not profile.get('previewAssetId'):return  # Preserve historical preset-only profiles.

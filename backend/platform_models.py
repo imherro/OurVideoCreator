@@ -299,6 +299,8 @@ def resolve(connection, model_id, kind, inp, *, document=None, node_id=None, pre
 
 
 def validate_capabilities(caps, inp):
+    if inp.get('voice_samples') and not (caps.get('voice_sample_reference') and caps.get('audio_reference')):
+        raise ValueError('所选平台模型未发布音色样本参考能力')
     if (inp.get('generation_mode') or {}).get('requested') == 'multimodal' and not caps.get('multimodal_reference'):
         raise ValueError('所选平台模型未发布多模态参考能力')
     if inp.get('motion_reference') and not caps.get('video_reference'):

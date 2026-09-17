@@ -34,7 +34,7 @@ def protocol_limits(kind, model):
         raise ValueError('当前适配器/模型尚未接通多模态参考协议；不会更换模型或删除绑定')
     newer = '2.5' in model or '2-5' in model
     return {'max_images': 30 if newer else 9, 'max_duration': 30 if newer else 15,
-            'max_reference_duration': 30 if newer else 15, 'audio_only': newer}
+            'max_reference_duration': 30 if newer else 15, 'audio_only': newer,'max_audio':10 if newer else 3}
 
 
 def capability(provider):
@@ -44,6 +44,7 @@ def capability(provider):
     return {'max_images': caps.get('max_references', 1),
             'max_duration': caps['max_video_duration'],
             'max_reference_duration': caps['max_reference_duration'],
+            'max_audio':caps.get('max_audio_references',0),
             'audio_only': caps.get('audio_only_reference') is True,
             'video': caps.get('video_reference') is True}
 
@@ -100,6 +101,8 @@ def resolve_generation_mode(document, shot):
 
 
 def validate_shot_reference(shot):
+    if shot.get('dialogueMode') not in (None,'','voice_sample','full_dialogue'):
+        raise ValueError('对白生成方式无效')
     if shot.get('videoReferenceMode') not in (None, '', *MODES):
         raise ValueError('视频生成模式无效')
     reference = shot.get('motionReference')
@@ -141,7 +144,7 @@ def invalidate_content(content, node_ids, previous=None):
 
 def compile_motion_input(document, node_id, kind, input_value, project_id, provider):
     result = copy.deepcopy(input_value)
-    for key in ('generation_mode', 'motion_reference', 'reference_manifest', 'motion_compiler', 'motion_warnings'):
+    for key in ('generation_mode', 'motion_reference', 'reference_manifest', 'motion_compiler', 'motion_warnings','voice_samples','dialogue_mode'):
         result.pop(key, None)
     if kind != 'video':
         return result
@@ -151,6 +154,21 @@ def compile_motion_input(document, node_id, kind, input_value, project_id, provi
     reference = shot.get('motionReference')
     mode = resolve_generation_mode(document, shot)
     result['generation_mode'] = mode
+    from .voice_samples import dialogue_mode, compile_samples
+    dialogue=dialogue_mode(document,shot)
+    if shot.get('dialogueMode') or document.get('dialogueMode'):result['dialogue_mode']=dialogue
+    if dialogue=='voice_sample':
+        for key in ('dialogue_audio','dialogue_audio_asset_ids','dialogue_audio_mode','audio_asset_ids','audio_reference_ids'):
+            result.pop(key,None)
+    samples_requested=dialogue=='voice_sample' and any(str(line.get('text') or '').strip() for line in shot.get('dialogues',[]))
+    if samples_requested:
+        if mode['requested']!='multimodal':raise ValueError('音色样本需要明确选择多模态参考，不会自动改变首帧约束')
+        if not (provider or {}).get('capabilities',{}).get('voice_sample_reference'):
+            raise ValueError('所选平台模型未发布音色样本参考能力')
+        result['voice_samples']=compile_samples(document,shot,project_id,capability(provider))
+        result['dialogue_audio_mode']='voice_sample'
+        if 'generate_audio' not in provider.get('rules',{}):raise ValueError('音色样本需要平台发布generate_audio参数')
+        result['parameters']={**result.get('parameters',{}),'generate_audio':True}
     if mode['requested'] == 'legacy' and not reference:
         mode['actual'] = ('multimodal' if result.get('dialogue_audio') else
                           'first_last_frame' if result.get('end_asset_id') else
@@ -276,13 +294,22 @@ def compile_motion_input(document, node_id, kind, input_value, project_id, provi
         manifest.append({'kind': 'audio', 'index': 1, 'assetIds': result['dialogue_audio_asset_ids'],
                          'name': '固定对白时序参考', 'duration': duration})
         lines.append('严格使用@音频1的音色、情绪、语速和开口时序表演对白，不得改词或增加对白。')
+    for sample in result.get('voice_samples',[]):
+        if not any(item.get('kind')=='audio' and item.get('assetId')==sample['assetId'] for item in manifest):
+            manifest.append({'kind':'audio','index':sample['index'],'assetId':sample['assetId'],
+                'name':sample['media']['name'],'duration':sample['media']['duration'],'purpose':'仅参考音色，不复述样本'})
+        visual=f"（@图片{actors[sample['characterCardId']]}）" if sample['characterCardId'] in actors else ''
+        lines.append(f"{sample['characterName']}{visual}仅参考@音频{sample['index']}的音色与声线，不复述或播放样本台词，不沿用样本情绪、语调或说话时长。")
+    if samples_requested:
+        audio=True
+        lines.append('对白内容、情绪和开口时机以本镜结构化台词为准；不得串用其他角色的声音，没有台词的角色不说话。')
     if not ordered and not reference and (not audio or not caps['audio_only']):
         raise ValueError('当前多模态模式需要图片或视频参考，不能仅文本或不受支持的仅音频提交')
     lines.append(END)
     result.update(prompt=result['prompt'] + '\n\n' + '\n'.join(filter(None, lines)), asset_ids=ids,
                   image_reference_sources=ordered, motion_reference=frozen, reference_manifest=manifest,
                   motion_warnings=warnings, motion_compiler={'version': VERSION, 'mode': 'multimodal',
-                    'fingerprint': hashlib.sha256(s.dumps([mode, frozen, manifest]).encode()).hexdigest()})
+                    'fingerprint': hashlib.sha256(s.dumps([mode, frozen, manifest]+([dialogue,result['voice_samples']] if samples_requested else [])).encode()).hexdigest()})
     result.pop('end_asset_id', None)
     return result
 

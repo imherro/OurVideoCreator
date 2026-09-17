@@ -10,7 +10,7 @@ from .generation_policy import validate_generation_policy
 
 router = APIRouter()
 EPISODE_FIELDS = {'brief', 'ratio', 'duration', 'videoResolution', 'videoRatio',
-                  'videoDuration', 'videoFormat', 'videoReferenceMode', 'characters'}
+                  'videoDuration', 'videoFormat', 'videoReferenceMode', 'dialogueMode','characters'}
 BIBLE_FIELDS = {'story', 'style', 'continuity', 'styleVersion'}
 
 
@@ -21,6 +21,8 @@ class Metadata(BaseModel):
 
 
 def check_episode(patch):
+    if 'dialogueMode' in patch and patch['dialogueMode'] not in ('voice_sample','full_dialogue'):
+        raise HTTPException(422,'对白生成方式无效')
     if set(patch) - EPISODE_FIELDS - {'name'}:
         raise HTTPException(422, '元数据接口不接受协作对象或整份 document')
     for key in ('brief', 'name', 'ratio', 'videoResolution', 'videoRatio', 'videoFormat'):
@@ -61,14 +63,16 @@ def episode_metadata(pid: str, body: Metadata):
             raise HTTPException(409, {'type': 'metadata', 'revision': row['revision']})
         collab.validate_asset_references(c,row['production_id'],body.patch)
         metadata = json.loads(row['document'])
-        if 'videoReferenceMode' in body.patch and metadata.get('videoReferenceMode','legacy')!=body.patch['videoReferenceMode']:
+        changed_modes={key for key,default in [('videoReferenceMode','legacy'),('dialogueMode','full_dialogue')]
+                       if key in body.patch and metadata.get(key,default)!=body.patch[key]}
+        if changed_modes:
             from .motion_references import invalidated_nodes, invalidate_content
             from .collaboration_document import object_content
             objects=list(c.execute('SELECT * FROM collaboration_objects WHERE project_id=%s AND NOT deleted ORDER BY id FOR UPDATE',(pid,)))
             roots=[]
             for obj in objects:
                 value=object_content(obj)
-                if obj['kind']=='shot' and not value['shot'].get('videoReferenceMode'):
+                if obj['kind']=='shot' and any(not value['shot'].get(key) for key in changed_modes):
                     roots.append(value['shot'].get('videoNode') or (value['shot'].get('pipeline') or {}).get('videoNodeId'))
                 elif obj['kind']=='node' and value['node']['data'].get('kind')=='video': roots.append(value['node']['id'])
             affected=invalidated_nodes(objects,roots)

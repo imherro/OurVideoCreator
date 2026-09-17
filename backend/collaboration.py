@@ -162,6 +162,8 @@ def validate_asset_references(connection, production_id, content):
 
 def create(connection, project_id, kind, content, *, validated=False):
     validate_content(kind, content)
+    if kind=='visual_card' and (content.get('voice_profile') or {}).get('referenceAssetId'):
+        raise HTTPException(422,'新角色须先明确采纳试听再确认声音参考，不能直接导入确认标记')
     lock_identity(connection)
     scope = project_scope(connection, project_id, 'editor')
     validate_asset_references(connection, scope['production_id'], content)
@@ -371,19 +373,33 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     requested={item['id']:item for item in modifications}
     lock_ids=set(requested)
     from .motion_references import invalidated_nodes, invalidate_content
-    motion_rows=list(connection.execute('SELECT * FROM collaboration_objects WHERE project_id=%s AND NOT deleted',(project_id,)))
+    motion_rows=list(connection.execute('SELECT * FROM collaboration_objects WHERE production_id=%s AND NOT deleted',(scope['production_id'],)))
     motion_prior={row['id']:row for row in motion_rows}
-    motion_roots=[]
+    motion_roots=[];voice_cards=set()
     for item in updates:
         prior=motion_prior.get(item['id'])
+        if prior and prior['kind']=='visual_card':
+            before=validation.object_content(prior).get('voice_profile') or {};after=item['content'].get('voice_profile') or {}
+            if any(before.get(key)!=after.get(key) for key in ('referenceAssetId','referenceVersion','version','status')):
+                voice_cards.add(validation.object_content(prior)['card']['id'])
         if not prior or prior['kind']!='shot':continue
         before=validation.object_content(prior)['shot'];after=item['content'].get('shot',{})
-        if any(before.get(key)!=after.get(key) for key in ('motionReference','videoReferenceMode')):
+        if any(before.get(key)!=after.get(key) for key in ('motionReference','videoReferenceMode','dialogueMode')):
             motion_roots.append(after.get('videoNode') or (after.get('pipeline') or {}).get('videoNodeId'))
-    motion_affected=invalidated_nodes(motion_rows,motion_roots)
-    if motion_affected:
-        lock_ids.update(row['id'] for row in motion_rows if row['kind']=='graph' or
-            validation.node_ids(row['kind'],validation.object_content(row)) & motion_affected)
+    affected_by_project={}
+    for ep in {row['project_id'] for row in motion_rows if row['project_id']}:
+        ep_rows=[row for row in motion_rows if row['project_id']==ep]
+        roots=list(motion_roots) if ep==project_id else []
+        for row in ep_rows:
+            if row['kind']=='shot':
+                shot=validation.object_content(row)['shot']
+                if any(line.get('characterCardId') in voice_cards for line in shot.get('dialogues',[])):
+                    roots.append(shot.get('videoNode') or (shot.get('pipeline') or {}).get('videoNodeId'))
+        affected=invalidated_nodes(ep_rows,roots)
+        if affected:
+            affected_by_project[ep]=affected
+            lock_ids.update(row['id'] for row in ep_rows if row['kind']=='graph' or
+                validation.node_ids(row['kind'],validation.object_content(row)) & affected)
     dependency_targets=set()
     for item in creates:
         validate_content(item['kind'],item['content'])
@@ -413,17 +429,29 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
                 lock_ids.add(row['id'])
     locked = {}
     for object_id in sorted(lock_ids):
-        row = load(connection, project_id, object_id, write=True)
+        object_project=project_id if object_id in requested else ((motion_prior.get(object_id) or {}).get('project_id') or project_id)
+        if object_id not in requested and object_project!=project_id:
+            # Trusted derived invalidation only, including recoverable episodes.
+            # The production identity barrier is already held. Never use this
+            # path for caller-selected writes or expose hidden episode content.
+            row=connection.execute('''SELECT o.*,p.workspace_id FROM collaboration_objects o
+                JOIN productions p ON p.id=o.production_id
+                WHERE o.id=%s AND o.production_id=%s AND o.project_id=%s AND NOT o.deleted FOR UPDATE OF o''',
+                (object_id,scope['production_id'],object_project)).fetchone()
+            live_principal(connection)
+            if not row:raise HTTPException(409,'关联镜头已变化，请刷新后重试')
+        else:
+            row = load(connection, object_project, object_id, write=True)
         if object_id in requested:
             item=requested[object_id]
             editable(connection, row)
             expected(row, item['expected_revision'], item['assignment_epoch'])
         locked[row['id']] = row
-    if motion_affected:
+    if affected_by_project:
         for row in motion_rows:
-            if row['kind']=='graph':
+            if row['kind']=='graph' and row['project_id'] in affected_by_project:
                 expected(locked[row['id']],row['revision'],row['assignment_epoch'])
-        updates=[{**item,'content':invalidate_content(item['content'],motion_affected,
+        updates=[{**item,'content':invalidate_content(item['content'],affected_by_project.get(locked[item['id']]['project_id'],set()),
                     validation.object_content(locked[item['id']]))} for item in updates]
     for item in deletes:
         row = locked[item['id']]
@@ -511,7 +539,8 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
             if locked[item['id']]['kind']=='visual_card':
                 previous=validation.object_content(locked[item['id']]).get('voice_profile')
                 voice=item['content']['voice_profile']
-                if previous and previous.get('status')=='locked' and voice!=previous:
+                from .voice_identity import is_reference_confirmation
+                if previous and previous.get('status')=='locked' and voice!=previous and not is_reference_confirmation(previous,voice):
                     if not voice or voice.get('status')!='draft' or voice.get('version',0)<=previous.get('version',0):
                         raise HTTPException(422,'已锁定音色不可原地修改；须派生新版本')
     # Acquire creation identity locks before the final lease clock check. A
@@ -532,11 +561,12 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     created = [create(connection, project_id, item['kind'], item['content'], validated=True) for item in creates]
     updated = [replace_content(connection, locked[item['id']], item['content'], project_id, _action) for item in updates]
     for oid,row in locked.items():
-        if oid in requested or not (validation.node_ids(row['kind'],validation.object_content(row)) & motion_affected):
+        affected=affected_by_project.get(row['project_id'],set())
+        if oid in requested or not (validation.node_ids(row['kind'],validation.object_content(row)) & affected):
             continue
         # Derived invalidation only: retain the other editor's content, assignment and lease.
-        replace_content(connection,row,invalidate_content(validation.object_content(row),motion_affected),
-                        project_id,'reference.invalidate')
+        replace_content(connection,row,invalidate_content(validation.object_content(row),affected),
+                        row['project_id'] or project_id,'reference.invalidate')
     for item in deletes:
         row=locked[item['id']]
         removed=connection.execute('''UPDATE collaboration_objects SET deleted=TRUE,revision=revision+1,

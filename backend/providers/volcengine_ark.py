@@ -489,6 +489,11 @@ def generate_video(worker, job, provider):
                     False if job['input'].get('dialogue_audio') else bool(params.get('generate_audio', True))
                 ),
             }
+            if job['input'].get('voice_samples'):
+                from ..voice_samples import submission_assets, sample_data_uri
+                body['content'].extend({'type':'audio_url','audio_url':{'url':sample_data_uri(asset)},'role':'reference_audio'}
+                                       for asset in submission_assets(job))
+                body['generate_audio']=True
             if (dialogue_reference or multimodal) and selected_model.lower().startswith(SEEDANCE_25_PREFIX):
                 body['omni_reference_task_type'] = 'reference'
             # Seedance derives image-to-video output ratio from the first frame

@@ -24,6 +24,7 @@ export type ProjectSetupDraft = {
   videoDuration: number;
   videoFormat: "mp4" | "mov";
   videoReferenceMode: 'multimodal' | 'first_frame' | 'first_last_frame' | 'legacy';
+  dialogueMode: 'voice_sample'|'full_dialogue';
   episodeCount: number;
   platform: string;
   brief: string;
@@ -52,6 +53,7 @@ export function defaultProjectSetupDraft(providers: Value[]): ProjectSetupDraft 
     videoDuration: -1,
     videoFormat: "mp4",
     videoReferenceMode: 'multimodal',
+    dialogueMode:'voice_sample',
     episodeCount: 1,
     platform: "通用短视频",
     brief: "",
@@ -105,6 +107,7 @@ export function projectSetupPayload(draft: ProjectSetupDraft) {
     video_duration: draft.videoDuration,
     video_format: draft.videoFormat,
     video_reference_mode: draft.videoReferenceMode,
+    dialogue_mode:draft.dialogueMode,
     episode_count: draft.episodeCount,
     platform: draft.platform,
     brief: draft.brief,

@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {motionCharacters,videoGenerationMode,videoModeLabels} from '../motionReference';
+import {dialogueMode,dialogueModeLabels,voiceSampleRows} from '../dialogueMode';
 import './motionReference.css';
 type Value=Record<string,any>;
 type Props={document:Value;shot:Value;node:Value;assets:Value[];models:Value[];projectId:string;
@@ -13,8 +14,8 @@ export function MotionReferenceEditor(props:Props){
  const model=models.find(item=>item.id===node.data.model_id);
  const supported=model?.capabilities?.multimodal_reference===true;
  const body=JSON.stringify({node_id:node.id,model_id:node.data.model_id,node_data:node.data,
-  shot:{motionReference:reference??null,videoReferenceMode:shot.videoReferenceMode||'',duration:shot.duration,
-   video_prompt:shot.video_prompt??node.data.prompt,camera:shot.camera||''},videoReferenceMode:document.videoReferenceMode||'legacy'});
+  shot:{motionReference:reference??null,videoReferenceMode:shot.videoReferenceMode||'',dialogueMode:shot.dialogueMode||'',duration:shot.duration,
+   video_prompt:shot.video_prompt??node.data.prompt,camera:shot.camera||''},videoReferenceMode:document.videoReferenceMode||'legacy',dialogueMode:document.dialogueMode||'full_dialogue'});
  useEffect(()=>{
   if(!open)return;
   let active=true;setWorking(true);setError('');setResult(undefined);
@@ -33,6 +34,11 @@ export function MotionReferenceEditor(props:Props){
   }catch(reason:any){setError(reason.message||String(reason))}finally{setUploading(false)}
  };
  return <section className="motion-reference-editor" aria-label="动作参考与视频模式">
+  <label>对白方式<select value={shot.dialogueMode||''} onChange={event=>onPatch({dialogueMode:event.target.value})}>
+   <option value="">跟随本集（{dialogueModeLabels[document.dialogueMode||'full_dialogue']}）</option>
+   {Object.entries(dialogueModeLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+  {dialogueMode(document,shot)==='voice_sample'&&<div><small>仅参考音色，不复述样本；本镜台词和情绪保持。样本时长不延长镜头。</small>
+   {voiceSampleRows(document,shot,assets).map((row:any)=><p key={row.cardId}>{row.name} · {row.ready?`已确认 V${row.profile.version}`:'缺少当前版本已确认样本'}</p>)}</div>}
   <label>视频生成模式<select value={shot.videoReferenceMode||''} onChange={event=>onPatch({videoReferenceMode:event.target.value})}>
    <option value="">跟随项目（{videoModeLabels[document.videoReferenceMode||'legacy']}）</option>
    {Object.entries(videoModeLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>

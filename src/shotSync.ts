@@ -14,7 +14,7 @@ export function updateShot<T extends {shots:Value[];nodes:Node[];edges:Edge[]}>(
  const imageNodeId=shot.imageNode||shot.pipeline?.imageNodeId;
  const videoNodeId=shot.videoNode||shot.pipeline?.videoNodeId;
  let next={...document,shots:document.shots.map(s=>s.id===id?{...s,...patch}:s)};
- if(['motionReference','videoReferenceMode'].some(key=>key in patch&&JSON.stringify(shot[key])!==JSON.stringify(patch[key]))){
+ if(['motionReference','videoReferenceMode','dialogueMode'].some(key=>key in patch&&JSON.stringify(shot[key])!==JSON.stringify(patch[key]))){
   // Only edit the owned shot locally. The server marks dependent objects without overwriting their owners' work.
   next={...next,nodes:next.nodes.map(node=>node.id===videoNodeId?{...node,data:{...node.data,
    generation_revision:Number(node.data.generation_revision||0)+1,

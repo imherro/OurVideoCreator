@@ -4097,6 +4097,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                   <label>避免项（每行一项）<textarea value={projectBibleFields.avoidItems} onChange={(event)=>update((document)=>mergeBibleFields(document,{...bibleFields(document),avoidItems:event.target.value}))}/></label>
                 </> : <>
                   <h3>当前制作集设置</h3>
+                  <label>默认对白方式<select value={(doc as Any).dialogueMode||'full_dialogue'} onChange={event=>update(document=>({...document,dialogueMode:event.target.value}))}><option value="voice_sample">音色样本参考</option><option value="full_dialogue">完整对白参考</option></select><small>音色样本须配合多模态模型，台词使用本镜对白。</small></label>
                   <label>视频参考模式<select value={(doc as any).videoReferenceMode||'legacy'} onChange={event=>update(document=>({...document,videoReferenceMode:event.target.value}))}>{Object.entries(videoModeLabels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>仅影响本集跟随默认模式的镜头，原素材保留。</small></label>
                   <label>Episode 标题<input maxLength={100} value={project.name} onChange={(event)=>{setProject({...project,name:event.target.value,episode_title:event.target.value});dirty.current=true;setSaved("未保存");}}/><small>只修改当前 EP{String(project.episode_no).padStart(2,"0")}，不会改变整部作品名称。</small></label>
                   <label>创作简介<textarea value={doc.brief} onChange={(event)=>update((document)=>({...document,brief:event.target.value}))}/></label>

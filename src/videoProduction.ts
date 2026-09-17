@@ -1,6 +1,7 @@
 import { requiresInitialStateReview } from "./graph.ts";
 import { shotIdentity } from "./storyboard.ts";
 import {videoGenerationMode} from './motionReference.ts';
+import {dialogueMode,voiceSampleRows} from './dialogueMode.ts';
 
 type Value = Record<string, any>;
 
@@ -67,6 +68,7 @@ export function deriveVideoProductionRows(
     const job = latestJob(jobs, videoNode?.id);
     const provider = providerMap.get(videoNode?.data?.model_id);
     const mode=videoGenerationMode(document,shot),multimodal=mode==='multimodal';
+    const sampleMode=dialogueMode(document,shot)==='voice_sample',samples=sampleMode?voiceSampleRows(document,shot,assets):[];
     const motionAsset=assets.find(asset=>asset.id===shot.motionReference?.assetId&&asset.kind==='video');
     const bindings=shot.assetBindings||{};
     const hasVisualBindings=Boolean(bindings.characters?.length||bindings.scene?.versionId||bindings.props?.length);
@@ -77,8 +79,8 @@ export function deriveVideoProductionRows(
     const configuredDuration = Number(document.videoDuration ?? -1);
     let effectiveDuration = configuredDuration >= 4 ? configuredDuration : plannedDuration;
     let dialogueReadinessReason = "";
-    if (["volcengine_ark", "runninghub"].includes(provider?.type)
-      || (provider?.type === "hc_atom" && provider.capabilities?.audio_reference === true)) {
+    if (!sampleMode&&(["volcengine_ark", "runninghub"].includes(provider?.type)
+      || (provider?.type === "hc_atom" && provider.capabilities?.audio_reference === true))) {
       for (const dialogue of dialogues) {
         const profile = profiles[dialogue.characterCardId] || {};
         if (profile.status !== "locked" || !String(profile.voiceType || "").trim()) {
@@ -119,12 +121,15 @@ export function deriveVideoProductionRows(
     else if (!String(videoNode.data?.prompt || "").trim()) readinessReason = "Video Prompt 为空";
     else if (!provider || videoNode.data?.model_id === "local") readinessReason = "尚未选择可用的视频 Provider";
     else if (!String(videoNode.data?.model_id || "").trim()) readinessReason = "尚未选择视频模型";
+    else if (sampleMode&&dialogues.length&&!multimodal) readinessReason = "音色样本需要明确选择多模态参考";
+    else if (sampleMode&&dialogues.length&&!provider?.capabilities?.voice_sample_reference) readinessReason = "所选模型未发布音色样本参考能力";
+    else if (sampleMode&&samples.some((sample:Value)=>!sample.ready)) readinessReason = "说话角色缺少当前版本已确认的声音样本";
     else if (multimodal&&!provider?.capabilities?.multimodal_reference) readinessReason = "所选平台模型未发布多模态参考能力";
     else if (shot.motionReference&&mode!=='multimodal') readinessReason = "动作视频需要明确选择多模态参考";
     else if (shot.motionReference&&!provider?.capabilities?.video_reference) readinessReason = "所选模型未发布动作视频参考能力";
     else if (shot.motionReference&&!motionAsset) readinessReason = "动作参考视频不存在或不可访问";
     else if (multimodal&&!firstFrame&&!motionAsset&&!hasVisualBindings&&!videoNode.data?.asset_ids?.length&&!videoNode.data?.end_asset_id
-      &&!(dialogueAudioAssets.length&&provider?.capabilities?.audio_only_reference)) readinessReason = "多模态模式缺少参考素材";
+      &&!((dialogueAudioAssets.length||samples.length)&&provider?.capabilities?.audio_only_reference)) readinessReason = "多模态模式缺少参考素材";
     else if (videoNode.data?.end_asset_id && !endFrameSupported) readinessReason = "当前模型不支持尾帧";
     else if (dialogueReadinessReason) readinessReason = dialogueReadinessReason;
     else if (mode!=='legacy'&&!multimodal&&dialogueAudioAssets.length) readinessReason = "严格帧模式不能混入固定对白音频";
