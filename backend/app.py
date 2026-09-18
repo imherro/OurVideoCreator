@@ -53,6 +53,8 @@ from .job_candidates import router as job_candidates_router
 app.include_router(job_candidates_router)
 from .workflow_routes import router as workflow_router
 app.include_router(workflow_router)
+from .workflow_reviews import router as workflow_reviews_router
+app.include_router(workflow_reviews_router)
 PUBLIC = {
     '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
     '/api/auth/register', '/api/auth/password-reset',
@@ -2187,7 +2189,8 @@ def transition_script(production_id,episode_no,expected_revision,assignment_epoc
         metadata=json.loads(row['metadata'])
         independent=metadata.get('origin')=='canvas' or metadata.get('adaptationLinked') is False
         if target=='approved':
-            if not independent and (context['adaptationPlan']['status']!='approved' or not plan or plan['status']!='approved'):raise ValueError('请先批准改编策划和本集分集规划')
+            from . import business_roles
+            if not business_roles.workflow(c,production_id) and not independent and (context['adaptationPlan']['status']!='approved' or not plan or plan['status']!='approved'):raise ValueError('请先批准改编策划和本集分集规划')
             if row['status']!='review':raise ValueError('请先将本集剧本提交审核')
         if target=='review' and row['status']=='stale':raise ValueError('剧本已过期，请先修订后再提交审核')
         now=time.time()

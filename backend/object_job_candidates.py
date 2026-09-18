@@ -173,10 +173,15 @@ def freeze(c,pid,body,state=None):
         }}
     target=locked[target['id']];collab.editable(c,target)
     validate_audio(list(locked.values()),target,mode,body)
+    from .workflow_reviews import generation_approvals
+    approvals=generation_approvals(c,scope['production_id'],script,list(locked.values()),target,mode,body,upstream)
+    if approvals:
+        script_ref={'kind':'script','id':pid,'revision':script['revision'],'assignment_epoch':script['assignment_epoch']}
     binding={'target':ref(target),'mode':mode,'references':[ref(r) for oid,r in locked.items() if oid!=target['id']],
              'script_reference':script_ref,'project_revision':project['revision'],'production_revision':production['revision']}
     if mode=='storyboard':binding['replacement_shots']=sorted(r['id'] for r in snapshot['objects'] if r['kind']=='shot')
     if mode=='storyboard':binding['visual_catalog_objects']=visual_catalog_objects
+    if approvals:binding['workflow_approvals']=approvals
     return binding
 
 

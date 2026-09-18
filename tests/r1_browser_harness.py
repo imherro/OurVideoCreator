@@ -11,11 +11,14 @@ import tempfile
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=7886)
+    parser.add_argument('--host',default='127.0.0.31',help='Distinct loopback host keeps test cookies away from the live app')
     parser.add_argument('--ui',type=Path,required=True)
+    parser.add_argument('--reviews',action='store_true')
     args=parser.parse_args()
     if not (args.ui/'index.html').is_file():raise RuntimeError('Build the staged UI first')
     # Refuse an occupied listener before creating fixtures.
-    with socket.socket() as listener:listener.bind(('127.0.0.1',args.port))
+    if not ipaddress.ip_address(args.host).is_loopback:raise RuntimeError('UI fixture must remain loopback-only')
+    with socket.socket() as listener:listener.bind((args.host,args.port))
     original=socket.socket.connect
     def guarded(instance,address):
         if isinstance(address,tuple):
@@ -56,6 +59,24 @@ def main():
                 if role=='writer':
                     source=checked(member.post(f'/api/productions/{pid}/sources',json={'title':'测试原著','type':'manual','metadata':{}}))
                     checked(member.post(f"/api/productions/{pid}/sources/{source['id']}/chapters",json={'title':'第一章：相遇','content':'雨夜，两名旅人在车站相遇。'}))
+                    if args.reviews:
+                        checked(admin.put(base+'/episodes/'+project['id'],json={'revision':state['config']['revision'],
+                            'role':'writer','user_id':user['id']}))
+                        script_path=f'/api/productions/{pid}/episode-scripts/1'
+                        script=checked(member.get(script_path))
+                        from backend.adaptation import SCRIPT_FIELDS
+                        payload={key:script[key] for key in SCRIPT_FIELDS}
+                        payload.update(revision=script['revision'],assignment_epoch=script['assignment_epoch'],
+                            title='第一集：雨夜相遇',body='外景，车站，夜。\n小林：末班车还没来。\n小周把伞递给小林。')
+                        script=checked(member.put(script_path,json=payload))
+                        checked(member.post(script_path+'/review',json={'revision':script['revision'],'assignment_epoch':script['assignment_epoch']}))
+                if role=='artist' and args.reviews:
+                    asset=checked(member.post(f"/api/projects/{project['id']}/objects",json={'kind':'visual_card','content':{
+                        'card':{'id':'review-hero','name':'小林 · 雨夜旅人','kind':'character','currentVersionId':'review-hero-v1','parentCardId':None,'status':'active'},
+                        'versions':{'review-hero-v1':{'id':'review-hero-v1','cardId':'review-hero','version':1,'parentVersionId':None,'status':'draft',
+                            'spec':{'description':'深蓝色外套，短发，旧帆布包。雨夜站在车站屋檐下。','attributes':[]},'invariants':[],'references':[],'createdAt':1,'provenance':{}}},'voice_profile':None}}))
+                    checked(member.post(base+'/reviews/assets',json={'action':'submit','items':[
+                        {key:asset[key] for key in ('id','revision','assignment_epoch')}]}))
                 people.append({'nickname':name,'role':role})
         assert checked(admin.get('/api/models'))['models']==[]
     # Serve only this staged build, leaving the live 7878 static directory untouched.
@@ -64,10 +85,10 @@ def main():
     for path in ('/workflow','/members','/admin'):
         app.add_api_route(path,page,methods=['GET'])
     app.mount('/',StaticFiles(directory=args.ui,html=True),name='r1-staged-ui')
-    print(json.dumps({'url':f'http://127.0.0.1:{args.port}/','production_id':pid,
+    print(json.dumps({'url':f'http://{args.host}:{args.port}/','production_id':pid,
         'project_id':project['id'],'database':database,'members':people,'paid_calls':0},ensure_ascii=False),flush=True)
     import uvicorn
-    uvicorn.run(app,host='127.0.0.1',port=args.port,log_level='warning')
+    uvicorn.run(app,host=args.host,port=args.port,log_level='warning')
 
 
 if __name__=='__main__':main()

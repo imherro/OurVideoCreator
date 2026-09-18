@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import './productionWorkflow.css';
+import {ProductionReviews} from './ProductionReviews';
 
 type V = Record<string, any>;
 type Request = (path:string, options?:RequestInit)=>Promise<any>;
@@ -65,6 +66,7 @@ export function ProductionWorkflow({request}:{request:Request}) {
     {data&&!data.enabled&&<section><h2>启用五角色生产流程</h2><p>原作品内容和现有对象负责人保留。启用者成为本作品制片人；请随后给成员设置业务角色和分工，否则他们将只能查看。</p>
       {data.can_enable?<button className="primary" disabled={busy} onClick={()=>void change('/enable','POST',{})}>保留原分工，启用五角色流程</button>:<p>请联系作品管理者启用。</p>}</section>}
     {data?.enabled&&<>
+      <ProductionReviews key={pid} productionId={pid} request={request}/>
       <section><h2>作品成员与角色</h2><p>我的角色：{data.my_roles.map((r:string)=>ROLES[r]).join('、')||'只读成员'}</p>
         {data.can_manage?<>{data.members.map((m:V)=><RoleForm key={`${m.id}:${data.config.revision}`} member={m} busy={busy}
           save={(id,roles)=>void change(`/members/${id}`,'PUT',{roles})}/>)}

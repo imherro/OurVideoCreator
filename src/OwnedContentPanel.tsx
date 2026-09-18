@@ -62,7 +62,7 @@ export function OwnedContentPanel({store,id,actorId,canManage,canEdit,request,on
       <button disabled={busy||!clean} onClick={()=>void run(()=>command('assign',{assignee_id:assignee||null}))}>确认分配</button>
       <button disabled={busy||!clean} onClick={()=>void run(()=>command('assign',{assignee_id:actorId}))}>明确接管到我</button>
     </div></details>}
-    {path&&store.kind==='chapter'&&<div className="collaboration-actions">
+    {path&&!businessMode&&store.kind==='chapter'&&<div className="collaboration-actions">
       <button disabled={busy||!clean||!editable} onClick={()=>void run(()=>command('review',{action:'submit'}))}>提交章节审核</button>
       <button disabled={busy||!clean||!canManage||value.status!=='pending_review'} onClick={()=>void run(()=>command('review',{action:'approve'}))}>确认章节</button>
       <button disabled={busy||!clean||!canManage} onClick={()=>void run(()=>command('review',{action:'return'}))}>退回章节</button>

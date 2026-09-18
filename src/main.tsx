@@ -2785,7 +2785,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         </span>
         <div className="top-spacer" />
         <button className={panel==='collaboration'?'quiet active':'quiet'}
-          onClick={()=>setPanel(panel==='collaboration'?null:'collaboration')}>对象协作</button>
+          onClick={()=>setPanel(panel==='collaboration'?null:'collaboration')}>{(project as Any).permissions?.workflow_enabled?'制作记录与冲突':'对象协作'}</button>
         <button
           className="icon-button"
           aria-label="保存项目"

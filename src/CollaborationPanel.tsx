@@ -54,14 +54,14 @@ export function CollaborationPanel({client,document,assets,actorId,canManage,can
   const person=(id:string|null)=>members.find(member=>member.id===id)?.nickname|| (id===actorId?'我':id||'待分配');
   const held=row&&client.leases.get(row.id);
   return <section className="collaboration-panel" aria-label="对象协作">
-    <p>只保存自己负责的对象。管理者请先明确接管再改内容；分配与接管会撤销旧页面的编辑凭证。</p>
-    <label>协作对象<select aria-label="协作对象" value={selected} disabled={busy} onChange={e=>setSelected(e.target.value)}>
-      {rows.map(item=><option key={item.id} value={item.id}>{label(item)} · {states[client.drafts.entries.get(item.id)?.state||'saved']}</option>)}
+    <p>{businessMode?'这里查看制作内容的保存状态、历史与冲突。日常角色和分集负责人请在作品分工中设置。':'只保存自己负责的对象。管理者请先明确接管再改内容；分配与接管会撤销旧页面的编辑凭证。'}</p>
+    <label>{businessMode?'制作内容':'协作对象'}<select aria-label="协作对象" value={selected} disabled={busy} onChange={e=>setSelected(e.target.value)}>
+      {rows.map(item=><option key={item.id} value={item.id}>{businessMode?(item.content.card?.name||item.content.node?.data?.label||item.content.shot?.scene||kindNames[item.kind]):label(item)} · {states[client.drafts.entries.get(item.id)?.state||'saved']}</option>)}
     </select></label>
     {error&&<p role="alert" className="danger">{error}</p>}
     {row&&<>
       <dl className="collaboration-summary"><div><dt>负责人</dt><dd>{person(row.assignee_id)}</dd></div>
-        <div><dt>服务端版本</dt><dd>r{row.revision} / 分配代际 {row.assignment_epoch}</dd></div>
+        <div><dt>内容版本</dt><dd>r{row.revision}{!businessMode&&` / 分配代际 ${row.assignment_epoch}`}</dd></div>
         <div><dt>保存状态</dt><dd role="status">{states[draft?.state||'saved']}</dd></div>
         <div><dt>审核状态</dt><dd>{reviews[row.status]||row.status}</dd></div></dl>
       {draft?.error&&<p className="danger">{draft.error}</p>}
@@ -91,7 +91,7 @@ export function CollaborationPanel({client,document,assets,actorId,canManage,can
             已比较，明确提交此对象草稿</button>
         </div>
       </section>}
-      {canManage&&<fieldset disabled={busy}><legend>分配 / 明确接管</legend>
+      {canManage&&<details open={businessMode?undefined:true}><summary>制片人高级异常处理</summary><fieldset disabled={busy}><legend>特殊分配 / 明确接管</legend>
         <label>负责人账号<select aria-label="分配对象负责人" value={assignee} onChange={e=>setAssignee(e.target.value)}>
           <option value="">待分配</option>
           <option value={actorId}>我（当前账号）</option>
@@ -99,7 +99,7 @@ export function CollaborationPanel({client,document,assets,actorId,canManage,can
         </select></label>
         <div className="collaboration-actions"><button onClick={()=>void run(()=>change('assign',{assignee_id:assignee||null}))}>确认重新分配</button>
           <button onClick={()=>void run(()=>change('assign',{assignee_id:actorId}))}>明确接管到我（旧凭证失效）</button></div>
-      </fieldset>}
+      </fieldset></details>}
       {row.kind==='timeline'&&<fieldset disabled={busy||!own||!canEdit}><legend>时间线独占租约</legend>
         <p>{held?`本页租约到期：${new Date(held.expires*1000).toLocaleTimeString()}`:'本页尚未取得租约。另一页面持有时不可编辑提交。'}</p>
         <div className="collaboration-actions">
@@ -109,13 +109,13 @@ export function CollaborationPanel({client,document,assets,actorId,canManage,can
         </div>
         <small>保存前会校验并按需续租；管理者明确接管会使旧租约失效。</small>
       </fieldset>}
-      <fieldset disabled={busy||draft?.state!=='saved'}><legend>版本审核</legend>
+      {businessMode?<p><a href={`/workflow?production=${encodeURIComponent(productionId)}`}>前往剧本与总资产验收</a>。镜头生成完成后由抽卡师选定素材，不设置额外分集制作审批。</p>:<fieldset disabled={busy||draft?.state!=='saved'}><legend>版本审核</legend>
         <div className="collaboration-actions">
           <button disabled={!editable||!['in_progress','returned'].includes(row.status)} onClick={()=>void run(()=>change('review',{action:'submit'}))}>提交当前 r{row.revision} 确认</button>
           {canManage&&<><button disabled={row.status!=='pending_review'} onClick={()=>void run(()=>change('review',{action:'approve'}))}>确认当前版本</button>
             <button disabled={row.status!=='pending_review'} onClick={()=>void run(()=>change('review',{action:'return'}))}>退回修改</button></>}
         </div>
-      </fieldset>
+      </fieldset>}
       <details><summary>历史版本（恢复会追加新版本）</summary>
         {history.map(item=><div className="collaboration-history" key={item.revision}>
           <span>r{item.revision} · {item.action} · {person(item.actor_user_id)} · {new Date(item.created*1000).toLocaleString()}</span>

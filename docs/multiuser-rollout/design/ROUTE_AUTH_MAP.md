@@ -214,6 +214,8 @@
 | PUT `/api/productions/{production_id}/workflow/defaults` | 制片人、分工 revision；目标具备对应角色；仅改变后续新增内容默认归属 |
 | PUT `/api/productions/{production_id}/workflow/episodes/{project_id}` | 制片人、分工 revision、真实父作品；整集制作范围原子转交及旧租约失效，特殊分配先确认；不转交共享资产与剧本 |
 | POST `/api/productions/{production_id}/workflow/assign` | 制片人、分工及逐项 revision/epoch；按章节/资产业务清单批量分配，全部成功或全部回滚 |
+| GET `/api/productions/{production_id}/workflow/reviews` | 五角色作品有效成员只读；返回当前剧本与共享资产明确版本 |
+| POST `/api/productions/{production_id}/workflow/reviews/assets` | 资产师提交自己的资产；制片人批准或退回；每项版本/代际核验、批次原子成功或回滚；复用对象历史 |
 
 启用五角色后，上述历史条目中的 manager 写权限由作品制片人承担，不赋予 Workspace owner；正文仍要求业务角色与实际负责人。原著/章节软删除由编剧执行并校验全部目标负责人及版本。改编策划及其候选采纳由默认编剧执行；任务冻结分工修订，分工变更后旧任务不能沿用旧票据恢复。供应商/凭证/模型目录仍仅平台管理员管理。
 
