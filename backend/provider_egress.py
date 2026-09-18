@@ -104,7 +104,7 @@ def validate_url(value, *, resolve=False):
         except (OSError, ValueError):
             raise EgressDenied('模型地址无法安全解析，调用已阻止') from None
     if not addresses or any(not _public(ip) and (*origin, ip) not in exceptions for ip in addresses):
-        raise EgressDenied('模型出站已拒绝：目标不是公网地址，且无精确部署例外')
+        raise EgressDenied(f'模型出站已拒绝：目标不是公网地址，且无精确部署例外（域名：{host}）')
     return origin, addresses
 
 

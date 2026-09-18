@@ -287,6 +287,16 @@ def test_egress_rejects_unsafe_addresses(monkeypatch, url):
         egress.validate_url(url, resolve=True)
 
 
+def test_egress_diagnostic_exposes_host_not_signed_url(monkeypatch):
+    monkeypatch.delenv(egress.EXCEPTIONS_ENV, raising=False)
+    monkeypatch.setattr(egress.socket,'getaddrinfo',lambda *a,**k:
+        [(2,1,6,'',('198.18.0.10',443))])
+    with pytest.raises(egress.EgressDenied) as error:
+        egress.validate_url('https://media.example.test/private-file.png?signature=secret-value',resolve=True)
+    assert 'media.example.test' in str(error.value)
+    assert 'private-file' not in str(error.value) and 'secret-value' not in str(error.value)
+
+
 def test_dns_pinning_redirect_and_exact_private_exception(monkeypatch):
     monkeypatch.setattr(socket, 'getaddrinfo', lambda *args, **kwargs: [
         (socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 443))])
