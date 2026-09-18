@@ -176,6 +176,7 @@ import {
   type WorkflowStage,
 } from "./app/workflow";
 import { WorkflowOverview } from "./pages/WorkflowOverview";
+import { RoleWorkInbox } from './RoleWorkInbox';
 import { SourceLibraryPage } from "./pages/SourceLibraryPage";
 import { AdaptationPage } from "./pages/AdaptationPage";
 import { ScriptRoomPage } from "./pages/ScriptRoomPage";
@@ -2925,6 +2926,16 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         </div>
         {workflowStage === "overview" ? (
           <WorkflowOverview
+            businessInbox={(project as Any).permissions?.workflow_enabled ? <RoleWorkInbox productionId={project.production_id} request={api} onOpen={async task=>{
+              if(['reviews','samples','deliveries','asset-candidates','staff'].includes(task.stage)){
+                await prepareProjectSwitch();
+                location.assign(`/workflow?production=${encodeURIComponent(project.production_id)}${task.project_id?'&episode='+encodeURIComponent(task.project_id):''}#${task.stage}`);
+                return;
+              }
+              if(task.project_id&&task.project_id!==project.id)await switchEpisode(task.title,()=>openProject(task.project_id));
+              if(task.episode_no)setPlanningEpisodeFocus(known=>({...known,[project.production_id]:task.episode_no}));
+              activateWorkflowStage(task.stage as WorkflowStage);
+            }}/> : undefined}
             projectName={currentProduction?.name || project.name}
             duration={doc.duration}
             ratio={doc.ratio}

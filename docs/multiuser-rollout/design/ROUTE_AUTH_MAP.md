@@ -215,6 +215,7 @@
 | PUT `/api/productions/{production_id}/workflow/episodes/{project_id}` | 制片人、分工 revision、真实父作品；整集制作范围原子转交及旧租约失效，特殊分配先确认；不转交共享资产与剧本 |
 | POST `/api/productions/{production_id}/workflow/assign` | 制片人、分工及逐项 revision/epoch；按章节/资产业务清单批量分配，全部成功或全部回滚 |
 | GET `/api/productions/{production_id}/workflow/reviews` | 五角色作品有效成员只读；返回当前剧本与共享资产明确版本 |
+| GET `/api/productions/{production_id}/workflow/tasks` | 当前作品有效成员；按当前业务角色和真实内容负责人只读投影我的工作，不授予任何新权限 |
 | GET `/api/productions/{production_id}/workflow/asset-candidates` | 作品有效成员；从成功未采纳的分镜任务列出新资产候选，不创建或改写资产 |
 | POST `/api/productions/{production_id}/workflow/asset-candidates/{jid}` | 当前默认资产师；核对候选及分工指纹，仅创建新共享资产草稿，记录原任务关联，不授予制作对象权限 |
 | GET `/api/projects/{pid}/deliveries` | 当前作品有效成员查看固定交付版本；无制作写权限要求 |

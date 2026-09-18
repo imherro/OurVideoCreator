@@ -5,7 +5,8 @@ type Request=(path:string,options?:RequestInit)=>Promise<any>;
 
 export function EpisodeSamples({episodes,request}:{episodes:V[];request:Request}){
   const video=useRef<HTMLVideoElement>(null);
-  const [pid,setPid]=useState(episodes[0]?.id||''),[data,setData]=useState<V|null>(null),[deliveries,setDeliveries]=useState<V[]>([]);
+  const requested=new URLSearchParams(location.search).get('episode');
+  const [pid,setPid]=useState(episodes.find(ep=>ep.id===requested)?.id||episodes[0]?.id||''),[data,setData]=useState<V|null>(null),[deliveries,setDeliveries]=useState<V[]>([]);
   const [delivery,setDelivery]=useState(''),[selected,setSelected]=useState(''),[file,setFile]=useState<File|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const uploadId=useRef(crypto.randomUUID()),input=useRef<HTMLInputElement>(null),base=`/projects/${pid}/samples`;

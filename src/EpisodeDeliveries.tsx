@@ -4,7 +4,8 @@ type V=Record<string,any>;
 type Request=(path:string,options?:RequestInit)=>Promise<any>;
 
 export function EpisodeDeliveries({episodes,actorId,roles,request}:{episodes:V[];actorId:string;roles:string[];request:Request}){
-  const [pid,setPid]=useState(episodes[0]?.id||''),[preview,setPreview]=useState<V|null>(null);
+  const requested=new URLSearchParams(location.search).get('episode');
+  const [pid,setPid]=useState(episodes.find(ep=>ep.id===requested)?.id||episodes[0]?.id||''),[preview,setPreview]=useState<V|null>(null);
   const [history,setHistory]=useState<V[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const episode=episodes.find(item=>item.id===pid),base=`/projects/${pid}/deliveries`;

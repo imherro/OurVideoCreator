@@ -40,6 +40,7 @@ export function ProductionWorkflow({request}:{request:Request}) {
   const [target,setTarget]=useState(''),[special,setSpecial]=useState<V|null>(null);
   useEffect(()=>{let alive=true;request('/productions').then(rows=>{if(alive){setProductions(rows);setPid(old=>old||rows[0]?.id||'');}}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[]);
   const path=`/productions/${pid}/workflow`;
+  useEffect(()=>{if(data?.enabled&&['#reviews','#samples','#deliveries','#asset-candidates','#staff'].includes(location.hash))document.getElementById(location.hash.slice(1))?.scrollIntoView();},[Boolean(data?.enabled),pid]);
   useEffect(()=>{let alive=true;setData(null);setError('');setNotice('');setSelected([]);setSpecial(null);
     if(pid)request(path).then(v=>{if(alive)setData(v);}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[pid]);
   async function change(suffix:string,method:string,value:V) {
@@ -69,11 +70,11 @@ export function ProductionWorkflow({request}:{request:Request}) {
     {data&&!data.enabled&&<section><h2>启用五角色生产流程</h2><p>原作品内容和现有对象负责人保留。启用者成为本作品制片人；请随后给成员设置业务角色和分工，否则他们将只能查看。</p>
       {data.can_enable?<button className="primary" disabled={busy} onClick={()=>void change('/enable','POST',{})}>保留原分工，启用五角色流程</button>:<p>请联系作品管理者启用。</p>}</section>}
     {data?.enabled&&<>
-      <ProductionReviews key={pid} productionId={pid} request={request}/>
-      <StoryboardAssetRequests key={`assets:${pid}:${data.config.revision}`} productionId={pid} request={request}/>
-      <EpisodeDeliveries key={`delivery:${pid}:${data.config.revision}`} episodes={data.episodes} actorId={data.actor_id} roles={data.my_roles} request={request}/>
-      <EpisodeSamples key={`samples:${pid}:${data.config.revision}`} episodes={data.episodes} request={request}/>
-      <section><h2>作品成员与角色</h2><p>我的角色：{data.my_roles.map((r:string)=>ROLES[r]).join('、')||'只读成员'}</p>
+      <div id="reviews"><ProductionReviews key={pid} productionId={pid} request={request}/></div>
+      <div id="asset-candidates"><StoryboardAssetRequests key={`assets:${pid}:${data.config.revision}`} productionId={pid} request={request}/></div>
+      <div id="deliveries"><EpisodeDeliveries key={`delivery:${pid}:${data.config.revision}`} episodes={data.episodes} actorId={data.actor_id} roles={data.my_roles} request={request}/></div>
+      <div id="samples"><EpisodeSamples key={`samples:${pid}:${data.config.revision}`} episodes={data.episodes} request={request}/></div>
+      <section id="staff"><h2>作品成员与角色</h2><p>我的角色：{data.my_roles.map((r:string)=>ROLES[r]).join('、')||'只读成员'}</p>
         {data.can_manage?<>{data.members.map((m:V)=><RoleForm key={`${m.id}:${data.config.revision}`} member={m} busy={busy}
           save={(id,roles)=>void change(`/members/${id}`,'PUT',{roles})}/>)}
           <form className="workflow-assignment" onSubmit={e=>{e.preventDefault();if(person)void change(`/members/${person}`,'PUT',{roles:[]});}}>
