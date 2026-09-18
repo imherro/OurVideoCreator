@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Request
 
 from . import platform_models as models, store as s
+from . import provider_presets
 
 router = APIRouter()
 
@@ -55,6 +56,16 @@ def revoke_provider_key(provider_id: str, credential_id: str):
 @router.get('/api/admin/models')
 def admin_models():
     return models.admin_models()
+
+
+@router.get('/api/admin/provider-presets')
+def presets():
+    return provider_presets.catalog()
+
+
+@router.post('/api/admin/provider-presets/{preset_id}')
+async def save_preset(preset_id: str, request: Request):
+    return provider_presets.save(_id(preset_id), await _body(request))
 
 
 @router.post('/api/admin/models')

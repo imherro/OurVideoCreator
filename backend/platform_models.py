@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from fastapi import HTTPException
@@ -67,13 +68,13 @@ def admin_providers():
         return {'providers': [_provider_view(connection, row) for row in rows], 'key_service': key_status}
 
 
-def save_provider(provider_id, body):
+def save_provider(provider_id, body, *, connection=None):
     actor = _admin()
     validation._object(body, {'revision', 'name', 'enabled', 'config', 'api_key'}, '模型服务')
     name = validation._string(body.get('name'), '服务名称', 100)
     config = validation.provider_config(body.get('config'))
     enabled = _bool(body, 'enabled', True)
-    with s.db() as connection:
+    with (s.db() if connection is None else nullcontext(connection)) as connection:
         # Low-volume platform mutations share a transaction lock, including
         # creates, so same-ID races return a clean revision conflict.
         connection.execute('SELECT pg_advisory_xact_lock(%s)', (0x4F56435F4D444C31,))
@@ -177,10 +178,10 @@ def admin_models():
                 'defaults': {row['kind']: row['model_id'] for row in connection.execute('SELECT * FROM model_defaults')}}
 
 
-def save_model(model_id, body):
+def save_model(model_id, body, *, connection=None):
     actor = _admin()
     validation._object(body, {'revision', 'kind', 'provider_id', 'definition', 'published', 'enabled', 'default'}, '平台模型')
-    with s.db() as connection:
+    with (s.db() if connection is None else nullcontext(connection)) as connection:
         connection.execute('SELECT pg_advisory_xact_lock(%s)', (0x4F56435F4D444C31,))
         row = connection.execute('SELECT * FROM model_catalog WHERE id=%s FOR UPDATE', (model_id,)).fetchone()
         _revision(body, row)

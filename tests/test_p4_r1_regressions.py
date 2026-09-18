@@ -266,6 +266,9 @@ def test_other_declared_controls_cannot_fall_back_when_omitted(admin, fake, name
     assert events == []
     allowed = model(admin, provider, kind=kind, rules={name: rule}, defaults={name: value})
     assert allowed.status_code == 200
+    # New Productions freeze the enabled model pool at creation. The newly
+    # published comparison model belongs to a new project, not the old pool.
+    p = project(admin)
     response = submit(admin, p['id'], allowed.json()['id'], kind=kind)
     assert response.status_code == 200
     with s.db() as c:

@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {ProviderSetupCards} from './ProviderSetupCards';
 import './platformModels.css';
 
 type Value = Record<string, any>;
@@ -25,14 +26,16 @@ function parseObject(raw: string, label: string) {
 export function PlatformModels({request}: {request: Request}) {
   const [providers, setProviders] = useState<Value[]>([]), [models, setModels] = useState<Value[]>([]);
   const [defaults, setDefaults] = useState<Value>({}), [keyStatus, setKeyStatus] = useState('');
+  const [presets, setPresets] = useState<Value[]>([]);
   const [provider, setProvider] = useState<Value>(emptyProvider), [model, setModel] = useState<Value>(emptyModel);
   const [key, setKey] = useState(''), [replaceKey, setReplaceKey] = useState(true), [options, setOptions] = useState('{}');
   const [caps, setCaps] = useState('{}'), [params, setParams] = useState('{}'), [rules, setRules] = useState('{}');
   const [isDefault, setIsDefault] = useState(false), [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(''), [error, setError] = useState(''), [revokeId, setRevokeId] = useState('');
   async function load() {
-    const [p, m] = await Promise.all([request('/admin/model-providers'), request('/admin/models')]);
+    const [p, m, shortcuts] = await Promise.all([request('/admin/model-providers'), request('/admin/models'), request('/admin/provider-presets')]);
     setProviders(p.providers); setKeyStatus(p.key_service); setModels(m.models); setDefaults(m.defaults);
+    setPresets(shortcuts.presets);
   }
   useEffect(() => {void load().catch(e => setError(e.message));}, []);
   async function act(action: () => Promise<void>) {
@@ -51,11 +54,14 @@ export function PlatformModels({request}: {request: Request}) {
     setRules(JSON.stringify(value.definition.rules || {}, null, 2));
   }
   return <section className="platform-models" aria-label="平台模型配置">
-    <h2>平台模型与服务</h2>
-    <p>仅平台管理员配置服务与 Key。普通成员只使用已发布模型。保存和检查不会发起生成。</p>
-    {keyStatus === 'unavailable' && <p className="error">模型密钥服务未就绪：首次保存需要部署 OVC_PROVIDER_MASTER_KEY；已有配置请核对主密钥。账号管理不受影响。</p>}
+    <h2>供应商与 API Key</h2>
+    <p>填写四个服务的 Key 即可配置单人版默认模型。保存不会调用生成接口；Key 加密保存且不回显。</p>
+    {keyStatus === 'unavailable' && <p className="error">密钥保存服务尚未就绪。首次配置会在保存时初始化；若仍提示无法保存，请检查服务器原有加密配置。</p>}
     {error && <div role="alert" className="error">{error}</div>}
     {notice && <div role="status" className="notice">{notice}</div>}
+    <ProviderSetupCards presets={presets} request={request} onSaved={load}/>
+    <details className="platform-advanced"><summary>高级配置：其他服务、模型参数与凭证管理</summary>
+    <p className="muted">已有自定义服务和模型保留在这里。快捷保存会补齐预设模型，已有模型的自定义参数不会重置。</p>
     <div className="platform-model-grid">
       <div>
         <h3>Provider 与凭证</h3>
@@ -143,5 +149,6 @@ export function PlatformModels({request}: {request: Request}) {
         </form>
       </div>
     </div>
+    </details>
   </section>;
 }

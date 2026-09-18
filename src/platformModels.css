@@ -1,4 +1,25 @@
 .platform-model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.provider-setup-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; margin: 20px 0; }
+.provider-setup-card { display: flex; flex-direction: column; gap: 12px; padding: 22px; border: 1px solid #394142; border-radius: 12px; background: #1d2425; min-width: 0; }
+.provider-card-heading { display: flex; gap: 12px; justify-content: space-between; align-items: center; }
+.provider-card-heading h3 { margin: 0; }
+.provider-badge { font-size: 12px; color: #c3b38f; white-space: nowrap; }
+.provider-badge.configured { color: #9fd2b2; }
+.provider-setup-card p { margin: 0; line-height: 1.6; }
+.provider-setup-card label { display: grid; gap: 7px; color: #d5dcda; }
+.provider-setup-card input { width: 100%; margin: 0; }
+.provider-setup-card .checkbox { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.provider-setup-card .checkbox input { width: auto; }
+.provider-setup-card > .primary { margin-top: auto; align-self: flex-start; }
+.provider-preset-models { display: grid; gap: 8px; padding: 0; margin: 0 0 4px; list-style: none; }
+.provider-preset-models li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.provider-preset-models small { color: #dfc38e; margin-left: auto; }
+.provider-preset-models .model-kind { color: #97a4a4; font-size: 12px; }
+.provider-footnote { color: #a4b1b0; font-size: 12px; overflow-wrap: anywhere; }
+.provider-setup-card summary, .platform-advanced > summary { cursor: pointer; color: #dfc38e; }
+.provider-setup-card details label { margin-top: 12px; }
+.platform-advanced { border-top: 1px solid #394142; padding-top: 20px; margin-top: 28px; }
+@media(max-width: 800px) { .provider-setup-grid { grid-template-columns: 1fr; } }
 .platform-model-grid > div { min-width: 0; }
 .platform-model-grid form { display: grid; gap: 12px; margin-top: 18px; }
 .platform-model-grid label { display: grid; gap: 5px; color: #cbd2d3; }
