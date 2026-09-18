@@ -110,6 +110,16 @@ async def upload(pid:str,file:UploadFile=File(...),delivery_id:str=Form(...),upl
             return public(c.execute('SELECT * FROM episode_samples WHERE id=%s',(sid,)).fetchone())
 
 
+def verified_media(row,variant):
+    folder=(s.DATA/'samples').resolve();path=(folder/row[variant+'_path']).resolve()
+    if path.parent!=folder or not path.is_file():raise HTTPException(409,'样片文件丢失，不会自动替换旧版本')
+    # Verification applies equally to range playback and original downloads.
+    stat=path.stat()
+    if verified_hash(str(path),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)!=row[variant+'_sha256']:
+        raise HTTPException(409,'样片完整性检查失败')
+    return path
+
+
 @router.get('/{sid}/{variant}')
 def media(pid:str,sid:str,variant:str):
     if variant not in {'review','original'}:raise HTTPException(404,'样片文件类型不存在')
@@ -117,12 +127,7 @@ def media(pid:str,sid:str,variant:str):
         scope(c,pid)
         row=c.execute('SELECT * FROM episode_samples WHERE id=%s AND project_id=%s',(sid,pid)).fetchone()
         if not row:raise HTTPException(404,'样片版本不存在')
-    folder=(s.DATA/'samples').resolve();path=(folder/row[variant+'_path']).resolve()
-    if path.parent!=folder or not path.is_file():raise HTTPException(409,'样片文件丢失，不会自动替换旧版本')
-    # Verification applies equally to range playback and original downloads.
-    stat=path.stat()
-    if verified_hash(str(path),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)!=row[variant+'_sha256']:
-        raise HTTPException(409,'样片完整性检查失败')
+    path=verified_media(row,variant)
     original=variant=='original'
     return FileResponse(path,media_type=(mimetypes.guess_type(row['original_name'])[0] if original else 'video/mp4') or 'application/octet-stream',
         filename=row['original_name'] if original else f'sample-v{row["version"]}-review.mp4',

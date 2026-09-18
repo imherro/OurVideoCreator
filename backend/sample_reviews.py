@@ -6,7 +6,7 @@ from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel,Field
 
 from . import business_roles as br,identity,store as s
-from .episode_samples import scope,latest
+from .episode_samples import scope,latest,verified_media
 
 router=APIRouter(prefix='/api/projects/{pid}/samples')
 
@@ -68,6 +68,17 @@ def listing(pid:str,sid:str):
 
 @router.post('/{sid}/review-events',status_code=201)
 def append(pid:str,sid:str,body:ReviewEvent):
+    verified=[]
+    if body.kind=='approve':
+        with s.db() as c:
+            project,_=scope(c,pid)
+            br.require_role(c,project['production_id'],'producer')
+            candidate=sample(c,pid,sid)
+        # Hash large originals outside the global identity transaction. Media
+        # versions are immutable; check the same file stats again before commit.
+        for variant in ('original','review'):
+            path=verified_media(candidate,variant);stat=path.stat()
+            verified.append((path,(stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)))
     with s.db() as c:
         identity.lock_identity_invariants(c)
         project,config=scope(c,pid);row=sample(c,pid,sid)
@@ -98,6 +109,11 @@ def append(pid:str,sid:str,body:ReviewEvent):
             if sid!=current['latest_id']:raise HTTPException(409,'请审查最新样片；旧版审批历史保留')
             if body.kind=='approve' and current['unresolved_ids']:
                 raise HTTPException(409,'还有未确认解决的批注，请核对修改结果后再批准')
+        for path,expected in verified:
+            try:stat=path.stat()
+            except OSError as error:raise HTTPException(409,'样片文件已不可用，请重新核对') from error
+            if (stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns)!=expected:
+                raise HTTPException(409,'样片文件在审核期间发生变化，请重新核对')
         eid=s.uid('review-')
         c.execute('''INSERT INTO sample_review_events
             (id,project_id,sample_id,revision,kind,frame,parent_id,related_sample_id,body,created_by,created)

@@ -2,6 +2,7 @@
 from tests.test_episode_samples import clip,setup,upload
 from tests.test_business_roles import change_roles
 from tests.test_p5_object_transactions import team,admin,clients,clear_auth_rate_limits
+from backend import store as s
 
 
 def send(team,path,sid,kind,client=None,**fields):
@@ -76,3 +77,22 @@ def test_cross_episode_parent_and_revoked_then_restored_role_are_rejected(team,c
     assert team['b'].post(url,json={**body,'kind':'reply','parent_id':comment,'body':'旧票据'}).status_code==409
     other=team['admin'].post('/api/projects',json={'name':'another review','five_role_workflow':True}).json()
     assert team['admin'].get('/api/projects/'+other['id']+'/samples/'+one+'/review-events').status_code==404
+
+
+def test_missing_or_corrupt_media_cannot_be_approved(team,clip):
+    path,delivery=setup(team);sid=upload(team,path,delivery,clip).json()['id']
+    with s.db() as c:row=c.execute('SELECT * FROM episode_samples WHERE id=%s',(sid,)).fetchone()
+    original=s.DATA/'samples'/row['original_path'];review=s.DATA/'samples'/row['review_path']
+    # Only files generated in this isolated test; preserve bytes for restoration.
+    original_bytes=original.read_bytes();review_bytes=review.read_bytes()
+    moved=review.with_suffix('.missing-test');review.rename(moved)
+    try:assert send(team,path,sid,'approve').status_code==409
+    finally:moved.rename(review)
+    original.write_bytes(b'corrupt original')
+    try:assert send(team,path,sid,'approve').status_code==409
+    finally:original.write_bytes(original_bytes)
+    review.write_bytes(b'corrupt review')
+    try:assert send(team,path,sid,'approve').status_code==409
+    finally:review.write_bytes(review_bytes)
+    assert not team['admin'].get(path+'/'+sid+'/review-events').json()['events']
+    assert send(team,path,sid,'approve').status_code==201
