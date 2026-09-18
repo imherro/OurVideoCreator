@@ -107,3 +107,20 @@ def test_variable_frame_rate_gets_fixed_review_timeline(tmp_path):
     timestamps=[float(frame['best_effort_timestamp_time']) for frame in frames]
     assert len(timestamps)==result['frame_count']
     assert all(abs((b-a)-0.04)<0.00001 for a,b in zip(timestamps,timestamps[1:]))
+
+
+@pytest.mark.parametrize('rate,count', [('30000/1001',30),('24000/1001',24)])
+def test_fractional_frame_rates_preserve_exact_frame_clock(tmp_path,rate,count):
+    from backend.sample_media import normalize
+    from fractions import Fraction
+    source=tmp_path/'fractional.mp4';dest=tmp_path/'fractional-review.mp4'
+    subprocess.run(['ffmpeg','-nostdin','-v','error','-f','lavfi','-i',
+        f'testsrc2=size=160x120:rate={rate}','-frames:v',str(count),'-c:v','libx264',str(source)],check=True)
+    result=normalize(source,dest);fps=Fraction(rate)
+    assert (result['fps_num'],result['fps_den'])==(fps.numerator,fps.denominator)
+    assert result['frame_count']==count and result['review']['start_time']==0
+    frames=json.loads(subprocess.run(['ffprobe','-v','error','-select_streams','v:0','-show_frames',
+        '-show_entries','frame=best_effort_timestamp_time','-of','json',str(dest)],capture_output=True,text=True,check=True).stdout)['frames']
+    assert len(frames)==count
+    for index,frame in enumerate(frames):
+        assert abs(float(frame['best_effort_timestamp_time'])-float(index/fps))<0.000002
