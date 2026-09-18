@@ -5,7 +5,7 @@ Existing visual cards, versions, voices, assets and timelines are never replaced
 """
 from copy import deepcopy
 from fastapi import HTTPException
-from . import collaboration as collab, platform_models, store as s
+from . import collaboration as collab, platform_models, store as s, business_roles as br
 from .collaboration_validation import object_content,node_ids
 from .production_context import read_project_state
 from .prompts import validate_shots
@@ -44,15 +44,18 @@ def impact(c,job):
     removed=[r for r in rows if object_content(r)['shot']['id'] not in ids]
     actor=collab.live_principal(c)
     allowed=all(r['assignee_id']==actor.user_id for r in rows)
-    if removed:
+    business=bool(br.workflow(c,job['production_id']))
+    if removed and not business:
         from .identity import can_production
         allowed=allowed and can_production(c,actor,job['production_id'],'manager')
+    new_count=len(((result.get('filmBible') or {}).get('visual') or {}).get('cards') or {})
+    needs_artist=bool(business and new_count)
     return {'scope':'替换本集分镜表；已有视觉卡、音色、素材和剪辑保留',
             'shots':[collab.public(r) for r in rows],
             'removed_ids':[r['id'] for r in removed],
             'candidate_shot_count':len(result['shots']),
-            'new_card_count':len(((result.get('filmBible') or {}).get('visual') or {}).get('cards') or {}),
-            'can_replace_shots':allowed}
+            'new_card_count':new_count,'needs_artist':needs_artist,'business_mode':business,
+            'can_replace_shots':allowed and not needs_artist}
 
 
 def update(row,content):
@@ -82,6 +85,8 @@ def adopt(c,job,body,locked,target):
     pid=job['project_id'];binding=job['collaboration'];result=incoming(job)
     state=read_project_state(c,pid)
     result=prepared(state,result)
+    if br.workflow(c,job['production_id']) and (((result.get('filmBible') or {}).get('visual') or {}).get('cards')):
+        raise HTTPException(409,'本次分镜包含新共享资产，请先由资产师在作品分工的资产候选待办中接手')
     old_rows=[r for r in state['objects'] if r['kind']=='shot']
     if sorted(r['id'] for r in old_rows)!=binding['replacement_shots']:
         raise HTTPException(409,'本集镜头集合已变化，请重新生成分镜候选')

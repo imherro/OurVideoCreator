@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import socket
 import tempfile
+import subprocess
+import time
 
 
 def main():
@@ -14,7 +16,10 @@ def main():
     parser.add_argument('--host',default='127.0.0.31',help='Distinct loopback host keeps test cookies away from the live app')
     parser.add_argument('--ui',type=Path,required=True)
     parser.add_argument('--reviews',action='store_true')
+    parser.add_argument('--deliveries',action='store_true')
+    parser.add_argument('--asset-candidates',action='store_true')
     args=parser.parse_args()
+    args.reviews=args.reviews or args.deliveries or args.asset_candidates
     if not (args.ui/'index.html').is_file():raise RuntimeError('Build the staged UI first')
     # Refuse an occupied listener before creating fixtures.
     if not ipaddress.ip_address(args.host).is_loopback:raise RuntimeError('UI fixture must remain loopback-only')
@@ -77,8 +82,36 @@ def main():
                             'spec':{'description':'深蓝色外套，短发，旧帆布包。雨夜站在车站屋檐下。','attributes':[]},'invariants':[],'references':[],'createdAt':1,'provenance':{}}},'voice_profile':None}}))
                     checked(member.post(base+'/reviews/assets',json={'action':'submit','items':[
                         {key:asset[key] for key in ('id','revision','assignment_epoch')}]}))
+                if role=='generator' and (args.deliveries or args.asset_candidates):
+                    checked(admin.put(base+'/episodes/'+project['id'],json={'revision':state['config']['revision'],
+                        'role':'generator','user_id':user['id'],'confirm_special':True}))
+                    script_path=f'/api/productions/{pid}/episode-scripts/1'
+                    script=checked(admin.get(script_path))
+                    checked(admin.post(script_path+'/approve',json={key:script[key] for key in ('revision','assignment_epoch')}))
+                    if args.deliveries:
+                        from backend import store as s
+                        aid=s.uid('asset-');media=s.asset_path(aid,'.mp4')
+                        subprocess.run(['ffmpeg','-nostdin','-loglevel','error','-f','lavfi','-i',
+                            'color=c=blue:s=320x240:r=25:d=1','-c:v','libx264','-pix_fmt','yuv420p',str(media)],check=True)
+                        with s.db() as c:
+                            c.execute('''INSERT INTO assets(id,project_id,production_id,name,kind,mime,path,source,metadata,created,category)
+                                VALUES(%s,%s,%s,'isolated-blue-clip.mp4','video','video/mp4',%s,'upload','{}',%s,'general')''',
+                                (aid,project['id'],pid,media.name,time.time()))
+                        objects_path=f"/api/projects/{project['id']}/objects"
+                        checked(member.post(objects_path,json={'kind':'shot','content':{
+                            'shot':{'id':'01','uid':'r3-shot','videoNode':'r3-video','dialogues':[{'id':'r3-dialogue','characterName':'小林','text':'末班车来了。'}]},
+                            'nodes':[{'id':'r3-video','type':'media','data':{'kind':'video','assetId':aid}}]}}))
+                        graph=next(row for row in checked(member.get(objects_path)) if row['kind']=='graph')
+                        graph['content'].update(shotOrder=['r3-shot'],nodeOrder=['r3-video'])
+                        checked(member.patch(objects_path+'/'+graph['id'],json={'expected_revision':graph['revision'],
+                            'assignment_epoch':graph['assignment_epoch'],'content':graph['content']}))
+                    if args.asset_candidates:
+                        import pytest
+                        from tests.test_p5_storyboard_candidates import storyboard
+                        with pytest.MonkeyPatch.context() as patch:
+                            storyboard({'admin':admin,'a':member,'pid':project['id'],'production':pid},patch)
                 people.append({'nickname':name,'role':role})
-        assert checked(admin.get('/api/models'))['models']==[]
+        if not args.asset_candidates:assert checked(admin.get('/api/models'))['models']==[]
     # Serve only this staged build, leaving the live 7878 static directory untouched.
     app.router.routes[:]=[route for route in app.router.routes if getattr(route,'path','').startswith('/api')]
     def page():return FileResponse(args.ui/'index.html')

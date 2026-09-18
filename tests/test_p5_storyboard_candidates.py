@@ -10,6 +10,7 @@ from tests.test_p5_object_transactions import team,admin,clients,clear_auth_rate
 from tests.test_p5_canonical_integration import graph
 from tests.test_p5_object_candidates import candidate,voice_card
 from tests.platform_model_helpers import publish_test_model
+from tests.test_p5_relation_candidates import publish_candidate_model
 from tests.test_film_bible import visual_input,storyboard_input
 from backend.film_bible.validate import normalize_visual_bible
 from tests.test_p3_r2_interleavings import wait_for_db_waiters
@@ -23,7 +24,10 @@ def storyboard(team,monkeypatch,actor=None,dual=True,input_extra=None):
             'data':{'kind':'storyboard','prompt':'a five second story'}}}})
         assert response.status_code==201,response.text
         root=response.json()
-    model=uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model=team.get('_storyboard_model')
+    if not model:
+        model=uuid.uuid4().hex;publish_candidate_model(team,model)
+        team['_storyboard_model']=model
     job_input={'model_id':model,'prompt':'a five second story','target_duration':5,'film_bible':dual}
     job_input.update(input_extra or {})
     response=actor.post('/api/projects/'+team['pid']+'/jobs',json={

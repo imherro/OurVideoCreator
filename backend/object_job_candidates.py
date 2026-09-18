@@ -216,7 +216,8 @@ def adopt(c,job,body):
         script=owned.load(c,job['production_id'],'script',script_ref['id'],write=True)
         collab.expected(script,script_ref['revision'],script_ref['assignment_epoch'])
     refs={r['id']:r for r in binding.get('references',[])}
-    locked={oid:collab.load(c,pid,oid,write=True) for oid in sorted({target['id'],*refs})}
+    prepared_assets=set((binding.get('asset_preparation') or {}).get('object_ids') or []) if mode=='storyboard' else set()
+    locked={oid:collab.load(c,pid,oid,write=True) for oid in sorted({target['id'],*refs,*prepared_assets})}
     for oid,r in refs.items():collab.expected(locked[oid],r['revision'],r['assignment_epoch'])
     if mode=='storyboard':
         c.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
@@ -224,7 +225,7 @@ def adopt(c,job,body):
         current_visual_ids=sorted(item['id'] for item in c.execute(
             "SELECT id FROM collaboration_objects WHERE production_id=%s AND kind='visual_card' AND NOT deleted",
             (job['production_id'],)))
-        if current_visual_ids!=binding['visual_catalog_objects']:
+        if current_visual_ids!=sorted(set(binding['visual_catalog_objects'])|prepared_assets):
             raise HTTPException(409,'作品视觉资产集合已变化，请重新生成分镜候选')
     row=locked[target['id']];collab.editable(c,row);collab.expected(row,body.expected_revision,body.assignment_epoch)
     if not body.accept_stale and (body.expected_revision!=target['revision'] or body.assignment_epoch!=target['assignment_epoch']):

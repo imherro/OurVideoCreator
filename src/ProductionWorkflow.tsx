@@ -1,6 +1,8 @@
 import {useEffect, useState} from 'react';
 import './productionWorkflow.css';
 import {ProductionReviews} from './ProductionReviews';
+import {EpisodeDeliveries} from './EpisodeDeliveries';
+import {StoryboardAssetRequests} from './StoryboardAssetRequests';
 
 type V = Record<string, any>;
 type Request = (path:string, options?:RequestInit)=>Promise<any>;
@@ -67,6 +69,8 @@ export function ProductionWorkflow({request}:{request:Request}) {
       {data.can_enable?<button className="primary" disabled={busy} onClick={()=>void change('/enable','POST',{})}>保留原分工，启用五角色流程</button>:<p>请联系作品管理者启用。</p>}</section>}
     {data?.enabled&&<>
       <ProductionReviews key={pid} productionId={pid} request={request}/>
+      <StoryboardAssetRequests key={`assets:${pid}:${data.config.revision}`} productionId={pid} request={request}/>
+      <EpisodeDeliveries key={`delivery:${pid}:${data.config.revision}`} episodes={data.episodes} actorId={data.actor_id} roles={data.my_roles} request={request}/>
       <section><h2>作品成员与角色</h2><p>我的角色：{data.my_roles.map((r:string)=>ROLES[r]).join('、')||'只读成员'}</p>
         {data.can_manage?<>{data.members.map((m:V)=><RoleForm key={`${m.id}:${data.config.revision}`} member={m} busy={busy}
           save={(id,roles)=>void change(`/members/${id}`,'PUT',{roles})}/>)}

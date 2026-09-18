@@ -37,7 +37,8 @@ export function CandidateReview({job,request,onAdopt}:{job:Value;
         <pre style={{maxHeight:220,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(comparison.job.result,null,2)}</pre></details>
       {comparison.impact&&<details open><summary>分镜导入影响范围（负责人、版本及待移除对象）</summary>
         <p>{comparison.impact.scope}。导入 {comparison.impact.candidate_shot_count} 个镜头、{comparison.impact.new_card_count} 张新卡；移除 {comparison.impact.removed_ids.length} 个旧镜头。</p>
-        <p>必须负责所有被替换镜头；移除旧镜头还需 manager/owner 权限。任何引用版本改变都会拒绝整批导入。</p>
+        {comparison.impact.needs_artist&&<p>新共享资产已列入资产师待办。请资产师在“作品分工 → 分镜资产候选”接手后，再刷新比较并采纳分镜。<a href={`/workflow?production=${encodeURIComponent(job.production_id)}`}>查看资产待办</a></p>}
+        <p>{comparison.impact.business_mode?'必须负责所有被替换镜头；共享资产由资产师负责，不随分镜替换。':'必须负责所有被替换镜头；移除旧镜头还需 manager/owner 权限。'}任何引用版本改变都会拒绝整批导入。</p>
         <pre style={{maxHeight:220,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(comparison.impact.shots,null,2)}</pre></details>}
       {stale&&<p className="error">目标已编辑或重新分配。采纳会替换刚刚比较的当前版本，原版本留在历史中；若版本再次变化，服务器将拒绝。</p>}
       <button disabled={busy||!comparison.can_adopt} onClick={()=>void adopt()}>

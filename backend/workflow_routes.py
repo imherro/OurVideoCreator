@@ -78,7 +78,7 @@ def view(c, production_id):
             WHERE wm.workspace_id=%s AND u.is_active ORDER BY u.nickname,u.id''',(production['workspace_id'],))]
     effective_defaults={role:br.default_assignee(c,production_id,role) for role in ('writer','artist','editor')}
     return {'enabled':True,'production':dict(production),'config':dict(config),'effective_defaults':effective_defaults,'my_roles':sorted(business),
-            'can_manage':'producer' in business,'members':members,'available_members':available,'episodes':episodes,'items':items}
+            'actor_id':principal.user_id,'can_manage':'producer' in business,'members':members,'available_members':available,'episodes':episodes,'items':items}
 
 
 @router.get('')

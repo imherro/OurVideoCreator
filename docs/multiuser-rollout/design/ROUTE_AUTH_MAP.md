@@ -215,6 +215,12 @@
 | PUT `/api/productions/{production_id}/workflow/episodes/{project_id}` | 制片人、分工 revision、真实父作品；整集制作范围原子转交及旧租约失效，特殊分配先确认；不转交共享资产与剧本 |
 | POST `/api/productions/{production_id}/workflow/assign` | 制片人、分工及逐项 revision/epoch；按章节/资产业务清单批量分配，全部成功或全部回滚 |
 | GET `/api/productions/{production_id}/workflow/reviews` | 五角色作品有效成员只读；返回当前剧本与共享资产明确版本 |
+| GET `/api/productions/{production_id}/workflow/asset-candidates` | 作品有效成员；从成功未采纳的分镜任务列出新资产候选，不创建或改写资产 |
+| POST `/api/productions/{production_id}/workflow/asset-candidates/{jid}` | 当前默认资产师；核对候选及分工指纹，仅创建新共享资产草稿，记录原任务关联，不授予制作对象权限 |
+| GET `/api/projects/{pid}/deliveries` | 当前作品有效成员查看固定交付版本；无制作写权限要求 |
+| GET `/api/projects/{pid}/deliveries/preview` | 当前作品有效成员查看所选镜头、剧本与音频的交付清单和缺失提示 |
+| POST `/api/projects/{pid}/deliveries` | 当前分集抽卡师；打包前后复核实时角色、分集分工及完整内容版本；追加固定 ZIP 版本，不增加审批 |
+| GET `/api/projects/{pid}/deliveries/{did}/download` | 当前作品有效成员，嵌套分集 ID 校验、包完整性校验；不需要制作对象写权限 |
 | POST `/api/productions/{production_id}/workflow/reviews/assets` | 资产师提交自己的资产；制片人批准或退回；每项版本/代际核验、批次原子成功或回滚；复用对象历史 |
 
 启用五角色后，上述历史条目中的 manager 写权限由作品制片人承担，不赋予 Workspace owner；正文仍要求业务角色与实际负责人。原著/章节软删除由编剧执行并校验全部目标负责人及版本。改编策划及其候选采纳由默认编剧执行；任务冻结分工修订，分工变更后旧任务不能沿用旧票据恢复。供应商/凭证/模型目录仍仅平台管理员管理。

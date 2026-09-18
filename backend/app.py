@@ -55,6 +55,10 @@ from .workflow_routes import router as workflow_router
 app.include_router(workflow_router)
 from .workflow_reviews import router as workflow_reviews_router
 app.include_router(workflow_reviews_router)
+from .episode_deliveries import router as episode_deliveries_router
+app.include_router(episode_deliveries_router)
+from .storyboard_asset_requests import router as storyboard_asset_requests_router
+app.include_router(storyboard_asset_requests_router)
 PUBLIC = {
     '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
     '/api/auth/register', '/api/auth/password-reset',
