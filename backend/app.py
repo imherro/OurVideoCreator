@@ -59,6 +59,8 @@ from .episode_deliveries import router as episode_deliveries_router
 app.include_router(episode_deliveries_router)
 from .storyboard_asset_requests import router as storyboard_asset_requests_router
 app.include_router(storyboard_asset_requests_router)
+from .episode_samples import router as episode_samples_router
+app.include_router(episode_samples_router)
 PUBLIC = {
     '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
     '/api/auth/register', '/api/auth/password-reset',

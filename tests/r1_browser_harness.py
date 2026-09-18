@@ -18,7 +18,9 @@ def main():
     parser.add_argument('--reviews',action='store_true')
     parser.add_argument('--deliveries',action='store_true')
     parser.add_argument('--asset-candidates',action='store_true')
+    parser.add_argument('--samples',action='store_true')
     args=parser.parse_args()
+    args.deliveries=args.deliveries or args.samples
     args.reviews=args.reviews or args.deliveries or args.asset_candidates
     if not (args.ui/'index.html').is_file():raise RuntimeError('Build the staged UI first')
     # Refuse an occupied listener before creating fixtures.
@@ -47,7 +49,7 @@ def main():
     def checked(response):
         if response.status_code>=400:raise RuntimeError(f'Fixture API failure {response.status_code}: {response.text}')
         return response.json()
-    people=[]
+    people=[];sample_fixture=None
     with TestClient(app) as admin:
         owner=login_admin(admin)
         project=checked(admin.post('/api/projects',json={'name':'R1 五角色隔离样片','creation_mode':'direct','five_role_workflow':True}))
@@ -105,6 +107,11 @@ def main():
                         graph['content'].update(shotOrder=['r3-shot'],nodeOrder=['r3-video'])
                         checked(member.patch(objects_path+'/'+graph['id'],json={'expected_revision':graph['revision'],
                             'assignment_epoch':graph['assignment_epoch'],'content':graph['content']}))
+                        if args.samples:
+                            delivery_path=f"/api/projects/{project['id']}/deliveries"
+                            preview=checked(member.get(delivery_path+'/preview'))
+                            checked(member.post(delivery_path,json={'fingerprint':preview['fingerprint']}))
+                            sample_fixture=str(media)
                     if args.asset_candidates:
                         import pytest
                         from tests.test_p5_storyboard_candidates import storyboard
@@ -119,7 +126,7 @@ def main():
         app.add_api_route(path,page,methods=['GET'])
     app.mount('/',StaticFiles(directory=args.ui,html=True),name='r1-staged-ui')
     print(json.dumps({'url':f'http://{args.host}:{args.port}/','production_id':pid,
-        'project_id':project['id'],'database':database,'members':people,'paid_calls':0},ensure_ascii=False),flush=True)
+        'project_id':project['id'],'database':database,'members':people,'paid_calls':0,'sample_upload_fixture':sample_fixture},ensure_ascii=False),flush=True)
     import uvicorn
     uvicorn.run(app,host=args.host,port=args.port,log_level='warning')
 

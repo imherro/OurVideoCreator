@@ -19,7 +19,7 @@ from sqlalchemy.engine import Engine, make_url
 
 
 DATABASE_ENV = 'OVC_DATABASE_URL'
-SCHEMA_REVISION = '0009_episode_deliveries'
+SCHEMA_REVISION = '0010_episode_samples'
 
 
 class DatabaseConfigurationError(RuntimeError):

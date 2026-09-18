@@ -218,6 +218,9 @@
 | GET `/api/productions/{production_id}/workflow/asset-candidates` | 作品有效成员；从成功未采纳的分镜任务列出新资产候选，不创建或改写资产 |
 | POST `/api/productions/{production_id}/workflow/asset-candidates/{jid}` | 当前默认资产师；核对候选及分工指纹，仅创建新共享资产草稿，记录原任务关联，不授予制作对象权限 |
 | GET `/api/projects/{pid}/deliveries` | 当前作品有效成员查看固定交付版本；无制作写权限要求 |
+| GET `/api/projects/{pid}/samples` | 当前作品有效成员查看样片历史及本集剪辑上传资格 |
+| POST `/api/projects/{pid}/samples` | 本集有效剪辑负责人；绑定本集交付包，上传/转换前后核对角色、分工修订及样片前驱，追加版本并审计 |
+| GET `/api/projects/{pid}/samples/{sid}/{variant}` | 当前作品有效成员；嵌套样片归属检查，只读审片副本或下载原文件，完整性校验 |
 | GET `/api/projects/{pid}/deliveries/preview` | 当前作品有效成员查看所选镜头、剧本与音频的交付清单和缺失提示 |
 | POST `/api/projects/{pid}/deliveries` | 当前分集抽卡师；打包前后复核实时角色、分集分工及完整内容版本；追加固定 ZIP 版本，不增加审批 |
 | GET `/api/projects/{pid}/deliveries/{did}/download` | 当前作品有效成员，嵌套分集 ID 校验、包完整性校验；不需要制作对象写权限 |
