@@ -2585,7 +2585,12 @@ def resume(jid:str):
         if not job: raise HTTPException(404,'任务不存在')
         collab.project_scope(c,job['project_id'],'editor')
         if job['status'] in ('queued','running','succeeded'): return s.unpack(job)
-        if job['status']!='interrupted': raise HTTPException(409,'只有中断任务可以恢复查询')
+        # Older workers classified DNS-policy interruptions as failed even after
+        # obtaining a remote handle. Recover that handle only, never regenerate.
+        legacy_egress = (job['status']=='failed' and bool(job['provider_job_id']) and
+                        job['error'] in ('模型出站已拒绝：目标不是公网地址，且无精确部署例外',
+                                         '模型地址无法安全解析，调用已阻止'))
+        if job['status']!='interrupted' and not legacy_egress: raise HTTPException(409,'只有中断任务可以恢复查询')
         authorize_resume(c,s.unpack(job))
         provider=platform_models.load_job_provider(c,jid,remote=bool(job['provider_job_id'])) if job['kind']!='export' else {}
         if job['provider_job_id']:
@@ -2605,8 +2610,8 @@ def resume(jid:str):
                     raise HTTPException(409,'原任务对应的章节已删除或归属已变化，无法重新排队')
             phase='使用已保存的输入重新排队'
         updated=c.execute('''UPDATE jobs SET status='queued',result=NULL,error=NULL,phase=%s,progress=NULL,
-            started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s AND status='interrupted'
-            RETURNING *''',(phase,time.time(),jid)).fetchone()
+            started=NULL,finished=NULL,telemetry=NULL,updated=%s WHERE id=%s AND status=%s
+            RETURNING *''',(phase,time.time(),jid,job['status'])).fetchone()
         if not updated:raise HTTPException(409,'任务状态已变化，不能恢复查询')
         identity.audit(c,'job.resume','job',jid,workspace_id=job['workspace_id'],production_id=job['production_id'])
         s.event(job['project_id'],{'type':'job','id':jid},connection=c)

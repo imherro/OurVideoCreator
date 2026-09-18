@@ -162,7 +162,7 @@ class Worker:
                 if isinstance(exc,(httpx.ConnectError,httpx.ConnectTimeout)):
                     message='无法连接模型服务，请确认服务已启动、地址正确。'
                 if 'out of memory' in message.lower(): message='显存不足。请降低分辨率、时长或换用更小模型。'
-                if self.halt.is_set() or isinstance(exc,httpx.TransportError):
+                if self.halt.is_set() or isinstance(exc,(httpx.TransportError,provider_egress.EgressDenied)):
                     s.job_update(job['id'],status='interrupted',error=message[:1200],phase='连接中断，保留输入与上游任务编号；可恢复查询')
                 else:
                     s.job_update(job['id'],status='failed',error=message[:1200],phase='生成失败')

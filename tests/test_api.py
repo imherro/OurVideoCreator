@@ -942,19 +942,24 @@ def test_graph_scheduler_consumes_upstream_text(authenticated,monkeypatch):
     finally:worker.stop()
 
 @pytest.mark.parametrize('provider_type',['maestro','comfy','video_api'])
-def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_type):
+@pytest.mark.parametrize('previous_status',['interrupted','failed'])
+def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_type,previous_status):
     import httpx,io
     from PIL import Image
     from backend import worker as module
-    c=authenticated;p=project(c)
+    c=authenticated
     provider={'id':'recover-'+provider_type,'type':provider_type,'url':'http://engine.test','local':True,'model':'test','workflow':{}}
     kind='video' if provider_type=='video_api' else 'image'
+    publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url=provider['url'],options={'workflow':{}})
+    p=project(c)
     target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
         'content':{'node':{'id':'n','type':'media','data':{'kind':kind,'prompt':'test'}}}})
     assert target.status_code==201,target.text
-    publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url=provider['url'],options={'workflow':{}})
-    job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':kind,'submission_id':'resume-'+provider_type,'input':{'model_id':provider['id'],'prompt':'test'}}).json()
-    s.job_update(job['id'],status='interrupted',provider_job_id='original-handle')
+    response=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':kind,'submission_id':'resume-'+provider_type+'-'+previous_status,'input':{'model_id':provider['id'],'prompt':'test'}})
+    assert response.status_code==200,response.text
+    job=response.json()
+    s.job_update(job['id'],status=previous_status,provider_job_id='original-handle',
+                 error='模型出站已拒绝：目标不是公网地址，且无精确部署例外')
     # Editing the service after interruption must not change the polling target.
     publish_test_model(c,provider['id'],kind=kind,provider_type=provider_type,url='http://changed.invalid',options={'workflow':{}})
     assert c.post('/api/jobs/'+job['id']+'/resume').json()['status']=='queued'
@@ -982,13 +987,43 @@ def test_resume_only_queries_frozen_upstream(authenticated,monkeypatch,provider_
     assert worker.execute(job)['assets']
     assert calls
 
+def test_egress_failure_keeps_remote_job_recoverable(authenticated,monkeypatch):
+    from backend.provider_egress import EgressDenied
+    c=authenticated
+    provider=publish_test_model(c,'egress-recovery-test')
+    p=project(c)
+    create_node(c,p['id'],'n')
+    response=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text',
+        'submission_id':'egress-recovery','input':{'model_id':provider['id'],'prompt':'test'}})
+    assert response.status_code==200,response.text
+    job=response.json()
+    def denied(self,item):
+        s.attach_provider_job_id(item['id'],'existing-paid-task')
+        raise EgressDenied('模型出站已拒绝：目标不是公网地址，且无精确部署例外')
+    monkeypatch.setattr(Worker,'execute',denied)
+    worker=Worker(concurrency=1)
+    try:
+        worker.start()
+        deadline=time.time()+5
+        while time.time()<deadline:
+            result=c.get('/api/jobs/'+job['id']).json()
+            if result['status']=='interrupted':break
+            time.sleep(.05)
+        assert result['status']=='interrupted'
+        assert result['provider_job_id']=='existing-paid-task'
+    finally:worker.stop()
+
+
 def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(authenticated):
-    c=authenticated;p=project(c)
+    c=authenticated
+    provider=publish_test_model(c,'resume-test-api')
+    p=project(c)
     target=c.post('/api/projects/'+p['id']+'/objects',json={'kind':'node',
         'content':{'node':{'id':'n','type':'media','data':{'kind':'text','prompt':'test'}}}})
     assert target.status_code==201,target.text
-    provider=publish_test_model(c,'resume-test-api')
     job=c.post('/api/projects/'+p['id']+'/jobs',json={'node_id':'n','kind':'text','submission_id':'resume-no-handle','input':{'model_id':provider['id'],'prompt':'test'}}).json()
+    s.job_update(job['id'],status='failed',error='模型出站已拒绝：目标不是公网地址，且无精确部署例外')
+    assert c.post('/api/jobs/'+job['id']+'/resume').status_code==409
     s.job_update(job['id'],status='interrupted',error='restart',phase='old phase',progress=42,telemetry={'old':True})
     resumed=c.post('/api/jobs/'+job['id']+'/resume').json()
     assert resumed['status']=='queued'
@@ -997,6 +1032,8 @@ def test_resume_missing_handle_requeues_frozen_input_and_cancelled_rejected(auth
     assert resumed['phase']=='使用已保存的输入重新排队'
     assert resumed['error'] is None and resumed['progress'] is None and resumed['telemetry'] is None
     assert c.post('/api/jobs/'+job['id']+'/cancel').json()['status']=='cancelled'
+    assert c.post('/api/jobs/'+job['id']+'/resume').status_code==409
+    s.job_update(job['id'],status='failed',provider_job_id='original-handle',error='provider rejected prompt')
     assert c.post('/api/jobs/'+job['id']+'/resume').status_code==409
 
 def test_replicate_resume_uses_frozen_service_and_cancel_requests_remote_stop(authenticated,monkeypatch):
