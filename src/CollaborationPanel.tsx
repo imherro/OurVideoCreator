@@ -22,7 +22,8 @@ export function CollaborationPanel({client,document,assets,actorId,canManage,can
   const [,render]=useState(0),mounted=useRef(true),selectionRef=useRef(selected),documentRef=useRef(document);
   selectionRef.current=selected;documentRef.current=document;
   const rows=[...client.rows.values()],row=rows.find(item=>item.id===selected),draft=row&&client.drafts.entries.get(row.id);
-  const own=row?.assignee_id===actorId,editable=canEdit&&(own||row?.kind==='graph');
+  const businessMode=Boolean(client.project?.permissions?.workflow_enabled);
+  const own=row?.assignee_id===actorId,editable=canEdit&&(own||(!businessMode&&row?.kind==='graph'));
   const pid=client.project?.id,productionId=client.project?.production_id;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(()=>{let cancelled=false;

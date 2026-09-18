@@ -187,6 +187,36 @@
 
 ## 覆盖核对
 
+### R1 五角色作品分工（仅显式启用的作品）
+
+补齐此前已实现的单入口分类（不改变运行权限）：
+
+| 方法与路径 | 权限和对象边界 |
+|---|---|
+| GET `/api/admin/provider-presets` | 平台管理员；四家快捷配置安全投影，不返回明文凭证 |
+| POST `/api/admin/provider-presets/{preset_id}` | 平台管理员、CSRF、配置 revision；凭证与默认模型同事务保存，不发起生成 |
+| POST `/api/projects/{pid}/objects/{oid}/visual-versions/{version_id}/restore` | 当前资产负责人、对象 revision/epoch；校验历史版本与引用，不复活旧分配 |
+| POST `/api/projects/{pid}/assets/{aid}/voice-reference` | 当前作品授权及关联音色对象负责人；服务端确认素材归属，非任意 URL |
+| POST `/api/projects/{pid}/image-spec` | 作品 viewer+；模型池与参数编译预览，不写数据、不调用 Provider |
+| POST `/api/projects/{pid}/video-spec` | 作品 viewer+；真实镜头、模型池、引用与参数编译预览，不发起生成 |
+| POST `/api/productions/{production_id}/sources/{source_id}/chapters/import` | 旧 editor+；五角色为编剧；父作品核验，只追加章节并按默认编剧确定新负责人 |
+| GET `/api/productions/{production_id}/source-extractions` | 作品 viewer+；读取当前作品章节提取任务投影 |
+| POST `/api/productions/{production_id}/adaptation/episodes/{episode_no}/review` | 旧 manager；五角色默认编剧；保存版本检查，仅改当前集规划状态 |
+| POST `/api/productions/{production_id}/adaptation/episodes/{episode_no}/approve` | 旧 manager；五角色默认编剧；保存版本检查，不作为制片人剧本审批 |
+| POST `/api/productions/{production_id}/adaptation/episodes/{episode_no}/generate` | 旧 manager；五角色默认编剧；模型池、来源及分工快照，结果为待采纳候选 |
+| POST `/api/productions/{production_id}/episode-scripts/{episode_no}/assist` | 当前剧本负责人、模型池与任务准入；五角色额外核编剧角色，返回候选不自动写正文 |
+
+| 方法与路径 | 权限和对象边界 |
+|---|---|
+| GET `/api/productions/{production_id}/workflow` | 当前有效作品成员只读；仅制片人返回可添加的团队成员列表 |
+| POST `/api/productions/{production_id}/workflow/enable` | 旧作品 manager/owner 显式启用；现有负责人及内容保留，不升级 Workspace 权限 |
+| PUT `/api/productions/{production_id}/workflow/members/{user_id}` | 当前制片人、有效团队成员、分工 revision；固定五角色；撤权同步清空对应分配并递增代际；保留最后一名制片人 |
+| PUT `/api/productions/{production_id}/workflow/defaults` | 制片人、分工 revision；目标具备对应角色；仅改变后续新增内容默认归属 |
+| PUT `/api/productions/{production_id}/workflow/episodes/{project_id}` | 制片人、分工 revision、真实父作品；整集制作范围原子转交及旧租约失效，特殊分配先确认；不转交共享资产与剧本 |
+| POST `/api/productions/{production_id}/workflow/assign` | 制片人、分工及逐项 revision/epoch；按章节/资产业务清单批量分配，全部成功或全部回滚 |
+
+启用五角色后，上述历史条目中的 manager 写权限由作品制片人承担，不赋予 Workspace owner；正文仍要求业务角色与实际负责人。原著/章节软删除由编剧执行并校验全部目标负责人及版本。改编策划及其候选采纳由默认编剧执行；任务冻结分工修订，分工变更后旧任务不能沿用旧票据恢复。供应商/凭证/模型目录仍仅平台管理员管理。
+
 ### P5 既有关系表内容入口
 
 | 方法与路径 | 权限和对象边界 |

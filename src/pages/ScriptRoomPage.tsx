@@ -8,10 +8,11 @@ type Value = Record<string, any>;
 
 export function ScriptRoomPage({
   productionId, currentEpisodeNo, onFocusEpisode, providers, defaultTarget, refreshKey = 0, request, notify, report, onChanged, onSelectEpisode, onEnterEpisode,
-  store,actorId,canManage,canEdit,onAddEpisode,
+  store,actorId,canManage,canEdit,onAddEpisode,businessMode=false,
 }: {
   productionId: string; currentEpisodeNo: number; providers: Value[]; defaultTarget?: Value; refreshKey?: number;
   store:OwnedContentDrafts;actorId:string;canManage:boolean;canEdit:boolean;
+  businessMode?:boolean;
   request: (path: string, options?: RequestInit) => Promise<any>;
   notify: (message: string) => void; report: (error: unknown) => void;
   onChanged: (projectId?: string) => void | Promise<void>;
@@ -147,6 +148,7 @@ export function ScriptRoomPage({
       </div>)}</aside>
       <main>{draft ? <>
         <OwnedContentPanel key={`${productionId}:${active}`} store={store} id={String(active)} actorId={actorId}
+          businessMode={businessMode}
           canManage={canManage} canEdit={canEdit} request={request} onChange={redraw} onSave={save}/>
         {draft.metadata?.origin === "canvas" && <div className="notice"><b>来自画布快速创作</b><span>这里保存的是同一份正式剧本；修改后画布投影会同步更新。</span></div>}
         <div className="script-summary-strip"><span className={`workflow-status ${draft.status}`}>{STATUS_LABELS[draft.status]}</span><span>目标 {draft.estimatedDuration} 秒</span><span>{plan?.paywallRole || ''}</span><span>{draft.project_id ? "已建立 Episode" : "首次保存或生成时建立 Episode"}</span></div>

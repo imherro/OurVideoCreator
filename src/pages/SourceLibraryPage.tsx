@@ -7,10 +7,11 @@ type AnyValue = any;
 type CreateDialog = { mode: "source" | "chapter"; sourceId?: string; sourceName?: string };
 
 export function SourceLibraryPage({
-  productionId, projectId, providers, defaultTarget, refreshKey = 0, request, notify, report,store,actorId,canManage,canEdit,
+  productionId, projectId, providers, defaultTarget, refreshKey = 0, request, notify, report,store,actorId,canManage,canEdit,businessMode=false,
 }: {
   productionId: string; projectId: string;
   store:OwnedContentDrafts;actorId:string;canManage:boolean;canEdit:boolean;
+  businessMode?:boolean;
   providers: AnyValue[]; defaultTarget?: AnyValue; refreshKey?: number;
   request: (path: string, options?: RequestInit) => Promise<AnyValue>;
   notify: (message: string) => void; report: (error: unknown) => void;
@@ -175,6 +176,8 @@ export function SourceLibraryPage({
   }
   async function deleteActiveSource() {
     if (!activeSource) return;
+    if(businessMode&&(!canEdit||chapters.some(item=>item.source_id===activeSource.id&&!store.editable(item.id,actorId))))
+      throw new Error('移除整部原著前，须由制片人将全部章节明确分配给同一编剧');
     if(chapters.some(item=>item.source_id===activeSource.id&&store.drafts.entries.get(item.id)?.state!=='saved'))
       throw new Error('当前原著含未保存章节，请先处理草稿再删除');
     if (!window.confirm(`将原著“${activeSource.title}”及其 ${activeSource.chapter_count || 0} 个章节移入回收站？\n章节和已提取事件会暂时隐藏，恢复原著后会重新出现。`)) return;
@@ -191,6 +194,7 @@ export function SourceLibraryPage({
   }
   async function deleteSelectedChapters() {
     if (!selected.size) return;
+    if(!canEdit||[...selected].some(id=>!store.editable(id,actorId)))throw new Error('只能移除自己负责的章节，请先在作品分工确认负责人');
     if([...selected].some(id=>store.drafts.entries.get(id)?.state!=='saved'))throw new Error('所选章节含未保存草稿，请先处理');
     if (!window.confirm(`将选中的 ${selected.size} 个章节移入回收站？\n对应的已提取事件会暂时隐藏，恢复章节后会重新出现。`)) return;
     setBusy(true);
@@ -241,7 +245,7 @@ export function SourceLibraryPage({
           <button disabled={busy||!canEdit} onClick={()=>openCreateSource(true)}>添加另一部原著</button>
           <button disabled={busy||!canEdit} onClick={()=>chooseImport(true)}>导入为另一部原著</button>
         </details>}
-        <button className="danger-button" onClick={() => run(deleteActiveSource)} disabled={busy || !canManage || !activeSource} title="移入回收站，可恢复；须先接管全部章节"><Trash2 size={15}/>移除当前原著</button>
+        <button className="danger-button" onClick={() => run(deleteActiveSource)} disabled={busy || !(businessMode?canEdit:canManage) || !activeSource} title="移入回收站，可恢复；须负责全部章节"><Trash2 size={15}/>移除当前原著</button>
       </div>
     </header>
     <input ref={fileRef} hidden type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) run(() => importFile(file)); event.target.value = ""; }}/>
@@ -254,6 +258,7 @@ export function SourceLibraryPage({
       </aside>
       <main>{chapter ? <>
         <OwnedContentPanel key={`${productionId}:${active}`} store={store} id={active} actorId={actorId} canManage={canManage}
+          businessMode={businessMode}
           canEdit={canEdit} request={request} onChange={redraw} onSave={saveChapter}/>
         <div className="chapter-editor-head"><input readOnly={!editable} value={chapter.title} onChange={(event) => {store.patch(active,{title:event.target.value});redraw();}}/><button disabled={busy||!editable||entry?.state==='conflict'} onClick={() => run(saveChapter)}><Save size={14}/>保存章节</button></div>
         <textarea className="chapter-editor" readOnly={!editable} value={chapter.content} onChange={(event) => {store.patch(active,{content:event.target.value});redraw();}}/>

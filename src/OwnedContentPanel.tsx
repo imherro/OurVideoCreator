@@ -4,9 +4,10 @@ import type {OwnedContentDrafts,ContentRequest} from './ownedContentDrafts';
 type Value=Record<string,any>;
 const labels:Value={saved:'已保存',dirty:'未保存',saving:'保存中',conflict:'冲突：草稿已保留',error:'保存失败'};
 
-export function OwnedContentPanel({store,id,actorId,canManage,canEdit,request,onChange,onSave}: {
+export function OwnedContentPanel({store,id,actorId,canManage,canEdit,request,onChange,onSave,businessMode=false}: {
   store:OwnedContentDrafts;id:string;actorId:string;canManage:boolean;canEdit:boolean;request:ContentRequest;
   onChange:()=>void;onSave:()=>Promise<void>;
+  businessMode?:boolean;
 }){
   const [members,setMembers]=useState<Value[]>([]),[assignee,setAssignee]=useState('');
   const [history,setHistory]=useState<Value[]>([]),[comments,setComments]=useState<Value[]>([]),[body,setBody]=useState('');
@@ -36,8 +37,8 @@ export function OwnedContentPanel({store,id,actorId,canManage,canEdit,request,on
   }
   const person=(userId:string|null)=>members.find(m=>m.id===userId)?.nickname||(userId===actorId?'我':userId||'待分配');
   return <section className="collaboration-panel" aria-label={store.kind==='chapter'?'章节协作':'剧本协作'}>
-    <p><b>{labels[entry.state]}</b> · r{value.revision} · 分配代际 {value.assignment_epoch} · 负责人：{person(value.assignee_id)}</p>
-    {!editable&&<p>只读。管理者须明确接管，才能编辑他人负责的正文。</p>}
+    <p><b>{labels[entry.state]}</b> · 版本 {value.revision} · 负责人：{person(value.assignee_id)}</p>
+    {!editable&&<p>当前只读。{businessMode?<><a href={`/workflow?production=${encodeURIComponent(productionId)}`}>请在作品分工中确认编剧职责与负责人</a>；已有草稿可以保留或复制。</>:'管理者须明确接管，才能编辑他人负责的正文。'}</p>}
     {(error||entry.error)&&<p role="alert" className="error">{error||entry.error}</p>}
     {path&&entry.state!=='saved'&&<div>
       <button disabled={busy||!!entry.flight} onClick={()=>void run(async()=>{
@@ -53,14 +54,14 @@ export function OwnedContentPanel({store,id,actorId,canManage,canEdit,request,on
           store.drafts.resolve(id,store.row(id,comparison),'keep-draft');setComparison(null);onChange();await onSave();
         })}>已比较，明确提交此草稿</button></>}
     </div>}
-    {path&&canManage&&<div className="collaboration-actions">
+    {path&&canManage&&<details open={businessMode?undefined:true}><summary>制片人高级异常处理</summary><p>特殊转交会撤销旧负责人的写入资格。日常请通过作品分工安排工作。</p><div className="collaboration-actions">
       <select aria-label="内容负责人" value={assignee} disabled={busy||!clean} onChange={e=>setAssignee(e.target.value)}>
         <option value="">待分配</option><option value={actorId}>我</option>
         {members.filter(m=>m.id!==actorId).map(m=><option key={m.id} value={m.id}>{m.nickname} · {m.role}</option>)}
       </select>
       <button disabled={busy||!clean} onClick={()=>void run(()=>command('assign',{assignee_id:assignee||null}))}>确认分配</button>
       <button disabled={busy||!clean} onClick={()=>void run(()=>command('assign',{assignee_id:actorId}))}>明确接管到我</button>
-    </div>}
+    </div></details>}
     {path&&store.kind==='chapter'&&<div className="collaboration-actions">
       <button disabled={busy||!clean||!editable} onClick={()=>void run(()=>command('review',{action:'submit'}))}>提交章节审核</button>
       <button disabled={busy||!clean||!canManage||value.status!=='pending_review'} onClick={()=>void run(()=>command('review',{action:'approve'}))}>确认章节</button>

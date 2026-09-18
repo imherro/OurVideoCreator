@@ -11,7 +11,12 @@ from . import collaboration as collab, identity, store as s
 def production_scope(c,production_id,needed='viewer',*,write=False):
     if write:collab.lock_identity(c)
     actor=collab.live_principal(c)
-    identity.require_production(c,actor,production_id,needed)
+    if needed in {'writer', 'source_writer'}:
+        from . import business_roles
+        identity.require_production(c,actor,production_id,'viewer')
+        business_roles.require_writer(c,production_id,planning=needed=='writer')
+    else:
+        identity.require_production(c,actor,production_id,needed)
     return c.execute('SELECT id,workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
 
 
@@ -93,13 +98,20 @@ def assign(c,production_id,kind,target_id,revision,assignment_epoch,assignee_id)
         actor=identity.Principal(assignee_id,'','','user','',0)
         if not user or not identity.can_production(c,actor,production_id,'editor'):
             raise HTTPException(422,'负责人必须是有效作品编辑成员')
+        from . import business_roles
+        if business_roles.workflow(c,production_id):
+            business_roles.require_role(c,production_id,'writer',user_id=assignee_id)
     history_before(c,row,'assign')
     table,key=('episode_scripts','project_id') if kind=='script' else ('source_chapters','id')
     c.execute(f'''UPDATE {table} SET assignee_id=%s,assignment_epoch=assignment_epoch+1,
         revision=revision+1,updated_by=%s,updated=%s WHERE {key}=%s''',
         (assignee_id,identity.current().user_id,time.time(),target_id))
     latest=load(c,production_id,kind,target_id)
-    notify(c,latest,'assign');return public(latest)
+    notify(c,latest,'assign')
+    from . import business_roles
+    if business_roles.workflow(c,production_id):
+        business_roles._changed(c,production_id,'advanced.assign',{'kind':kind,'id':target_id})
+    return public(latest)
 
 
 def revoke(c,user_id,*,production_id=None,workspace_id=None,lost_access_only=False):

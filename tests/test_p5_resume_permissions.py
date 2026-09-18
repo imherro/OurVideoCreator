@@ -7,15 +7,14 @@ from backend import store as s
 from tests.test_p5_object_transactions import team,admin,clients,clear_auth_rate_limits,url,version,save
 from tests.test_p5_canonical_integration import node
 from tests.test_p5_object_candidates import submit
-from tests.test_p5_relation_candidates import extraction
+from tests.test_p5_relation_candidates import extraction,publish_candidate_model
 from tests.test_p5_owned_content import create_chapter,save as save_owned
-from tests.platform_model_helpers import publish_test_model
 from tests.test_p3_r2_interleavings import wait_for_db_waiters
 
 
 def interrupted(team):
     row=node(team,team['a'],'resume-node');model=uuid.uuid4().hex
-    publish_test_model(team['admin'],model)
+    publish_candidate_model(team,model)
     response=submit(team,row,model);assert response.status_code==200,response.text
     job=response.json()
     assert s.job_update(job['id'],status='interrupted',error='synthetic interruption')
@@ -53,7 +52,7 @@ def test_old_snapshot_cannot_be_requeued_after_edit_or_assignment_aba(team,chang
 
 
 def test_relational_retry_requires_current_chapter_owner_and_original_revision(team):
-    row=create_chapter(team);model=uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    row=create_chapter(team);model=uuid.uuid4().hex;publish_candidate_model(team,model)
     response=extraction(team,[row],model);assert response.status_code==200,response.text
     job=response.json()['jobs'][0];assert s.job_update(job['id'],status='interrupted')
     assert team['admin'].post(path(job)).status_code==403
@@ -82,7 +81,7 @@ def test_resume_rechecks_after_real_pg_object_lock_wait(team):
 
 def test_remote_resume_keeps_original_handle_and_allows_edits_but_not_reassignment(team):
     model=uuid.uuid4().hex
-    publish_test_model(team['admin'],model,kind='video',provider_type='minimax',upstream_model='MiniMax-Hailuo-2.3')
+    publish_candidate_model(team,model,kind='video',provider_type='minimax',upstream_model='MiniMax-Hailuo-2.3')
     response=team['a'].post(url(team),json={'kind':'node','content':{'node':{
         'id':'remote-video','type':'media','data':{'kind':'video','prompt':'saved prompt'}}}})
     assert response.status_code==201,response.text

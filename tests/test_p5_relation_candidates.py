@@ -18,6 +18,19 @@ SCRIPT={'title':'Generated title','synopsis':'Generated summary','body':'Generat
         'estimatedDuration':15,'characters':['A'],'scenes':['room'],'props':[]}
 
 
+def publish_candidate_model(team, model, **kwargs):
+    """Publish after fixture creation, then explicitly add to its frozen model pool."""
+    result=publish_test_model(team['admin'],model,**kwargs)
+    production=team['admin'].get(base(team)).json()
+    pool=production['context']['modelPool']
+    kind=kwargs.get('kind','text')
+    pool[kind]=[*pool[kind],{'model_id':model}]
+    response=team['admin'].patch(base(team)+'/context',json={
+        'expected_revision':production['revision'],'patch':{'modelPool':pool}})
+    assert response.status_code==200,response.text
+    return result
+
+
 def extraction(team,chapters,model,actor=None):
     return (actor or team['a']).post(base(team)+'/source-extractions',json={
         'project_id':team['pid'],'chapter_ids':[row['id'] for row in chapters],
@@ -45,7 +58,7 @@ def test_late_chapter_http_result_stays_candidate_until_explicit_current_owner_a
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     monkeypatch.setenv('OVC_PROVIDER_EGRESS_EXCEPTIONS',json.dumps([{'scheme':'http','host':'127.0.0.1','ip':'127.0.0.1','port':port}]))
     model='candidate-'+uuid.uuid4().hex
-    publish_test_model(team['admin'],model,url=f'http://127.0.0.1:{port}/v1')
+    publish_candidate_model(team,model,url=f'http://127.0.0.1:{port}/v1')
     try:
         submitted=extraction(team,[chapter],model);assert submitted.status_code==200,submitted.text
         job=submitted.json()['jobs'][0]
@@ -94,7 +107,7 @@ def test_late_chapter_http_result_stays_candidate_until_explicit_current_owner_a
 
 def test_source_batch_mixed_owner_creates_no_jobs(team):
     a=create_chapter(team);b=create_chapter(team,team['b'])
-    model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model='candidate-'+uuid.uuid4().hex;publish_candidate_model(team,model)
     before=team['a'].get('/api/projects/'+team['pid']+'/jobs').json()
     response=extraction(team,[a,b],model)
     assert response.status_code==403,response.text
@@ -125,7 +138,7 @@ def complete_without_network(monkeypatch,job,value):
 def test_script_generation_freezes_owner_and_sources_then_adopts_without_auto_write(team,monkeypatch):
     from tests.test_p5_owned_content import content
     chapter=create_chapter(team);approved_plan(team,chapter);script=content(team,'script')
-    model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model='candidate-'+uuid.uuid4().hex;publish_candidate_model(team,model)
     body={'episode_nos':[1],'model_id':model,'submission_id':'script-'+uuid.uuid4().hex}
     assert team['admin'].post(base(team)+'/script-generations',json=body).status_code==403
     response=team['a'].post(base(team)+'/script-generations',json=body)
@@ -146,7 +159,7 @@ def test_script_generation_freezes_owner_and_sources_then_adopts_without_auto_wr
 @pytest.mark.parametrize('accepted_video',[False,True])
 def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(team,monkeypatch,accepted_video):
     chapter=create_chapter(team)
-    model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model='candidate-'+uuid.uuid4().hex;publish_candidate_model(team,model)
     extracted=extraction(team,[chapter],model).json()['jobs'][0]
     complete_without_network(monkeypatch,extracted,{'events':[EVENT]})
     accepted=team['a'].post(candidate_path(team,extracted)+'/adopt',json=expected(chapter))
@@ -185,7 +198,7 @@ def test_adaptation_worker_keeps_candidate_and_editor_cannot_generate_or_adopt(t
 
 def test_two_candidates_same_revision_pg_waiters_only_one_adoption(team,monkeypatch):
     chapter=create_chapter(team)
-    model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model='candidate-'+uuid.uuid4().hex;publish_candidate_model(team,model)
     jobs=[]
     # Generate sequentially without adopting: completed candidates may coexist
     # at one revision, but a second active extraction is now rejected.
@@ -215,7 +228,7 @@ def test_two_candidates_same_revision_pg_waiters_only_one_adoption(team,monkeypa
 def test_script_candidate_rejects_changed_source_snapshot_without_partial_adoption(team,monkeypatch,change):
     from tests.test_p5_owned_content import content
     chapter=create_chapter(team);approved_plan(team,chapter);script=content(team,'script')
-    model='candidate-'+uuid.uuid4().hex;publish_test_model(team['admin'],model)
+    model='candidate-'+uuid.uuid4().hex;publish_candidate_model(team,model)
     response=team['a'].post(base(team)+'/script-generations',json={
         'episode_nos':[1],'model_id':model,'submission_id':'script-'+uuid.uuid4().hex})
     assert response.status_code==200,response.text

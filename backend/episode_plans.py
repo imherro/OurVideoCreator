@@ -125,7 +125,9 @@ def freeze_target(connection,project_id,body,production):
     if marker.get('dependencyFingerprint')!=current['adaptation_generation']['dependencyFingerprint']:
         raise HTTPException(409,'单集规划依赖已变化，请重新提交')
     body.input.update(current)  # Rebuild prompt, schema and allowed IDs even for generic jobs.
-    return {'target':{'kind':'adaptation','id':production['id'],'revision':production['revision'],'assignment_epoch':0}}
+    from .business_roles import planning_epoch
+    return {'target':{'kind':'adaptation','id':production['id'],'revision':production['revision'],
+                      'assignment_epoch':planning_epoch(c,production['id'])}}
 
 
 def adopt_candidate(connection,job,production):

@@ -270,6 +270,12 @@ def production_role(connection, principal: Principal, production_id: str) -> tup
 
 def can_production(connection, principal: Principal, production_id: str, needed: str = 'viewer') -> bool:
     workspace_role, role = production_role(connection, principal, production_id)
+    from . import business_roles
+    if business_roles.workflow(connection, production_id):
+        if workspace_role is None or (workspace_role != 'owner' and role is None):
+            return False
+        business = business_roles.roles(connection, production_id, principal.user_id)
+        return needed == 'viewer' or (bool(business) if needed == 'editor' else 'producer' in business)
     if workspace_role == 'owner':
         return True
     if workspace_role is None:
@@ -285,8 +291,7 @@ def require_production(connection, principal: Principal, production_id: str, nee
     if not visible:
         # Do not disclose that a cross-workspace or unassigned Production ID exists.
         raise HTTPException(404, '资源不存在或无权访问')
-    level = 3 if workspace_membership == 'owner' else _ROLE_LEVEL.get(production_membership or '', 0)
-    if level < _ROLE_LEVEL[needed]:
+    if not can_production(connection, principal, production_id, needed):
         raise HTTPException(403, '当前作品角色无权执行此操作')
 
 
@@ -383,6 +388,16 @@ def authorize_request(request: Request, principal: Principal) -> None:
                 needed = 'viewer'
             if suffix.endswith('/approve') or suffix.endswith('/needs-changes'):
                 needed = 'manager'
+            if method != 'GET' and suffix.startswith('adaptation/'):
+                from . import business_roles
+                if business_roles.workflow(connection, production_id):
+                    # Internal adaptation preparation belongs to the default writer,
+                    # not a producer approval stage. The endpoint rechecks after locks.
+                    needed = 'editor'
+            if (method == 'POST' and suffix == 'chapters/trash') or (method == 'DELETE' and re.fullmatch(r'(chapters|sources)/[^/]+',suffix)):
+                from . import business_roles
+                if business_roles.workflow(connection,production_id):
+                    needed = 'editor'  # Endpoint checks writer plus each chapter's owner/version.
             require_production(connection, principal, production_id, needed)
             return
         if project_match:

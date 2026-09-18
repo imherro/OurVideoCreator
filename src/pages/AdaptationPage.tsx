@@ -23,7 +23,7 @@ const planningContent=(value:Value)=>JSON.stringify([value.adaptationPlan,value.
 
 export function AdaptationPage({
   productionId, projectId, focusedEpisodeNo, onSelectEpisode, providers, defaultTarget, refreshKey = 0,
-  request, notify, report, onDirtyChange, onRevision, onOpenSource,
+  request, notify, report, onDirtyChange, onRevision, onOpenSource, canEdit = false,
 }: {
   productionId: string; projectId: string; providers: Value[]; defaultTarget?: Value; refreshKey?: number;
   request: (path: string, options?: RequestInit) => Promise<any>;
@@ -33,6 +33,7 @@ export function AdaptationPage({
   onDirtyChange: (dirty: boolean) => void;
   onRevision: (revision: number) => void;
   onOpenSource: () => void;
+  canEdit?: boolean;
 }) {
   const [draft, setDraft] = useState<Value | null>(null);
   const [chapters, setChapters] = useState<Value[]>([]);
@@ -198,15 +199,16 @@ export function AdaptationPage({
       <div className="settings-actions">
         <span className={`workflow-status ${draft.adaptationPlan.status}`}>{STATUS_LABELS[draft.adaptationPlan.status] || draft.adaptationPlan.status}</span>
         <button disabled={busy} onClick={() => run(refreshPlanning)}><RefreshCw size={15} />刷新</button>
-        <button disabled={busy} onClick={() => run(save)}><Save size={15} />保存草稿</button>
-        <button disabled={busy||dirty} onClick={() => run(() => transition("review"))}>提交审核</button>
-        <button className="primary" disabled={busy || dirty || draft.adaptationPlan.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
+        <button disabled={busy||!canEdit} onClick={() => run(save)}><Save size={15} />保存草稿</button>
+        <button disabled={busy||dirty||!canEdit} onClick={() => run(() => transition("review"))}>提交审核</button>
+        <button className="primary" disabled={busy || !canEdit || dirty || draft.adaptationPlan.status !== "review"} onClick={() => run(() => transition("approve"))}><Check size={15} />批准</button>
       </div>
     </header>
+    {!canEdit&&<p className="notice">当前为只读查看。五角色作品由默认编剧维护改编策划，请在<a href={`/workflow?production=${encodeURIComponent(productionId)}`}>作品分工</a>中确认负责人。</p>}
     {remoteRefreshPending&&<div className="notice"><b>服务器上的改编规划已有更新</b><span>本地未保存草稿没有被覆盖。可以先尝试保存；若版本冲突，请用“刷新”明确放弃本地修改。</span></div>}
     <div className="adaptation-layout"><aside className="episode-plan-list">
       <div className="episode-plan-list-heading"><h3>分集导航</h3><button className="icon-button" title="新增分集规划" aria-label="新增分集规划"
-        disabled={busy||draft.episodePlans.length>=500} onClick={()=>createEpisode()}><Plus size={14}/></button></div>
+        disabled={busy||!canEdit||draft.episodePlans.length>=500} onClick={()=>createEpisode()}><Plus size={14}/></button></div>
       <div className="episode-plan-buttons">{draft.episodePlans.map((item:EpisodePlan)=><button key={item.episodeNo}
         className={active===item.episodeNo?'active':''} onClick={()=>onSelectEpisode(item.episodeNo)}>
         <span>EP{String(item.episodeNo).padStart(2,'0')}</span>{protectedEpisodes.has(item.episodeNo)
@@ -217,12 +219,12 @@ export function AdaptationPage({
         return <div className={assigned.length?'assigned':'unassigned'} key={chapter.id}>
           <span title={chapter.title}>{chapter.display_no??chapter.chapter_no}. {chapter.title}</span>
           {assigned.length?<small>{assigned.map(no=>`EP${String(no).padStart(2,'0')}`).join('、')}</small>:<><small>未分配</small><div>
-            <button disabled={!plan||protectedEpisodes.has(active)} onClick={()=>setPlan({sourceChapterRefs:[...new Set([...(plan?.sourceChapterRefs||[]),chapter.id])]})}>加入当前</button>
-            <button onClick={()=>createEpisode(chapter.id)}>建 EP{String(draft.episodePlans.length+1).padStart(2,'0')}</button>
+            <button disabled={!canEdit||!plan||protectedEpisodes.has(active)} onClick={()=>setPlan({sourceChapterRefs:[...new Set([...(plan?.sourceChapterRefs||[]),chapter.id])]})}>加入当前</button>
+            <button disabled={!canEdit} onClick={()=>createEpisode(chapter.id)}>建 EP{String(draft.episodePlans.length+1).padStart(2,'0')}</button>
           </div></>}
         </div>;
       })}</div>
-    </aside><main className="adaptation-main">
+    </aside><main className="adaptation-main"><fieldset disabled={!canEdit} style={{border:0,padding:0,margin:0,minWidth:0}}>
       <article className="domain-card"><h2>成片规格</h2><div className="domain-fields four">
         <label>总集数<input type="number" min="1" max="500" value={format.episodeCount} onChange={(e) => setFormat("episodeCount", Number(e.target.value))} /></label>
         <label>单集秒数<input list="adaptation-duration-options" type="number" min="1" max="3000" value={format.targetDuration} onChange={(e) => setFormat("targetDuration", Number(e.target.value))} /><datalist id="adaptation-duration-options">{DURATION_OPTIONS.map((value)=><option value={value} key={value}/>)}</datalist></label>
@@ -248,8 +250,10 @@ export function AdaptationPage({
         </div><fieldset className="chapter-reference-field"><legend>原著章节引用</legend>{chapters.map((chapter) => <label className="check-label" key={chapter.id}><input type="checkbox" checked={plan.sourceChapterRefs.includes(chapter.id)} onChange={(e) => setPlan({ sourceChapterRefs: e.target.checked ? [...plan.sourceChapterRefs, chapter.id] : plan.sourceChapterRefs.filter((id) => id !== chapter.id) })} />{chapter.display_no ?? chapter.chapter_no}. {chapter.title}</label>)}</fieldset></div> : <div className="empty-state">请先建立分集规划</div>}
       </article>
       <MonetizationEditor draft={draft} setDraft={setDraft} />
-    </main></div>
+    </fieldset></main></div>
+    <fieldset disabled={!canEdit} style={{border:0,padding:0,margin:0,minWidth:0}}>
     <footer className="domain-generation-bar"><div><b>AI 基于原著生成整个改编工作台</b><small>{draft.sourceEventCount ? `${draft.sourceEventCount} 条原著事件 · 将生成故事骨架、策略、分集规划和商业卡点` : "尚未提取原著事件，请先完成原著分析"}</small></div><label>服务<select value={providerId} onChange={(e) => setProviderId(e.target.value)}><option value="" disabled>请选择平台模型</option>{textProviders.map((item) => <option key={item.id} value={item.id}>外部 API · {item.name}</option>)}</select></label>{!textProviders.length&&<p className="error">暂无可用平台文本模型，请联系管理员。</p>}{draft.sourceEventCount ? <button className="primary" disabled={busy} onClick={() => run(generate)}><Sparkles size={15} />生成整个工作台</button> : <button className="primary" disabled={busy} onClick={onOpenSource}>先提取原著事件</button>}</footer>
+    </fieldset>
   </section></fieldset>;
 }
 

@@ -381,7 +381,7 @@ def mark_adaptation_stale(connection, production_id, *, chapter_ids=(), event_id
 
 
 def seed_episode_scripts(connection, project_id):
-    from . import store as s, identity
+    from . import store as s, identity, business_roles
     rows = connection.execute('''SELECT p.* FROM projects p LEFT JOIN episode_scripts sc ON sc.project_id=p.id
         WHERE p.id=%s AND sc.project_id IS NULL''',(project_id,)).fetchall()
     for project in rows:
@@ -400,7 +400,8 @@ def seed_episode_scripts(connection, project_id):
             project['id'], 'review' if body else 'draft', project['episode_title'] or project['name'], '',
             '[]', '', '{}', body, float(document.get('duration') or 60), '[]', '[]', '[]', None,
             s.dumps(metadata), project['created'], now,
-            identity.current().user_id,identity.current().user_id,identity.current().user_id,
+            business_roles.default_assignee(connection,project['production_id'],'writer',project_id=project_id,
+                legacy_user_id=identity.current().user_id),identity.current().user_id,identity.current().user_id,
         ))
 
 

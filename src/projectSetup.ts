@@ -104,6 +104,7 @@ export function projectSetupPayload(draft: ProjectSetupDraft) {
   const avoidItems = draft.bible.avoidItems.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
   return {
     creation_mode:draft.creationMode,
+    five_role_workflow:true,
     name: draft.name.trim(),
     episode_title: draft.episodeTitle.trim() || "第 01 集",
     style: draft.style.trim(),

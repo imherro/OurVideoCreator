@@ -80,7 +80,10 @@ def expected(row, revision, assignment_epoch):
 def editable(connection, row):
     actor = live_principal(connection)
     identity.require_production(connection, actor, row['production_id'], 'editor')
-    if row['kind'] != 'graph' and row['assignee_id'] != actor.user_id:
+    from . import business_roles
+    business_roles.require_content_role(connection, row)
+    strict_graph = bool(business_roles.workflow(connection, row['production_id']))
+    if (row['kind'] != 'graph' or strict_graph) and row['assignee_id'] != actor.user_id:
         raise HTTPException(403, '仅对象负责人可编辑；管理者须先显式接管')
     return actor
 
@@ -177,7 +180,7 @@ def _visual_document(rows):
     return result
 
 
-def create(connection, project_id, kind, content, *, validated=False):
+def create(connection, project_id, kind, content, *, validated=False, initialization=False):
     validate_content(kind, content)
     if kind=='visual_card' and any((content.get('voice_profile') or {}).get(key) for key in ('referenceAssetId','lockedVersions','defaultVersion')):
         raise HTTPException(422,'新角色须先明确采纳试听再确认声音参考，不能直接导入确认标记')
@@ -207,12 +210,15 @@ def create(connection, project_id, kind, content, *, validated=False):
                               (project_id, kind)).fetchone():
             raise HTTPException(409, '该分集对象已存在')
     actor = live_principal(connection)
+    from . import business_roles
+    assignee_id = business_roles.creation_assignee(connection, scope['production_id'], project_id, kind,
+                                                   initialization=initialization)
     now = time.time()
     row = connection.execute('''INSERT INTO collaboration_objects
         (id,production_id,project_id,kind,object_key,content,assignee_id,created_by,updated_by,created,updated)
         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
         (s.uid('object-'), scope['production_id'], None if kind == 'visual_card' else project_id,
-         kind, key, s.dumps(content), actor.user_id, actor.user_id, actor.user_id, now, now)).fetchone()
+         kind, key, s.dumps(content), assignee_id, actor.user_id, actor.user_id, now, now)).fetchone()
     row['workspace_id'] = scope['workspace_id']
     record(connection, row, 'create', project_id)
     return public(row)
@@ -223,10 +229,10 @@ def initialize_episode(connection, project_id):
     existing = connection.execute('SELECT object_collaboration FROM projects WHERE id=%s', (project_id,)).fetchone()
     if not existing or existing['object_collaboration']:
         return
-    create(connection, project_id, 'graph', {'edges': [], 'positions': {}, 'nodeOrder': [], 'shotOrder': []})
-    create(connection, project_id, 'timeline', {'timeline': {'version': 2, 'backgroundColor': '#000000', 'tracks': []}})
+    create(connection, project_id, 'graph', {'edges': [], 'positions': {}, 'nodeOrder': [], 'shotOrder': []}, initialization=True)
+    create(connection, project_id, 'timeline', {'timeline': {'version': 2, 'backgroundColor': '#000000', 'tracks': []}}, initialization=True)
     create(connection, project_id, 'director', {'stage': {'objects': [], 'views': [], 'camera': {
-        'yaw': 25, 'pitch': 12, 'distance': 8, 'fov': 45, 'targetHeight': 1}}})
+        'yaw': 25, 'pitch': 12, 'distance': 8, 'fov': 45, 'targetHeight': 1}}}, initialization=True)
     connection.execute('UPDATE projects SET object_collaboration=TRUE WHERE id=%s', (project_id,))
 
 
@@ -260,12 +266,18 @@ def assign(connection, project_id, object_id, *, expected_revision, assignment_e
         target_actor = identity.Principal(target['id'], target['phone'], target['nickname'], target['platform_role'], '', 0)
         if not identity.can_production(connection, target_actor, row['production_id'], 'editor'):
             raise HTTPException(422, '负责人必须是有效作品编辑成员')
+        from . import business_roles
+        if business_roles.workflow(connection, row['production_id']):
+            business_roles.require_role(connection, row['production_id'], business_roles.CONTENT_ROLE[row['kind']], user_id=assignee_id)
     updated = connection.execute('''UPDATE collaboration_objects SET assignee_id=%s,
         assignment_epoch=assignment_epoch+1,revision=revision+1,updated_by=%s,updated=%s,
         lease_hash=NULL,lease_user_id=NULL,lease_expires=NULL,lease_epoch=lease_epoch+1
         WHERE id=%s RETURNING *''', (assignee_id, actor.user_id, time.time(), object_id)).fetchone()
     updated['workspace_id'] = row['workspace_id']
     record(connection, updated, 'assign', project_id)
+    from . import business_roles
+    if business_roles.workflow(connection, row['production_id']):
+        business_roles._changed(connection, row['production_id'], 'advanced.assign', {'object_id': object_id})
     return public(updated)
 
 
@@ -408,6 +420,9 @@ def revoke_assignments(connection, user_id, *, production_id=None, workspace_id=
     very same membership/assignee. No old page or lease can revive itself.
     """
     from .owned_content import revoke
+    from . import business_roles
+    business_roles.revoke_membership(connection,user_id,production_id=production_id,
+                                     workspace_id=workspace_id,lost_access_only=lost_access_only)
     revoke(connection,user_id,production_id=production_id,workspace_id=workspace_id,lost_access_only=lost_access_only)
     rows = connection.execute('''SELECT o.*,p.workspace_id FROM collaboration_objects o
         JOIN productions p ON p.id=o.production_id WHERE o.assignee_id=%s AND NOT o.deleted
@@ -543,7 +558,9 @@ def commands(connection, project_id, *, creates, updates, deletes, _action='save
     for item in deletes:
         row = locked[item['id']]
         if not (_action=='script_promote' and row['kind']=='node' and row['id']==_promote_node_id):
-            identity.require_production(connection, actor, row['production_id'], 'manager')
+            from . import business_roles
+            if not business_roles.workflow(connection, row['production_id']):
+                identity.require_production(connection, actor, row['production_id'], 'manager')
         if row['kind'] in {'graph', 'timeline', 'director', 'visual_card'}:
             raise HTTPException(422, '固定对象不可删除；视觉卡请保留版本并标记弃用')
     node_identity_changed = any(

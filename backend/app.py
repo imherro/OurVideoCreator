@@ -51,6 +51,8 @@ from .collaboration_metadata import router as collaboration_metadata_router
 app.include_router(collaboration_metadata_router)
 from .job_candidates import router as job_candidates_router
 app.include_router(job_candidates_router)
+from .workflow_routes import router as workflow_router
+app.include_router(workflow_router)
 PUBLIC = {
     '/api/health', '/api/auth/status', '/api/auth/setup', '/api/auth/login',
     '/api/auth/register', '/api/auth/password-reset',
@@ -478,6 +480,9 @@ def put_production_member(production_id:str,user_id:str,body:ProductionMemberUpd
         identity.lock_identity_invariants(c)
         identity.require_production(c,principal,production_id,'manager')
         production_row=c.execute('SELECT workspace_id FROM productions WHERE id=%s',(production_id,)).fetchone()
+        from . import business_roles
+        if business_roles.workflow(c,production_id):
+            raise HTTPException(409,'此作品已启用五角色，请在作品分工页管理业务角色')
         if not production_row or not c.execute('SELECT 1 FROM workspace_members WHERE workspace_id=%s AND user_id=%s',(production_row['workspace_id'],user_id)).fetchone():
             raise HTTPException(409,'目标用户必须先加入作品所属团队')
         c.execute('''INSERT INTO production_members(production_id,user_id,role,created) VALUES(%s,%s,%s,%s)
@@ -540,6 +545,8 @@ def project(pid):
                 'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
                 'legacy_document_write':False,
             }
+            from . import business_roles
+            value['permissions'].update(business_roles.permission_summary(c,value['production_id'],principal))
     return value
 
 @app.get('/api/projects')
@@ -576,6 +583,8 @@ def production(production_id):
         value['permissions']={'role':'owner' if workspace_role=='owner' else production_role,
                               'can_read':level>=1,'can_generate':level>=2,'can_manage':level>=3,
                               'legacy_document_write':level>=3}
+        from . import business_roles
+        with s.db() as c:value['permissions'].update(business_roles.permission_summary(c,production_id,principal))
     return value
 
 @app.get('/api/productions')
@@ -737,6 +746,7 @@ def create_episode(production_id:str,body:EpisodeCreate):
     return project(pid)
 
 class ProjectCreate(StrictBody):
+    five_role_workflow:bool=False
     creation_mode:str='adaptation'
     name:str=Field(default='未命名短片',max_length=100)
     workspace_id:str|None=None
@@ -829,6 +839,9 @@ def create_project(body:ProjectCreate):
     with s.db() as c:
         workspace_id=_owned_workspace_id(c,body.workspace_id)
         c.execute('INSERT INTO productions(id,name,revision,shared_context,created,updated,workspace_id) VALUES(%s,%s,1,%s,%s,%s,%s)',(production_id,name,s.dumps(context),now,now,workspace_id))
+        if body.five_role_workflow:
+            from . import business_roles
+            business_roles.enable(c,production_id)
         c.execute('''INSERT INTO projects(
             id,name,revision,document,created,updated,production_id,episode_no,episode_title
         ) VALUES(%s,%s,1,%s,%s,%s,%s,1,%s)''',(pid,episode_title,s.dumps(episode_document_from_document(document)),now,now,production_id,episode_title))
@@ -1618,7 +1631,7 @@ def create_source_document(production_id:str,body:SourceCreate):
     source_id=s.uid('source-');now=time.time()
     with s.db() as c:
         from .owned_content import production_scope
-        production_scope(c,production_id,'editor',write=True)
+        production_scope(c,production_id,'source_writer',write=True)
         c.execute('INSERT INTO source_documents VALUES(%s,%s,%s,%s,%s,%s,%s)',(
             source_id,production_id,body.type,body.title.strip(),s.dumps(body.metadata),now,now,
         ))
@@ -1641,8 +1654,10 @@ def _import_source(production_id,body,existing_source_id=None):
     source_id=existing_source_id or s.uid('source-');now=time.time()
     with s.db() as c:
         from .owned_content import production_scope
-        production_scope(c,production_id,'editor',write=True)
+        production_scope(c,production_id,'source_writer',write=True)
         actor=identity.current().user_id
+        from . import business_roles
+        assigned_writer=business_roles.default_assignee(c,production_id,'writer',legacy_user_id=actor)
         if existing_source_id:
             source=c.execute('''SELECT id FROM source_documents WHERE id=%s AND production_id=%s
                 FOR UPDATE''',(source_id,production_id)).fetchone()
@@ -1664,7 +1679,7 @@ def _import_source(production_id,body,existing_source_id=None):
                 revision,created,updated,assignee_id,created_by,updated_by)
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(
                 chapter_id,source_id,number,title,content,number,1,now,now,
-                actor,actor,actor,
+                assigned_writer,actor,actor,
             ))
         count=c.execute('''SELECT COUNT(*) value FROM source_chapters sc WHERE source_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='chapter' AND d.item_id=sc.id)''',(source_id,)).fetchone()['value']
@@ -1675,10 +1690,12 @@ def _import_source(production_id,body,existing_source_id=None):
 def delete_source_document(production_id:str,source_id:str,body:SourceDelete):
     from . import owned_content as owned
     from . import collaboration_lifecycle as lifecycle
+    from . import business_roles
     now=time.time()
     with s.db() as c:
-        lifecycle.authorize(c,'source',source_id)
-        owned.production_scope(c,production_id,'manager',write=True)
+        identity.lock_identity_invariants(c)
+        owned.production_scope(c,production_id,write=True)
+        business_roles.require_chapter_cleanup(c,production_id)
         source=c.execute('SELECT * FROM source_documents WHERE id=%s AND production_id=%s FOR UPDATE',
                          (source_id,production_id)).fetchone()
         if not source:raise HTTPException(404,'原著不存在')
@@ -1687,7 +1704,7 @@ def delete_source_document(production_id:str,source_id:str,body:SourceDelete):
         live_ids=[row['id'] for row in c.execute('''SELECT sc.id FROM source_chapters sc WHERE sc.source_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='chapter' AND d.item_id=sc.id) ORDER BY sc.id''',(source_id,))]
         if set(body.versions)!=set(live_ids):raise HTTPException(409,'章节列表已变化，请重新比较后删除')
-        owned.production_scope(c,production_id,'manager')
+        business_roles.require_chapter_cleanup(c,production_id)
         for chapter_id in live_ids:
             row=owned.load(c,production_id,'chapter',chapter_id,write=True)
             expected=body.versions[chapter_id]
@@ -1714,13 +1731,14 @@ def delete_source_document(production_id:str,source_id:str,body:SourceDelete):
 
 def trash_source_chapters(production_id,chapter_ids,versions):
     from . import owned_content as owned
+    from . import business_roles
     from . import collaboration_lifecycle as lifecycle
     production(production_id);now=time.time()
     chapter_ids=list(dict.fromkeys(chapter_ids))
     if set(versions)!=set(chapter_ids):raise HTTPException(422,'必须提供全部所选章节的版本和分配代际')
     with s.db() as c:
         identity.lock_identity_invariants(c)
-        owned.production_scope(c,production_id,'manager',write=True)
+        business_roles.require_chapter_cleanup(c,production_id)
         for chapter_id in sorted(chapter_ids):
             row=owned.load(c,production_id,'chapter',chapter_id,write=True)
             expected=versions[chapter_id]
@@ -1757,7 +1775,8 @@ def trash_source_chapters(production_id,chapter_ids,versions):
 def delete_source_chapter_batch(production_id:str,body:ChapterTrashCreate):
     if len(set(body.chapter_ids))!=len(body.chapter_ids):raise ValueError('不能重复选择同一章节')
     with s.db() as c:
-        identity.require_production(c,identity.current(),production_id,'manager')
+        from . import business_roles
+        business_roles.require_chapter_cleanup(c,production_id)
     return trash_source_chapters(production_id,body.chapter_ids,body.versions)
 
 @app.delete('/api/productions/{production_id}/chapters/{chapter_id}')
@@ -1783,11 +1802,12 @@ def source_chapters(production_id:str,source_id:str|None=None,q:str=''):
 
 @app.post('/api/productions/{production_id}/sources/{source_id}/chapters')
 def create_source_chapter(production_id:str,source_id:str,body:ChapterCreate):
+    from . import business_roles
     if not body.title.strip():raise ValueError('章节标题不能为空')
     now=time.time()
     with s.db() as c:
         from .owned_content import production_scope
-        production_scope(c,production_id,'editor',write=True)
+        production_scope(c,production_id,'source_writer',write=True)
         source=c.execute('''SELECT * FROM source_documents WHERE id=%s AND production_id=%s
             AND NOT EXISTS(SELECT 1 FROM deleted_items d WHERE d.kind='source' AND d.item_id=source_documents.id)
             FOR UPDATE''',(source_id,production_id)).fetchone()
@@ -1802,7 +1822,7 @@ def create_source_chapter(production_id:str,source_id:str,body:ChapterCreate):
             revision,created,updated,assignee_id,created_by,updated_by)
             VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',(
             chapter_id,source_id,next_no,body.title.strip(),body.content,next_no,1,now,now,
-            actor,actor,actor,
+            business_roles.default_assignee(c,production_id,'writer',legacy_user_id=actor),actor,actor,
         ))
         c.execute('UPDATE source_documents SET updated=%s WHERE id=%s',(now,source_id))
     return next(item for item in source_chapters(production_id,source_id) if item['id']==chapter_id)
@@ -1969,10 +1989,10 @@ def save_adaptation(production_id:str,body:AdaptationSave):
         validate_source_references,protected_episode_nos,
     )
     with s.db() as c:
-        production_scope(c,production_id,'manager',write=True)
+        production_scope(c,production_id,'writer',write=True)
         row=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
-        production_scope(c,production_id,'manager')
+        production_scope(c,production_id,'writer')
         if row['revision']!=body.revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
         context=normalize_production_context(json.loads(row['shared_context']))
         bundle,changed,shared_changed,changed_episodes=prepare_manual_adaptation(context,{
@@ -1994,10 +2014,10 @@ def transition_adaptation(production_id,expected_revision,target,episode_no=None
     from .owned_content import production_scope
     from .adaptation import _persist_production_context,adaptation_bundle,validate_adaptation_bundle,validate_approval_ready,protected_episode_nos
     with s.db() as c:
-        production_scope(c,production_id,'manager',write=True)
+        production_scope(c,production_id,'writer',write=True)
         row=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         if not row:raise HTTPException(404,'Production 不存在')
-        production_scope(c,production_id,'manager')
+        production_scope(c,production_id,'writer')
         if row['revision']!=expected_revision:raise HTTPException(409,'改编策划已在其他页面更新，请重新加载。')
         protected=protected_episode_nos(c,production_id,lock=True)
         if protected and (episode_no is None or episode_no in protected):
@@ -2051,7 +2071,7 @@ def generate_episode_plan(production_id:str,episode_no:int,body:TextGenerationCr
     from .episode_plans import frozen_input
     with s.db() as c:
         job_admission.lock(c)
-        production_scope(c,production_id,'manager',write=True)
+        production_scope(c,production_id,'writer',write=True)
         c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         project=collaboration.project_scope(c,body.project_id,'editor')
         if project['production_id']!=production_id:raise HTTPException(422,'任务分集不属于当前作品')
@@ -2068,7 +2088,7 @@ def generate_adaptation(production_id:str,body:TextGenerationCreate):
     with s.db() as c:
         job_admission.lock(c)
         from . import owned_content as owned
-        owned.production_scope(c,production_id,'manager',write=True)
+        owned.production_scope(c,production_id,'writer',write=True)
         c.execute('SELECT id FROM productions WHERE id=%s FOR UPDATE',(production_id,)).fetchone()
         state=read_project_state(c,body.project_id)
         if not state or state['project']['production_id']!=production_id:

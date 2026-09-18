@@ -7,7 +7,7 @@ import json
 import time
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
-from . import collaboration as collab, owned_content as owned, identity, store as s
+from . import collaboration as collab, owned_content as owned, identity, store as s, business_roles
 from .collaboration_routes import StrictBody
 
 router=APIRouter(prefix='/api/projects/{pid}/candidates')
@@ -50,7 +50,7 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
     if marker.get('adaptationFingerprint')!=adaptation_fingerprint(context):
         raise HTTPException(409,'改编规划已变化，请刷新后重新提交')
     if kind=='adaptation':
-        identity.require_production(c,collab.live_principal(c),production_id,'manager')
+        business_roles.require_writer(c,production_id,planning=True)
         if marker.get('mode')=='episode':
             from .episode_plans import freeze_target
             return freeze_target(c,pid,body,production)
@@ -61,7 +61,8 @@ Other object kinds are cut over separately, never inferred from arbitrary IDs.
             raise HTTPException(422,'改编目标与节点不匹配')
         if marker.get('sourceFingerprint')!=source_fingerprint(source_snapshot(c,production_id)):
             raise HTTPException(409,'原著事件已变化，请重新提交')
-        return {'target':{'kind':kind,'id':production_id,'revision':production['revision'],'assignment_epoch':0}}
+        return {'target':{'kind':kind,'id':production_id,'revision':production['revision'],
+                          'assignment_epoch':business_roles.planning_epoch(c,production_id)}}
     if markers!=['episode_script_generation'] or body.node_id!='episode-script:'+pid:
         raise HTTPException(422,'正式剧本目标与节点不匹配')
     row=owned.load(c,production_id,'script',pid,write=True)
@@ -122,7 +123,9 @@ def authorize_resume(c,job):
     if job.get('provider_job_id'):
         row=current_target(c,job,write=True)
         if target['kind']=='adaptation':
-            identity.require_production(c,collab.live_principal(c),job['production_id'],'manager')
+            business_roles.require_writer(c,job['production_id'],planning=True)
+            if target['assignment_epoch']!=business_roles.planning_epoch(c,job['production_id']):
+                raise HTTPException(409,'作品分工已变化，旧改编任务不能沿用旧权限恢复')
         else:
             collab.editable(c,row)
             collab.expected(row,row['revision'],target['assignment_epoch'])
@@ -142,7 +145,7 @@ def preview(pid:str,jid:str):
     from .adaptation import adaptation_bundle
     with s.db() as c:
         job=load_job(c,pid,jid);row=current_target(c,job)
-        value=({'revision':row['revision'],'assignment_epoch':0,**adaptation_bundle(json.loads(row['shared_context']))}
+        value=({'revision':row['revision'],'assignment_epoch':business_roles.planning_epoch(c,job['production_id']),**adaptation_bundle(json.loads(row['shared_context']))}
                if job['collaboration']['target']['kind']=='adaptation' else
                collab.public(row) if row['kind'] in collab.KINDS else owned.public(row))
         if job['collaboration']['target']['kind']=='chapter':
@@ -152,6 +155,11 @@ def preview(pid:str,jid:str):
         actor=collab.live_principal(c)
         can_adopt=(identity.can_production(c,actor,job['production_id'],'manager') if kind=='adaptation' else
                    identity.can_production(c,actor,job['production_id'],'editor') and row['assignee_id']==actor.user_id)
+        if business_roles.workflow(c,job['production_id']):
+            if kind=='adaptation':
+                can_adopt=business_roles.permission_summary(c,job['production_id'],actor)['can_plan']
+            else:
+                can_adopt=can_adopt and business_roles.CONTENT_ROLE[kind] in business_roles.roles(c,job['production_id'],actor.user_id)
         result={'job':job,'current':value,'can_adopt':can_adopt}
         if job['collaboration'].get('mode')=='storyboard' and job['status']=='succeeded':
             from .storyboard_candidates import impact
@@ -198,8 +206,9 @@ def adopt(pid:str,jid:str,body:Adopt):
             production=c.execute('SELECT * FROM productions WHERE id=%s FOR UPDATE',(job['production_id'],)).fetchone()
         row=current_target(c,job,write=True)
         if kind=='adaptation':
-            identity.require_production(c,collab.live_principal(c),job['production_id'],'manager')
-            if body.assignment_epoch!=0 or row['revision']!=body.expected_revision:raise HTTPException(409,'改编版本已变化')
+            business_roles.require_writer(c,job['production_id'],planning=True)
+            if body.assignment_epoch!=business_roles.planning_epoch(c,job['production_id']) or row['revision']!=body.expected_revision:
+                raise HTTPException(409,'改编版本或作品分工已变化')
         else:owned.authorize(c,row,body.expected_revision,body.assignment_epoch)
         if not body.accept_stale and (body.expected_revision!=target['revision'] or body.assignment_epoch!=target['assignment_epoch']):
             raise HTTPException(409,'目标已修改或重新分配；请先比较候选与当前内容，再明确采纳')

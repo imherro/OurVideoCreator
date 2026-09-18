@@ -94,6 +94,8 @@ import { ImageGenerationSettings } from "./ImageGenerationSettings";
 import {MotionReferenceEditor} from './components/MotionReferenceEditor';
 import {videoModeLabels} from './motionReference';
 import { PlatformModels } from "./PlatformModels";
+import { ProductionWorkflow } from "./ProductionWorkflow";
+import { ProductionAccess } from "./ProductionAccess";
 import { GenerationPolicyPanel } from "./GenerationPolicyPanel";
 import { VisualStylePicker } from "./VisualStylePicker";
 import type { GenerationPolicy } from "./generationPolicy";
@@ -326,10 +328,11 @@ const api = async (path: string, options: RequestInit = {}) => {
                 : {}) },
     });
     if (!r.ok) {
+      const detail = await r.clone().json().then(value => value.detail).catch(() => undefined);
       const error = await readApiErrorMessage(r);
       throw Object.assign(
         new Error(error),
-        { kind: "api", status: r.status, url: requestUrl },
+        { kind: "api", status: r.status, url: requestUrl, detail },
       );
     }
     return await r.json();
@@ -629,19 +632,16 @@ function AdminConsole({ session, onLogout }: { session: Any; onLogout: () => voi
 }
 
 function MembershipConsole({ session, onLogout }: { session: Any; onLogout: () => void }) {
-  const [workspaceId,setWorkspaceId]=useState(session.workspaces?.[0]?.id||''),[members,setMembers]=useState<Any[]>([]),[productions,setProductions]=useState<Any[]>([]),[productionId,setProductionId]=useState(''),[productionMembers,setProductionMembers]=useState<Any[]>([]);
+  const [workspaceId,setWorkspaceId]=useState(session.workspaces?.[0]?.id||''),[members,setMembers]=useState<Any[]>([]),[productions,setProductions]=useState<Any[]>([]);
   const [workspaceUserId,setWorkspaceUserId]=useState(''),[workspaceRole,setWorkspaceRole]=useState('member');
-  const [productionUserId,setProductionUserId]=useState(''),[productionRole,setProductionRole]=useState('viewer'),[error,setError]=useState('');
-  const load=async()=>{try{const [m,p]=await Promise.all([api(`/workspaces/${workspaceId}/members`),api(`/productions?workspace_id=${encodeURIComponent(workspaceId)}`)]);setMembers(m);setProductions(p);setProductionId(p[0]?.id||'');setProductionMembers([]);}catch(e:any){setError(e.message);}};
+  const [error,setError]=useState('');
+  const load=async()=>{try{const [m,p]=await Promise.all([api(`/workspaces/${workspaceId}/members`),api(`/productions?workspace_id=${encodeURIComponent(workspaceId)}`)]);setMembers(m);setProductions(p);}catch(e:any){setError(e.message);}};
   useEffect(()=>{if(workspaceId)void load();},[workspaceId]);
-  useEffect(()=>{if(productionId)api(`/productions/${productionId}/members`).then(setProductionMembers).catch((e:any)=>setError(e.message));},[productionId]);
   const canManageWorkspace=session.workspaces.some((workspace:Any)=>workspace.id===workspaceId&&workspace.role==='owner');
-  const selectedProduction=productions.find((production:Any)=>production.id===productionId);
-  const canManageProduction=selectedProduction?.role==='owner'||selectedProduction?.role==='manager';
   return <div className="admin-page"><header><div><span className="eyebrow">TEAM ACCESS</span><h1>团队与作品成员</h1></div><div><a href="/">返回工作室</a>{session.user?.platform_role==='platform_admin'&&<a href="/admin">平台管理</a>}<button onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出</button></div></header>{error&&<div className="error">{error}</div>}
     <label>团队<select value={workspaceId} onChange={e=>setWorkspaceId(e.target.value)}>{session.workspaces.map((w:Any)=><option key={w.id} value={w.id}>{w.name} · {w.role}</option>)}</select></label>
     <section><h2>团队成员</h2>{canManageWorkspace?<div className="inline-fields"><input placeholder="已注册用户 ID" value={workspaceUserId} onChange={e=>setWorkspaceUserId(e.target.value)}/><select value={workspaceRole} onChange={e=>setWorkspaceRole(e.target.value)}><option value="member">member</option><option value="owner">owner</option></select><button onClick={async()=>{try{setError('');await api(`/workspaces/${workspaceId}/members/${workspaceUserId}`,send('PUT',{role:workspaceRole}));setWorkspaceUserId('');await load();}catch(e:any){setError(e.message);}}}>确认入组</button></div>:<p className="muted">只有团队 owner 可以确认入组或调整团队角色。</p>}<div className="admin-list">{members.map(m=><div key={m.id}><span><b>{m.nickname}</b><small>{m.id} · {m.phone}</small></span><em>{m.role}</em>{canManageWorkspace&&<button className="danger" onClick={async()=>{if(!window.confirm(`确认将 ${m.nickname} 移出团队？其作品权限也会撤销。`))return;try{setError('');await api(`/workspaces/${workspaceId}/members/${m.id}`,send('DELETE'));await load();}catch(e:any){setError(e.message);}}}>移出团队</button>}</div>)}</div></section>
-    <section><h2>作品成员</h2>{productions.length?<select value={productionId} onChange={e=>setProductionId(e.target.value)}>{productions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>:<p className="muted">当前团队没有你可见的作品。</p>}{canManageProduction&&<div className="inline-fields"><input placeholder="团队成员 user_id" value={productionUserId} onChange={e=>setProductionUserId(e.target.value)}/><select value={productionRole} onChange={e=>setProductionRole(e.target.value)}><option value="viewer">viewer</option><option value="editor">editor</option><option value="manager">manager</option></select><button disabled={!productionId} onClick={async()=>{try{setError('');await api(`/productions/${productionId}/members/${productionUserId}`,send('PUT',{role:productionRole}));setProductionUserId('');setProductionMembers(await api(`/productions/${productionId}/members`));}catch(e:any){setError(e.message);}}}>授权作品</button></div>}{productionId&&!canManageProduction&&<p className="muted">只有作品 manager 或团队 owner 可以调整作品成员。</p>}<div className="admin-list">{productionMembers.map(m=><div key={m.id}><b>{m.nickname}</b><code>{m.id}</code><em>{m.role}</em>{canManageProduction&&<button className="danger" onClick={async()=>{if(!window.confirm(`确认移除 ${m.nickname} 的作品权限？`))return;try{setError('');await api(`/productions/${productionId}/members/${m.id}`,send('DELETE'));setProductionMembers(await api(`/productions/${productionId}/members`));}catch(e:any){setError(e.message);}}}>移除作品权限</button>}</div>)}</div></section>
+    <ProductionAccess productions={productions} request={api}/>
   </div>;
 }
 
@@ -662,6 +662,7 @@ function Studio() {
   if (!session) return <Auth onLogin={(value) => setSession(value)} />;
   if (window.location.pathname === "/admin") return <AdminConsole session={session} onLogout={() => setSession(null)} />;
   if (window.location.pathname === "/members") return <MembershipConsole session={session} onLogout={() => setSession(null)} />;
+  if (window.location.pathname === "/workflow") return <ProductionWorkflow request={api} />;
   if (!session.workspaces?.length) return <WaitingForWorkspace session={session} onLogout={() => setSession(null)} />;
   const taskId = new URLSearchParams(window.location.search).get("task");
   if (taskId) return <TaskDetailPage jobId={taskId} request={api} />;
@@ -994,6 +995,19 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       try {
         const data = JSON.parse(e.data);
         const pid = current.current.project?.id;
+        if(data.project_id===pid&&data.type==='workflow'){
+          // Refresh permissions only: role changes must not discard local drafts.
+          void api(`/projects/${pid}`).then(latest=>{
+            const existing=current.current.project;
+            if(!existing||existing.id!==pid)return;
+            const updated={...existing,permissions:latest.permissions};
+            current.current.project=updated;
+            if(collaboration.current!.project)collaboration.current!.project.permissions=latest.permissions;
+            setProject(updated);
+            setWorkflowDataRevision(value=>({source:value.source+1,script:value.script+1,adaptation:value.adaptation+1}));
+            setNotice('作品分工已更新，本地未保存草稿保留。请按当前职责继续操作。');
+          }).catch(report);
+        }
         if(data.project_id===pid&&['chapter','script','source_deleted','source_chapters_deleted'].includes(data.type)){
           setWorkflowDataRevision(value=>({...value,
             source:value.source+Number(data.type!=='script'),
@@ -2399,7 +2413,7 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           <h1>{canCreateProduction ? "创建第一部作品" : "尚未加入作品"}</h1>
           <p>{canCreateProduction ? "先确认视觉风格、画幅、目标时长、默认模型与 Project Bible，再进入 EP01。" : "你已加入团队，但还没有获权作品。请联系团队 owner 将你加入作品。"}</p>
           {canCreateProduction && <button className="primary" onClick={openProjectSetup}><Plus size={17}/>创建第一部作品</button>}
-          <div className="account-actions"><a href="/members">成员管理</a>{session.user?.platform_role==='platform_admin'&&<a href="/admin">平台管理</a>}<button className="quiet" onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出登录</button></div>
+          <div className="account-actions"><a href="/workflow">作品分工</a><a href="/members">成员管理</a>{session.user?.platform_role==='platform_admin'&&<a href="/admin">平台管理</a>}<button className="quiet" onClick={async()=>{await api('/auth/logout',send('POST'));onLogout();}}>退出登录</button></div>
           {error && <div className="error">{error}</div>}
         </>}
         {canCreateProduction && projectSetupOpen && <ProjectSetupDialog
@@ -2789,7 +2803,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           {session.user?.nickname?.slice(0,1)||'我'}
         </button>
       </header>
-      <div className="permission-banner">当前角色：{(project as Any).permissions?.role||'只读'}。按对象分工保存；只能编辑自己负责的内容，管理者修改他人对象前须显式接管。{!project.object_collaboration&&' 此旧测试项目为只读，请创建新的协作项目。'}</div>
+      <div className="permission-banner">{(project as Any).permissions?.workflow_enabled?<>
+        当前职责：{(project as Any).permissions.business_roles.map((role:string)=>({producer:'制片人',writer:'编剧',artist:'资产师',generator:'抽卡师',editor:'剪辑师'} as Any)[role]).join('、')||'只读成员'}。
+        <a href={`/workflow?production=${encodeURIComponent(project.production_id)}`}>查看作品分工与本集负责人</a>。未分配工作时，请先由制片人安排；一人可兼任多种角色。
+      </>:<>当前角色：{(project as Any).permissions?.role||'只读'}。按对象分工保存；只能编辑自己负责的内容，管理者修改他人对象前须显式接管。</>}{!project.object_collaboration&&' 此旧测试项目为只读，请创建新的协作项目。'}</div>
       <GlobalNav
         active={panel}
         taskCount={activeCount}
@@ -2922,8 +2939,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
           />
         ) : workflowStage === "source" ? (
           <SourceLibraryPage
+            businessMode={Boolean((project as Any).permissions?.workflow_enabled)}
             store={sourceDrafts.current} actorId={session.user.id}
-            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
+            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.workflow_enabled
+              ?(project as Any).permissions.business_roles.includes('writer'):(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
             projectId={project.id}
             providers={config.models}
@@ -2936,6 +2955,8 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         ) : workflowStage === "adaptation" ? (
           <AdaptationPage
             key={project.production_id}
+            canEdit={(project as Any).permissions?.workflow_enabled
+              ?Boolean((project as Any).permissions.can_plan):Boolean((project as Any).permissions?.can_manage)}
             productionId={project.production_id}
             projectId={project.id}
             focusedEpisodeNo={planningEpisodeFocus[project.production_id]||project.episode_no}
@@ -2958,9 +2979,11 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         ) : workflowStage === "script" ? (
           <ScriptRoomPage
             onAddEpisode={()=>{const production=productions.find(item=>item.id===project.production_id);if(production)setEpisodeSetupProduction(production);}}
+            businessMode={Boolean((project as Any).permissions?.workflow_enabled)}
             key={project.production_id}
             store={scriptDrafts.current} actorId={session.user.id}
-            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.can_generate!==false}
+            canManage={Boolean((project as Any).permissions?.can_manage)} canEdit={(project as Any).permissions?.workflow_enabled
+              ?(project as Any).permissions.business_roles.includes('writer'):(project as Any).permissions?.can_generate!==false}
             productionId={project.production_id}
             currentEpisodeNo={planningEpisodeFocus[project.production_id]||project.episode_no}
             onFocusEpisode={(episodeNo)=>setPlanningEpisodeFocus(known=>known[project.production_id]===episodeNo
