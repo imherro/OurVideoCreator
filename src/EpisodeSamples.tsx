@@ -1,8 +1,10 @@
 import {useEffect,useRef,useState} from 'react';
+import {SampleReview} from './SampleReview';
 type V=Record<string,any>;
 type Request=(path:string,options?:RequestInit)=>Promise<any>;
 
 export function EpisodeSamples({episodes,request}:{episodes:V[];request:Request}){
+  const video=useRef<HTMLVideoElement>(null);
   const [pid,setPid]=useState(episodes[0]?.id||''),[data,setData]=useState<V|null>(null),[deliveries,setDeliveries]=useState<V[]>([]);
   const [delivery,setDelivery]=useState(''),[selected,setSelected]=useState(''),[file,setFile]=useState<File|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -45,7 +47,8 @@ export function EpisodeSamples({episodes,request}:{episodes:V[];request:Request}
       {data.items.map((item:V)=><option key={item.id} value={item.id}>V{item.version} · {item.original_name}</option>)}</select></label>
       {sample&&<article><h3>样片 V{sample.version}</h3>
         <p>{sample.metadata.timeline_note} · {sample.metadata.frame_count} 帧</p>
-        <video key={sample.id} controls preload="metadata" style={{width:'100%',maxHeight:540}} src={`/api/projects/${pid}/samples/${sample.id}/review`}/>
+        <video ref={video} key={sample.id} controls preload="metadata" style={{width:'100%',maxHeight:540}} src={`/api/projects/${pid}/samples/${sample.id}/review`}/>
+        <SampleReview key={sample.id} pid={pid} sample={sample} samples={data!.items} request={request} video={video}/>
         <p><a href={`/api/projects/${pid}/samples/${sample.id}/original`}>下载 V{sample.version} 原文件</a> · 上传于 {new Date(sample.created*1000).toLocaleString()}</p>
       </article>}
     </>}

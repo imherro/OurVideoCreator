@@ -219,6 +219,8 @@
 | POST `/api/productions/{production_id}/workflow/asset-candidates/{jid}` | 当前默认资产师；核对候选及分工指纹，仅创建新共享资产草稿，记录原任务关联，不授予制作对象权限 |
 | GET `/api/projects/{pid}/deliveries` | 当前作品有效成员查看固定交付版本；无制作写权限要求 |
 | GET `/api/projects/{pid}/samples` | 当前作品有效成员查看样片历史及本集剪辑上传资格 |
+| GET `/api/projects/{pid}/samples/{sid}/review-events` | 当前作品成员；样片归属校验，读取本集版本批注及审批历史 |
+| POST `/api/projects/{pid}/samples/{sid}/review-events` | 制片人批注/解决/退回/批准，本集剪辑负责人回复；身份屏障内复核批注版本、样片前驱和分工修订，追加审计 |
 | POST `/api/projects/{pid}/samples` | 本集有效剪辑负责人；绑定本集交付包，上传/转换前后核对角色、分工修订及样片前驱，追加版本并审计 |
 | GET `/api/projects/{pid}/samples/{sid}/{variant}` | 当前作品有效成员；嵌套样片归属检查，只读审片副本或下载原文件，完整性校验 |
 | GET `/api/projects/{pid}/deliveries/preview` | 当前作品有效成员查看所选镜头、剧本与音频的交付清单和缺失提示 |

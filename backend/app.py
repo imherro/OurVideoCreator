@@ -59,6 +59,8 @@ from .episode_deliveries import router as episode_deliveries_router
 app.include_router(episode_deliveries_router)
 from .storyboard_asset_requests import router as storyboard_asset_requests_router
 app.include_router(storyboard_asset_requests_router)
+from .sample_reviews import router as sample_reviews_router
+app.include_router(sample_reviews_router)
 from .episode_samples import router as episode_samples_router
 app.include_router(episode_samples_router)
 PUBLIC = {
