@@ -7,6 +7,7 @@ import {shotParameters} from './generationParameters';
 import { imageSizeForRatio, VIDEO_FORMATS, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from "./mediaSpecs";
 import {
   planBatchGeneration,
+  assetBatchFeedback,
   type BatchGenerationKind,
 } from "./batchGeneration";
 import { nodeDefaults } from "./nodeDefaults";
@@ -2205,6 +2206,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
       shot_videos: "视频",
     };
     if (!plan.readyIds.length) {
+      if (kind === "assets") {
+        const feedback = assetBatchFeedback(plan, 0);
+        setNotice(feedback.notice);
+        setError(feedback.error);
+        return;
+      }
       const detail = plan.blocked.slice(0, 3).map((item) => `${item.label}：${item.reason}`).join("；");
       report(new Error(detail || `没有需要生成的${names[kind]}`));
       return;
@@ -2236,6 +2243,12 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
         );
         submitted = result.count;
         await refresh(snapshot.project.id);
+      }
+      if (kind === "assets") {
+        const feedback = assetBatchFeedback(plan, submitted, failed);
+        setNotice(feedback.notice);
+        setError(feedback.error);
+        return;
       }
       if (!submitted && failed.length) throw new Error(failed[0]);
       if (kind === "shot_videos") setPanel("jobs");
@@ -2888,10 +2901,10 @@ function Workspace({ session, onLogout }: { session: Any; onLogout: () => void }
                 className="quiet"
                 disabled={busy}
                 onClick={() => void runSmartBatch("assets")}
-                title={`智能生成缺失的资产参考图；${assetBatchPlan.blocked.length} 项尚未满足条件`}
+                title={`仅提交就绪资产；${assetBatchPlan.waiting.length} 个状态资产等待基础图采纳并锁定；${assetBatchPlan.blocked.length} 项需要处理`}
               >
                 <BookOpen size={15} />
-                生成全部资产 <b>{assetBatchPlan.readyIds.length}</b>
+                生成全部资产 <b>{assetBatchPlan.readyIds.length}</b>{assetBatchPlan.waiting.length > 0 && <small> · {assetBatchPlan.waiting.length} 项等待锁定</small>}
               </button>}
               {["images", "canvas"].includes(workflowStage) && <button
                 className="quiet"
