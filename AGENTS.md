@@ -1,5 +1,11 @@
 # OurVideoCreator 项目执行规则
 
+## 当前统一入口（2026-09-19，覆盖下方历史目录约定）
+
+用户明确要求将已验证同步分支合回 master 并统一开发和启动入口。`codex/upstream-sync-20260917` 截至 `ac91cf2` 的提交已通过 fast-forward 合入原目录 master，完整保留历史；后续默认只在 `C:\Users\kunpeng\Documents\ChatGPT\OurVideoCreator` 的 `master` 开发、验证并推送 `origin/master`。旧同步分支保留作历史对照，旧 worktree 对齐统一入口提交后以 detached HEAD 保留，不再作为日常开发或启动入口；不得由旧文档把开发引回旧目录。
+
+本机日常启动使用根目录 `Start-Local.cmd`（或 `Start-Local.ps1`），复用本机已有私有运行配置、验收 PostgreSQL 和媒体，启动 7878 loopback Web 与一个并发为 1 的 Worker。不重新初始化数据库/账号/Key，不自动迁移，不新增付费调用。未完成的上游需求仍按剩余清单分批处理，AI 助手继续暂缓；不需要外部 ChatGPT 审核。统一过程与验证见 `docs/master-entry.md`。
+
 ## 当前接手与选择性同步约定（2026-09-19）
 
 用户指定继续在 `OurVideoCreator-upstream-sync-20260917`、`codex/upstream-sync-20260917` 开发，交接 HEAD 为 `e1da0df1073d58cd88ec7a6ef609fb6dcb86df03`。原目录 master 保留，不 reset/revert/clean、不清库或覆盖用户改动。允许重新 fetch 只读 upstream；历史 `13939a8`、`564dd22` 检查点保留，新检查点与剩余需求见 `docs/upstream-sync/2026-09-19-REMAINING.md`。不整批合并上游，不把审计数量当同步完成数量。

@@ -1,5 +1,13 @@
 # 安影 · OurVideoCreator
 
+## 当前开发与本机启动入口
+
+已验证同步分支（含五角色 R1–R6）已合入 `master`。当前统一使用原目录 `OurVideoCreator`；`OurVideoCreator-upstream-sync-20260917` 保留作历史对照，不再从那里开发或启动。选择性上游同步仍有未完成项，AI 助手暂缓；[剩余清单](docs/upstream-sync/2026-09-19-REMAINING.md) 不等同完成清单。
+
+本机双击 **`Start-Local.cmd`**，或运行 `./Start-Local.ps1 -NoBrowser`。该入口复用本机私有运行配置和现有验收数据，启动 [协作版 7878](http://127.0.0.1:7878) 及一个并发为 1 的 Worker。已有服务会按实例身份复用，不会重新初始化数据库、重置账号、重填 Key 或启动第二个 Worker。只需 Web/Worker 时分别加 `-WebOnly` / `-WorkerOnly`。其他机器没有本机配置时会明确报错，不自动建立空库。
+
+合并与数据保留证据见 [统一入口记录](docs/master-entry.md)。下面“运行”部分是通用环境配置方式；本机日常使用上述入口即可。
+
 安影协作版 AI 视频创作工作室。**当前约定功能范围已通过外部功能验收，功能收尾结束。** P0–P5、P6-SINGLE-01 历史通过保持，FINAL-FUNC-01 集成链路通过；见 [最终外部结论](docs/multiuser-rollout/reviews/FINAL-FUNC-01/ACCEPTANCE.md)。运维/部署/备份恢复暂缓，容量与真实供应商未验，旧 P6 多 Worker、完整配额及自动恢复平台仍延期；不等于生产可用或原九阶段全部条目通过，下一开发任务无。浏览器 Web 与持久任务 Worker 已分离，PostgreSQL 是唯一业务数据库，所有生成只调用显式配置的外部 Provider API。已改为邀请制个人账号、团队及作品授权；不得公网部署或发起未经独立授权的真实付费调用。阶段状态见 [多用户改造索引](docs/multiuser-rollout/README.md)。
 
 ## 运行

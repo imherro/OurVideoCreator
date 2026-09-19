@@ -1,5 +1,7 @@
 # ChatGPT 设计 + Codex 开发协作规则
 
+> 2026-09-19 最新覆盖：用户要求已验证同步分支正式合回 master，统一原目录 OurVideoCreator 开发与启动。当前默认在原目录 master 开发、验证、提交至 origin/master；旧同步 worktree 仅作历史对照。沿用独立完成、无需 ChatGPT 外审的约定，AI 助手暂缓；本机从 Start-Local.cmd 复用现有验收库、媒体和加密凭据启动。下方独立集成分支与保留旧 master 的文字为历史决定，已被本次明确合并授权替代。详见 docs/master-entry.md。
+
 > 2026-09-17 用户最新覆盖：本次上游选择性同步不再需要 ChatGPT 审核，由 Codex 独立分批实现、验证和交付。无需向旧会话发送或等待外部结论，不将自测称为外部 PASS。使用独立 `codex/upstream-sync-20260917` 集成分支，保留 master 验收基线。下面旧流程中外部审核/下发任务的要求在本次任务内暂停，其余权限、安全和简化原则继续有效；具体冻结范围见 AGENTS.md。
 
 你是本项目的开发实现者（Codex）。

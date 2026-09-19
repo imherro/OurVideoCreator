@@ -1,5 +1,7 @@
 # 选择性上游同步：接手检查与剩余清单
 
+> 本日后续用户已授权合回 master 并统一入口：当前开发目录为原 `OurVideoCreator`、分支 master；下文的同步 worktree 是清单接手时快照。见 [统一入口记录](../master-entry.md)。需求状态和 AI 助手暂缓决定保持。
+
 日期：2026-09-19。开发交付标识 READY_FOR_REVIEW；无需外部 ChatGPT 审核，不代表全部上游已同步。
 
 ## 检查点与证据边界
